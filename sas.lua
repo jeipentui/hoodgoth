@@ -46,7 +46,6 @@ local fov = 100
 local showFOV = false
 local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
-local simpleWallcheck = false  -- Новая переменная для упрощенного wallcheck
 local FriendList = {}
 
 -- Добавляем переменные для стабильного aimlock
@@ -138,7 +137,75 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Улучшенная функция проверки видимости цели (wallcheck)
+-- Улучшенная проверка видимости цели (wallcheck)
+local function IsVisible(targetPart)
+    if not targetPart then return false end
+    if not wallCheckEnabled then return true end
+
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    local distance = direction.Magnitude
+    direction = direction.Unit
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    -- Добавляем все части цели в исключения
+    local blacklist = {}
+    if localPlayer.Character then
+        table.insert(blacklist, localPlayer.Character)
+    end
+    
+    local targetChar = targetPart.Parent
+    if targetChar then
+        table.insert(blacklist, targetChar)
+    end
+    
+    params.FilterDescendantsInstances = blacklist
+    params.IgnoreWater = true
+
+    local ray = workspace:Raycast(origin, direction * distance, params)
+
+    -- ничего не поймали → цель видна
+    if not ray then
+        return true
+    end
+
+    local hit = ray.Instance
+
+    -- если луч попал прямо в targetPart → цель видна
+    if hit == targetPart or hit:IsDescendantOf(targetPart.Parent) then
+        return true
+    end
+
+    -- прозрачные части игнорируем
+    if hit.Transparency >= 0.9 then
+        return true
+    end
+
+    -- тонкие декоративные части (например рамки дверей)
+    if hit.Size.X < 0.2 or hit.Size.Y < 0.2 or hit.Size.Z < 0.2 then
+        return true
+    end
+    
+    -- Проверяем другие условия видимости
+    if hit:IsA("BasePart") then
+        -- Нет коллизии
+        if not hit.CanCollide then
+            return true
+        end
+        
+        -- ForceField материал
+        if hit.Material == Enum.Material.ForceField then
+            return true
+        end
+    end
+
+    -- если дошли сюда → заблокировано
+    return false
+end
+
+-- Старая функция для совместимости (можно удалить после тестирования)
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
     
@@ -147,60 +214,25 @@ local function isTargetVisible(targetHead, localChar)
     local rayDistance = rayDir.Magnitude
     rayDir = rayDir.Unit
     
-    -- Если включен упрощенный режим wallcheck
-    if simpleWallcheck then
-        local params = RaycastParams.new()
-        params.FilterDescendantsInstances = {localChar, targetHead.Parent}
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.IgnoreWater = true
-        
-        local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, params)
-        
-        -- Возвращаем true, если луч свободен ИЛИ если попали в проходимый объект
-        if not result then return true end
-        
-        local hit = result.Instance
-        if hit and hit.Parent then
-            local nameLower = hit.Name:lower()
-            local parentLower = hit.Parent.Name:lower()
-            
-            -- Список игнорируемых объектов (двери, окна, проемы и т.д.)
-            local ignorableObjects = {
-                "door", "window", "gate", "arch", "gateway", "passage",
-                "opening", "entrance", "exit", "portal", "frame",
-                "glass", "fence", "railing", "bars", "grill", "mesh"
-            }
-            
-            for _, objName in ipairs(ignorableObjects) do
-                if nameLower:find(objName) or parentLower:find(objName) then
-                    return true  -- Игнорируем этот объект
-                end
-            end
-        end
-        
-        return hit == targetHead or hit:IsDescendantOf(targetHead.Parent)
+    local blacklist = {}
+    if localChar then
+        table.insert(blacklist, localChar)
+    end
+    
+    local targetChar = targetHead.Parent
+    if targetChar then
+        table.insert(blacklist, targetChar)
+    end
+    
+    rayParams.FilterDescendantsInstances = blacklist
+    
+    local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
+    
+    if not result then
+        return true
     else
-        -- Оригинальный сложный wallcheck
-        local blacklist = {}
-        if localChar then
-            table.insert(blacklist, localChar)
-        end
-        
-        local targetChar = targetHead.Parent
-        if targetChar then
-            table.insert(blacklist, targetChar)
-        end
-        
-        rayParams.FilterDescendantsInstances = blacklist
-        
-        local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
-        
-        if not result then
-            return true
-        else
-            local hit = result.Instance
-            return hit == targetHead or hit:IsDescendantOf(targetHead)
-        end
+        local hit = result.Instance
+        return hit == targetHead or hit:IsDescendantOf(targetHead)
     end
 end
 
@@ -219,12 +251,11 @@ local function isValidTarget(plr, targetHead)
     return true
 end
 
--- Получение ближайшей цели к курсору
+-- Получение ближайшей цели к курсору (обновленная с новой функцией видимости)
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
     local mousePos = UIS:GetMouseLocation()
-    local localChar = localPlayer.Character
     
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
@@ -235,7 +266,7 @@ local function getNearestToCursor()
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
                         local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist and isTargetVisible(head, localChar) then
+                        if dist < minDist and IsVisible(head) then
                             minDist = dist
                             nearest = head
                         end
@@ -248,14 +279,14 @@ local function getNearestToCursor()
     return nearest
 end
 
--- Функция для получения/обновления цели
+-- Функция для получения/обновления цели (обновленная с новой функцией видимости)
 local function getTarget()
     -- Если у нас уже есть цель и она все еще валидна
     if currentTarget and targetLocked then
         local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
         if plr and isValidTarget(plr, currentTarget) then
             -- Проверяем, находится ли цель все еще в FOV и видима
-            if isTargetInFOV(currentTarget) and isTargetVisible(currentTarget, localPlayer.Character) then
+            if isTargetInFOV(currentTarget) and IsVisible(currentTarget) then
                 return currentTarget
             else
                 -- Цель вышла из FOV или стала невидимой, сбрасываем
@@ -763,22 +794,6 @@ local WallcheckToggle = RageTab:CreateToggle({
     end,
 })
 
--- НОВАЯ ОПЦИЯ: Простой Wallcheck
-local SimpleWallcheckToggle = RageTab:CreateToggle({
-    Name = "Простой Wallcheck",
-    CurrentValue = false,
-    Flag = "SimpleWallcheckToggle",
-    Callback = function(Value)
-        simpleWallcheck = Value
-        Rayfield:Notify({
-            Title = "Wallcheck Mode",
-            Content = Value and "Простой режим: игнорирует двери и проемы" or "Стандартный режим",
-            Duration = 2,
-            Image = 4483362458,
-        })
-    end,
-})
-
 local FOVSlider = RageTab:CreateSlider({
     Name = "FOV Aim",
     Range = {50, 500},
@@ -1010,7 +1025,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости\nПростой Wallcheck доступен в настройках Ragebot",
+    Content = "Script loaded successfully!\nУлучшенный WallCheck активирован - теперь игнорируются прозрачные объекты и тонкие детали\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
     Duration = 5,
     Image = 4483362458,
 })
