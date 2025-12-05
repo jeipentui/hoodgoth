@@ -137,7 +137,7 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Улучшенная проверка видимости цели (wallcheck)
+-- Улучшенная проверка видимости цели (wallcheck) - НЕ целимся через стены
 local function IsVisible(targetPart)
     if not targetPart then return false end
     if not wallCheckEnabled then return true end
@@ -150,90 +150,38 @@ local function IsVisible(targetPart)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Blacklist
     
-    -- Добавляем все части цели в исключения
+    -- Создаем черный список
     local blacklist = {}
+    
+    -- Добавляем нашего персонажа
     if localPlayer.Character then
         table.insert(blacklist, localPlayer.Character)
     end
     
-    local targetChar = targetPart.Parent
-    if targetChar then
-        table.insert(blacklist, targetChar)
-    end
+    -- НЕ добавляем персонажа цели - хотим проверить, есть ли препятствия
+    -- Если добавить цель в черный список, луч пройдет через нее и мы не узнаем о препятствиях
     
     params.FilterDescendantsInstances = blacklist
     params.IgnoreWater = true
 
+    -- Делаем raycast
     local ray = workspace:Raycast(origin, direction * distance, params)
 
-    -- ничего не поймали → цель видна
+    -- Если ничего не попалось - цель видима
     if not ray then
         return true
     end
 
     local hit = ray.Instance
-
-    -- если луч попал прямо в targetPart → цель видна
+    
+    -- Если луч попал прямо в цель или ее часть - цель видима
     if hit == targetPart or hit:IsDescendantOf(targetPart.Parent) then
         return true
     end
-
-    -- прозрачные части игнорируем
-    if hit.Transparency >= 0.9 then
-        return true
-    end
-
-    -- тонкие декоративные части (например рамки дверей)
-    if hit.Size.X < 0.2 or hit.Size.Y < 0.2 or hit.Size.Z < 0.2 then
-        return true
-    end
     
-    -- Проверяем другие условия видимости
-    if hit:IsA("BasePart") then
-        -- Нет коллизии
-        if not hit.CanCollide then
-            return true
-        end
-        
-        -- ForceField материал
-        if hit.Material == Enum.Material.ForceField then
-            return true
-        end
-    end
-
-    -- если дошли сюда → заблокировано
+    -- Если попали во что-то другое - цель НЕ видима
+    -- НЕ делаем исключений для прозрачных объектов и тонких частей
     return false
-end
-
--- Старая функция для совместимости (можно удалить после тестирования)
-local function isTargetVisible(targetHead, localChar)
-    if not wallCheckEnabled then return true end
-    
-    local rayOrigin = Camera.CFrame.Position
-    local rayDir = targetHead.Position - rayOrigin
-    local rayDistance = rayDir.Magnitude
-    rayDir = rayDir.Unit
-    
-    local blacklist = {}
-    if localChar then
-        table.insert(blacklist, localChar)
-    end
-    
-    local targetChar = targetHead.Parent
-    if targetChar then
-        table.insert(blacklist, targetChar)
-    end
-    
-    rayParams.FilterDescendantsInstances = blacklist
-    
-    local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
-    
-    if not result then
-        return true
-    else
-        local hit = result.Instance
-        return hit == targetHead or hit:IsDescendantOf(targetHead)
-    end
 end
 
 -- Проверка валидности цели
@@ -1025,7 +973,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nУлучшенный WallCheck активирован - теперь игнорируются прозрачные объекты и тонкие детали\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
+    Content = "Script loaded successfully!\nСтрогий WallCheck активирован - теперь НЕ целимся через стены\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
     Duration = 5,
     Image = 4483362458,
 })
