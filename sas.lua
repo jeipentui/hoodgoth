@@ -137,50 +137,34 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Улучшенная проверка видимости цели (wallcheck) - НЕ целимся через стены
-local function IsVisible(targetPart)
-    if not targetPart then return false end
+-- НОВАЯ УЛУЧШЕННАЯ ФУНКЦИЯ ВИДИМОСТИ (НЕ СТРЕЛЯЕТ ЧЕРЕЗ ДВЕРИ/СТЕКЛО/ТОНКИЕ СТЕНЫ)
+local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
+    if not targetHead or not targetHead.Parent then return false end
 
-    local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin)
+    local rayOrigin = Camera.CFrame.Position
+    local predictedPos = getPredictedPosition(targetHead)  -- учитываем предикт
+    local direction = predictedPos - rayOrigin
     local distance = direction.Magnitude
     direction = direction.Unit
 
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    
-    -- Создаем черный список
-    local blacklist = {}
-    
-    -- Добавляем нашего персонажа
-    if localPlayer.Character then
-        table.insert(blacklist, localPlayer.Character)
-    end
-    
-    -- НЕ добавляем персонажа цели - хотим проверить, есть ли препятствия
-    -- Если добавить цель в черный список, луч пройдет через нее и мы не узнаем о препятствиях
-    
-    params.FilterDescendantsInstances = blacklist
-    params.IgnoreWater = true
+    -- Очень важный blacklist: игнорируем только локального игрока и самого врага
+    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-    -- Делаем raycast
-    local ray = workspace:Raycast(origin, direction * distance, params)
+    local result = workspace:Raycast(rayOrigin, direction * distance, rayParams)
 
-    -- Если ничего не попалось - цель видима
-    if not ray then
+    -- Если луч вообще ничего не задел — видно
+    if not result then
         return true
     end
 
-    local hit = ray.Instance
-    
-    -- Если луч попал прямо в цель или ее часть - цель видима
-    if hit == targetPart or hit:IsDescendantOf(targetPart.Parent) then
+    -- Если луч попал в САМУ цель (голову или любую часть её тела) — считаем видимой
+    if result.Instance and result.Instance:IsDescendantOf(targetHead.Parent) then
         return true
     end
-    
-    -- Если попали во что-то другое - цель НЕ видима
-    -- НЕ делаем исключений для прозрачных объектов и тонких частей
+
+    -- Всё остальное (двери, стекло, стены, машины и т.д.) — НЕВИДИМО
     return false
 end
 
@@ -199,11 +183,12 @@ local function isValidTarget(plr, targetHead)
     return true
 end
 
--- Получение ближайшей цели к курсору (обновленная с новой функцией видимости)
+-- Получение ближайшей цели к курсору
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
     local mousePos = UIS:GetMouseLocation()
+    local localChar = localPlayer.Character
     
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
@@ -214,7 +199,7 @@ local function getNearestToCursor()
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
                         local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist and IsVisible(head) then
+                        if dist < minDist and isTargetVisible(head, localChar) then
                             minDist = dist
                             nearest = head
                         end
@@ -227,14 +212,14 @@ local function getNearestToCursor()
     return nearest
 end
 
--- Функция для получения/обновления цели (обновленная с новой функцией видимости)
+-- Функция для получения/обновления цели
 local function getTarget()
     -- Если у нас уже есть цель и она все еще валидна
     if currentTarget and targetLocked then
         local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
         if plr and isValidTarget(plr, currentTarget) then
             -- Проверяем, находится ли цель все еще в FOV и видима
-            if isTargetInFOV(currentTarget) and IsVisible(currentTarget) then
+            if isTargetInFOV(currentTarget) and isTargetVisible(currentTarget, localPlayer.Character) then
                 return currentTarget
             else
                 -- Цель вышла из FOV или стала невидимой, сбрасываем
@@ -973,7 +958,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nСтрогий WallCheck активирован - теперь НЕ целимся через стены\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
+    Content = "Script loaded successfully!\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
     Duration = 5,
     Image = 4483362458,
 })
