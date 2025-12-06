@@ -57,6 +57,11 @@ local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 rayParams.IgnoreWater = true
 
+-- Кеш для DoorBase частей
+local doorBaseCache = {}
+local lastCacheUpdate = 0
+local CACHE_UPDATE_INTERVAL = 5 -- Обновлять кеш каждые 5 секунд
+
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
 fovCircle.Color = fovColor
@@ -137,36 +142,45 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Функция для получения всех DoorBase частей
-local function getDoorBaseParts()
-    local doorParts = {}
+-- Функция для получения всех DoorBase частей (кешированная)
+local function getCachedDoorBaseParts()
+    local currentTime = tick()
     
-    -- Ищем все части с именем DoorBase в workspace
-    local function searchInFolder(folder)
-        for _, obj in pairs(folder:GetChildren()) do
+    -- Обновляем кеш если прошло больше 5 секунд
+    if currentTime - lastCacheUpdate > CACHE_UPDATE_INTERVAL or #doorBaseCache == 0 then
+        doorBaseCache = {}
+        
+        -- Быстрый поиск DoorBase частей
+        for _, obj in pairs(workspace:GetDescendants()) do
             if obj:IsA("BasePart") and obj.Name == "DoorBase" then
-                table.insert(doorParts, obj)
-            elseif obj:IsA("Folder") or obj:IsA("Model") then
-                searchInFolder(obj)
+                table.insert(doorBaseCache, obj)
             end
         end
+        
+        lastCacheUpdate = currentTime
+        -- print("[DoorBase Cache] Обновлен, найдено частей: " .. #doorBaseCache)
     end
     
-    searchInFolder(workspace)
-    return doorParts
+    return doorBaseCache
 end
 
--- Проверка видимости цели (wallcheck) с исключением DoorBase
+-- Проверка видимости цели (wallcheck) с исключением DoorBase (оптимизированная)
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
-    
+    if not targetHead or not targetHead.Parent then return false end
+
     local rayOrigin = Camera.CFrame.Position
     local rayDir = targetHead.Position - rayOrigin
     local rayDistance = rayDir.Magnitude
-    rayDir = rayDir.Unit
     
-    -- Оптимизация: используем глобальный rayParams
+    if rayDistance > 1000 then return false end -- Оптимизация: не проверяем дальние цели
+    
+    rayDir = rayDir.Unit
+
+    -- Создаем blacklist
     local blacklist = {}
+    
+    -- Добавляем персонажей
     if localChar then
         table.insert(blacklist, localChar)
     end
@@ -176,10 +190,13 @@ local function isTargetVisible(targetHead, localChar)
         table.insert(blacklist, targetChar)
     end
     
-    -- Добавляем DoorBase в исключения
-    local doorParts = getDoorBaseParts()
-    for _, doorPart in ipairs(doorParts) do
-        table.insert(blacklist, doorPart)
+    -- Добавляем DoorBase части из кеша
+    if #doorBaseCache > 0 then
+        for _, doorPart in ipairs(doorBaseCache) do
+            if doorPart and doorPart.Parent then
+                table.insert(blacklist, doorPart)
+            end
+        end
     end
     
     rayParams.FilterDescendantsInstances = blacklist
@@ -225,9 +242,12 @@ local function getNearestToCursor()
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
                         local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist and isTargetVisible(head, localChar) then
-                            minDist = dist
-                            nearest = head
+                        if dist < minDist then
+                            -- Проверяем видимость только для ближайшей цели
+                            if isTargetVisible(head, localChar) then
+                                minDist = dist
+                                nearest = head
+                            end
                         end
                     end
                 end
@@ -245,10 +265,10 @@ local function getTarget()
         local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
         if plr and isValidTarget(plr, currentTarget) then
             -- Проверяем, находится ли цель все еще в FOV и видима
-            if isTargetInFOV(currentTarget) and isTargetVisible(currentTarget, localPlayer.Character) then
+            if isTargetInFOV(currentTarget) then
                 return currentTarget
             else
-                -- Цель вышла из FOV или стала невидимой, сбрасываем
+                -- Цель вышла из FOV, сбрасываем
                 currentTarget = nil
                 targetLocked = false
                 return nil
@@ -923,6 +943,11 @@ local DestroyUIButton = MiscTab:CreateButton({
 --==================== Render Loop ====================
 local currentTool
 
+-- Инициализируем кеш DoorBase при старте
+task.spawn(function()
+    getCachedDoorBaseParts()
+end)
+
 RunService.RenderStepped:Connect(function()
     -- FOV Circle
     local mousePos = UIS:GetMouseLocation()
@@ -984,7 +1009,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nDoorBase добавлен в исключения wallcheck\nAimlock теперь будет работать через дверные проемы",
+    Content = "Script loaded successfully!\nDoorBase добавлен в исключения wallcheck\nОптимизировано для устранения лагов",
     Duration = 5,
     Image = 4483362458,
 })
