@@ -57,6 +57,9 @@ local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 rayParams.IgnoreWater = true
 
+-- Кеш для blacklist
+local blacklistCache = {}
+
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
 fovCircle.Color = fovColor
@@ -137,6 +140,21 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
+-- Оптимизированная функция получения blacklist
+local function getBlacklist(localChar, targetChar)
+    local cacheKey = tostring(localChar) .. "_" .. tostring(targetChar)
+    
+    if not blacklistCache[cacheKey] then
+        blacklistCache[cacheKey] = {localChar, targetChar}
+    else
+        local t = blacklistCache[cacheKey]
+        t[1] = localChar
+        t[2] = targetChar
+    end
+    
+    return blacklistCache[cacheKey]
+end
+
 -- Проверка видимости цели (wallcheck) с умным исключением DFrame
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
@@ -146,18 +164,9 @@ local function isTargetVisible(targetHead, localChar)
     local rayDistance = rayDir.Magnitude
     rayDir = rayDir.Unit
     
-    -- Оптимизация: используем глобальный rayParams
-    local blacklist = {}
-    if localChar then
-        table.insert(blacklist, localChar)
-    end
-    
+    -- Оптимизация: используем кешированный blacklist
     local targetChar = targetHead.Parent
-    if targetChar then
-        table.insert(blacklist, targetChar)
-    end
-    
-    rayParams.FilterDescendantsInstances = blacklist
+    rayParams.FilterDescendantsInstances = getBlacklist(localChar, targetChar)
     
     local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
     
@@ -179,10 +188,7 @@ local function isTargetVisible(targetHead, localChar)
             
             if remainingDistance > 0 then
                 -- Добавляем DFrame в игнор для второго raycast
-                local newBlacklist = {}
-                for _, obj in ipairs(blacklist) do
-                    table.insert(newBlacklist, obj)
-                end
+                local newBlacklist = getBlacklist(localChar, targetChar)
                 table.insert(newBlacklist, hit)  -- Игнорируем сам DFrame
                 
                 rayParams.FilterDescendantsInstances = newBlacklist
@@ -308,7 +314,6 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 --==================== ESP System ====================
-local ESP_CornerboxEnabled = false
 local ESP_HPEnabled = false
 local Box_ESP_Enabled = false
 local ESP_NameEnabled = false
@@ -318,26 +323,16 @@ local ESP_MaxDistance = 1500
 local Settings = {ESP_Color=Color3.fromRGB(255,0,0), Friend_Color=Color3.fromRGB(0,255,0)}
 
 -- Таблицы для хранения ESP объектов
-local ESP_Lines = {}
 local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
 local ESP_Boxes = {}
 local partCache = {}
 local characterCache = {} -- Кеш для персонажей игроков
+local viewportCache = {} -- Кеш для WorldToViewportPoint
 
 -- Функция для полной очистки ESP игрока
 local function cleanupPlayerESP(plr)
-    if ESP_Lines[plr] then
-        for _, line in pairs(ESP_Lines[plr]) do
-            if line then
-                line.Visible = false
-                line:Remove()
-            end
-        end
-        ESP_Lines[plr] = nil
-    end
-    
     if ESP_HPText[plr] then
         if ESP_HPText[plr] then
             ESP_HPText[plr].Visible = false
@@ -374,29 +369,33 @@ local function cleanupPlayerESP(plr)
         ESP_Boxes[plr] = nil
     end
     
-    -- Очищаем кеш частей
+    -- Очищаем кеши
     partCache[plr] = nil
     characterCache[plr] = nil
+    viewportCache[plr] = nil
+end
+
+-- Функция для скрытия ESP игрока (без удаления)
+local function hidePlayerESP(plr)
+    if ESP_HPText[plr] then
+        ESP_HPText[plr].Visible = false
+    end
+    if ESP_NameText[plr] then
+        ESP_NameText[plr].Visible = false
+    end
+    if ESP_WeaponText[plr] then
+        ESP_WeaponText[plr].Visible = false
+    end
+    if ESP_Boxes[plr] then
+        ESP_Boxes[plr].box.Visible = false
+        ESP_Boxes[plr].boxoutline.Visible = false
+    end
 end
 
 -- Функция для создания ESP объектов
 local function createESPObjects(plr)
     -- Сначала очищаем старые объекты, если они есть
     cleanupPlayerESP(plr)
-    
-    -- Создаем новые объекты
-    local lines = {}
-    local lineNames = {"TL1", "TL2", "TR1", "TR2", "BL1", "BL2", "BR1", "BR2"}
-    
-    for _, name in ipairs(lineNames) do
-        local line = Drawing.new("Line")
-        line.Visible = false
-        line.Color = Settings.ESP_Color
-        line.Thickness = 2
-        lines[name] = line
-    end
-    
-    ESP_Lines[plr] = lines
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -479,12 +478,75 @@ local function shouldCreateESP(plr)
     return dist <= ESP_MaxDistance
 end
 
+-- Функция для получения углов 3D бокса
+local function get3DBoxCorners(hrp)
+    local cf = hrp.CFrame
+    local size = Vector3.new(4, 6, 1.5)
+
+    return {
+        cf * Vector3.new(-size.X/2, size.Y/2, 0),
+        cf * Vector3.new( size.X/2, size.Y/2, 0),
+        cf * Vector3.new(-size.X/2,-size.Y/2, 0),
+        cf * Vector3.new( size.X/2,-size.Y/2, 0),
+    }
+end
+
+-- Кеширование WorldToViewportPoint точек
+local function cacheViewportPoints(plr)
+    local char = plr.Character
+    if not char then 
+        viewportCache[plr] = nil
+        return 
+    end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        viewportCache[plr] = nil
+        return 
+    end
+    
+    -- Создаем или обновляем кеш
+    if not viewportCache[plr] then
+        viewportCache[plr] = {}
+    end
+    
+    -- Кешируем позицию головы
+    local head = char:FindFirstChild("Head")
+    if head then
+        local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+        viewportCache[plr].head = {pos = Vector2.new(headPos.X, headPos.Y), visible = headVisible, z = headPos.Z}
+    else
+        viewportCache[plr].head = nil
+    end
+    
+    -- Кешируем углы для Box ESP (только если включен Box ESP)
+    if Box_ESP_Enabled then
+        local corners = get3DBoxCorners(hrp)
+        viewportCache[plr].boxCorners = {}
+        
+        for i, corner in ipairs(corners) do
+            local pos, visible = Camera:WorldToViewportPoint(corner)
+            viewportCache[plr].boxCorners[i] = {pos = Vector2.new(pos.X, pos.Y), visible = visible, z = pos.Z}
+        end
+    else
+        viewportCache[plr].boxCorners = nil
+    end
+end
+
 --==================== Update ESP ====================
 local function UpdateESP(plr)
+    -- Проверяем, включен ли вообще какой-либо ESP
+    if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
+        if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
+            hidePlayerESP(plr)
+        end
+        return
+    end
+    
     local char = plr.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
         -- Игрок мертв или нет персонажа - удаляем ESP
-        if ESP_Lines[plr] then
+        if ESP_HPText[plr] then
             cleanupPlayerESP(plr)
         end
         return
@@ -495,15 +557,15 @@ local function UpdateESP(plr)
     
     -- Если игрок ВНЕ зоны видимости
     if dist > ESP_MaxDistance then
-        -- Если у него есть ESP объекты - удаляем их
-        if ESP_Lines[plr] then
-            cleanupPlayerESP(plr)
+        -- Если у него есть ESP объекты - скрываем их
+        if ESP_HPText[plr] then
+            hidePlayerESP(plr)
         end
         return
     end
     
     -- Если игрок В зоне видимости, но ESP объектов нет - создаем их
-    if not ESP_Lines[plr] then
+    if not ESP_HPText[plr] then
         createESPObjects(plr)
     end
     
@@ -519,98 +581,55 @@ local function UpdateESP(plr)
         end
     end
     
+    -- Кешируем точки обзора
+    cacheViewportPoints(plr)
+    
+    -- Если игрока нет на экране - скрываем ESP
+    if not viewportCache[plr] or not viewportCache[plr].head or not viewportCache[plr].head.visible then
+        hidePlayerESP(plr)
+        return
+    end
+    
     local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-    local lines = ESP_Lines[plr]
     local hpText = ESP_HPText[plr]
     local nameText = ESP_NameText[plr]
     local weaponText = ESP_WeaponText[plr]
     local boxes = ESP_Boxes[plr]
     
-    -- Cornerbox
-    if ESP_CornerboxEnabled and lines then
-        local sizeX, sizeY = 1.5, 3
-        local TL3D = hrp.Position + Vector3.new(-sizeX/2, sizeY/2, 0)
-        local TR3D = hrp.Position + Vector3.new(sizeX/2, sizeY/2, 0)
-        local BL3D = hrp.Position + Vector3.new(-sizeX/2, -sizeY/2, 0)
-        local BR3D = hrp.Position + Vector3.new(sizeX/2, -sizeY/2, 0)
-        local TL, onTL = Camera:WorldToViewportPoint(TL3D)
-        local TR, onTR = Camera:WorldToViewportPoint(TR3D)
-        local BL, onBL = Camera:WorldToViewportPoint(BL3D)
-        local BR, onBR = Camera:WorldToViewportPoint(BR3D)
-        
-        if onTL and onTR and onBL and onBR then
-            local offset = math.clamp(1/dist*1000,5,20)
-            
-            lines.TL1.From, lines.TL1.To = Vector2.new(TL.X,TL.Y), Vector2.new(TL.X+offset,TL.Y)
-            lines.TL2.From, lines.TL2.To = Vector2.new(TL.X,TL.Y), Vector2.new(TL.X,TL.Y-offset)
-            lines.TR1.From, lines.TR1.To = Vector2.new(TR.X,TR.Y), Vector2.new(TR.X-offset,TR.Y)
-            lines.TR2.From, lines.TR2.To = Vector2.new(TR.X,TR.Y), Vector2.new(TR.X,TR.Y-offset)
-            lines.BL1.From, lines.BL1.To = Vector2.new(BL.X,BL.Y), Vector2.new(BL.X+offset,BL.Y)
-            lines.BL2.From, lines.BL2.To = Vector2.new(BL.X,BL.Y), Vector2.new(BL.X,BL.Y+offset)
-            lines.BR1.From, lines.BR1.To = Vector2.new(BR.X,BR.Y), Vector2.new(BR.X-offset,BR.Y)
-            lines.BR2.From, lines.BR2.To = Vector2.new(BR.X,BR.Y), Vector2.new(BR.X,BR.Y+offset)
-            
-            for _, line in pairs(lines) do
-                line.Visible = true
-                line.Color = color
-            end
-        else
-            for _, line in pairs(lines) do
-                line.Visible = false
-            end
-        end
-    elseif lines then
-        for _, line in pairs(lines) do
-            line.Visible = false
-        end
-    end
-
-    -- Head Texts
-    local head = char:FindFirstChild("Head")
-    if head then
-        local pos, onScr = Camera:WorldToViewportPoint(head.Position)
+    -- Используем кешированные точки
+    local headCache = viewportCache[plr].head
+    if headCache then
+        local headPos = headCache.pos
         
         -- HP Text
         if ESP_HPEnabled and hpText then
-            if onScr then
-                local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
-                local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
-                hpText.Position = Vector2.new(pos.X + 20, pos.Y)
-                hpText.Text = math.floor(hp) .. " HP"
-                hpText.Color = hpColor
-                hpText.Visible = true
-            else
-                hpText.Visible = false
-            end
+            local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
+            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
+            hpText.Position = Vector2.new(headPos.X + 20, headPos.Y)
+            hpText.Text = math.floor(hp) .. " HP"
+            hpText.Color = hpColor
+            hpText.Visible = true
         elseif hpText then
             hpText.Visible = false
         end
         
         -- Name Text
         if ESP_NameEnabled and nameText then
-            if onScr then
-                nameText.Position = Vector2.new(pos.X, pos.Y - 15)
-                nameText.Text = plr.Name
-                nameText.Color = color
-                nameText.Visible = true
-            else
-                nameText.Visible = false
-            end
+            nameText.Position = Vector2.new(headPos.X, headPos.Y - 15)
+            nameText.Text = plr.Name
+            nameText.Color = color
+            nameText.Visible = true
         elseif nameText then
             nameText.Visible = false
         end
         
         -- Weapon Text
         if ESP_WeaponEnabled and weaponText then
-            if onScr then
-                local tool = char:FindFirstChildOfClass("Tool")
-                weaponText.Position = Vector2.new(pos.X, pos.Y + 15)
-                weaponText.Text = tool and tool.Name or "None"
-                weaponText.Color = color
-                weaponText.Visible = true
-            else
-                weaponText.Visible = false
-            end
+            local tool = char:FindFirstChildOfClass("Tool")
+            weaponText.Position = Vector2.new(headPos.X, headPos.Y + 15)
+            weaponText.Text = tool and tool.Name or "None"
+            weaponText.Color = color
+            weaponText.Visible = true
         elseif weaponText then
             weaponText.Visible = false
         end
@@ -621,40 +640,40 @@ local function UpdateESP(plr)
     end
 
     -- Box ESP
-    if Box_ESP_Enabled and boxes and partCache[plr] then
-        local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
-        local anyVisible = false
+    if Box_ESP_Enabled and boxes then
+        local boxCorners = viewportCache[plr] and viewportCache[plr].boxCorners
         
-        -- Обновляем позиции только кешированных частей
-        for part in pairs(partCache[plr]) do
-            if part.Parent == char then
-                local pos = Camera:WorldToViewportPoint(part.Position)
-                if pos.Z > 0 then
+        if boxCorners then
+            local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
+            local anyVisible = false
+            
+            for _, corner in ipairs(boxCorners) do
+                if corner.visible and corner.z > 0 then
                     anyVisible = true
-                    minX = math.min(minX, pos.X)
-                    minY = math.min(minY, pos.Y)
-                    maxX = math.max(maxX, pos.X)
-                    maxY = math.max(maxY, pos.Y)
+                    minX = math.min(minX, corner.pos.X)
+                    minY = math.min(minY, corner.pos.Y)
+                    maxX = math.max(maxX, corner.pos.X)
+                    maxY = math.max(maxY, corner.pos.Y)
                 end
-            else
-                -- Часть удалена, убираем из кеша
-                partCache[plr][part] = nil
             end
-        end
-        
-        if anyVisible then
-            local w, h = maxX - minX, maxY - minY
-            local pos = Vector2.new(minX, minY)
             
-            boxes.box.Position = pos
-            boxes.box.Size = Vector2.new(w, h)
-            boxes.box.Color = color
-            boxes.box.Visible = true
-            
-            boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
-            boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
-            boxes.boxoutline.Color = color
-            boxes.boxoutline.Visible = true
+            if anyVisible then
+                local w, h = maxX - minX, maxY - minY
+                local pos = Vector2.new(minX, minY)
+                
+                boxes.box.Position = pos
+                boxes.box.Size = Vector2.new(w, h)
+                boxes.box.Color = color
+                boxes.box.Visible = true
+                
+                boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
+                boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
+                boxes.boxoutline.Color = color
+                boxes.boxoutline.Visible = true
+            else
+                boxes.box.Visible = false
+                boxes.boxoutline.Visible = false
+            end
         else
             boxes.box.Visible = false
             boxes.boxoutline.Visible = false
@@ -829,15 +848,6 @@ local ClearFriendsButton = RageTab:CreateButton({
 })
 
 -- ESP Tab
-local CornerboxToggle = ESPTab:CreateToggle({
-    Name = "Cornerbox ESP",
-    CurrentValue = false,
-    Flag = "CornerboxToggle",
-    Callback = function(Value)
-        ESP_CornerboxEnabled = Value
-    end,
-})
-
 local HPToggle = ESPTab:CreateToggle({
     Name = "Health ESP",
     CurrentValue = false,
@@ -923,7 +933,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         -- Очищаем все ESP объекты перед уничтожением
-        for plr, _ in pairs(ESP_Lines) do
+        for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
         end
         fovCircle:Remove()
@@ -935,14 +945,18 @@ local DestroyUIButton = MiscTab:CreateButton({
 local currentTool
 
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle
-    local mousePos = UIS:GetMouseLocation()
-    if showFOV and (mousePos ~= lastMousePos or fov ~= lastFOV) then
-        fovCircle.Position = mousePos
-        fovCircle.Radius = fov
-        fovCircle.Visible = true
-        lastMousePos = mousePos
-        lastFOV = fov
+    -- FOV Circle оптимизация
+    if not aimbotEnabled or not showFOV then
+        fovCircle.Visible = false
+    else
+        local mousePos = UIS:GetMouseLocation()
+        if mousePos ~= lastMousePos or fov ~= lastFOV then
+            fovCircle.Position = mousePos
+            fovCircle.Radius = fov
+            fovCircle.Visible = true
+            lastMousePos = mousePos
+            lastFOV = fov
+        end
     end
 
     -- Aimlock и Autofire
@@ -995,7 +1009,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nDFrame теперь проверяется правильно - aimlock не будет целиться через стены",
+    Content = "Script loaded successfully!\nDFrame теперь проверяется правильно - aimlock не будет целиться через стены\nОптимизация применена: кеширование, минимизация вычислений",
     Duration = 5,
     Image = 4483362458,
 })
