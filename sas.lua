@@ -137,35 +137,61 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- НОВАЯ УЛУЧШЕННАЯ ФУНКЦИЯ ВИДИМОСТИ (НЕ СТРЕЛЯЕТ ЧЕРЕЗ ДВЕРИ/СТЕКЛО/ТОНКИЕ СТЕНЫ)
+-- Функция для получения всех DoorBase частей
+local function getDoorBaseParts()
+    local doorParts = {}
+    
+    -- Ищем все части с именем DoorBase в workspace
+    local function searchInFolder(folder)
+        for _, obj in pairs(folder:GetChildren()) do
+            if obj:IsA("BasePart") and obj.Name == "DoorBase" then
+                table.insert(doorParts, obj)
+            elseif obj:IsA("Folder") or obj:IsA("Model") then
+                searchInFolder(obj)
+            end
+        end
+    end
+    
+    searchInFolder(workspace)
+    return doorParts
+end
+
+-- Проверка видимости цели (wallcheck) с исключением DoorBase
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
-    if not targetHead or not targetHead.Parent then return false end
-
+    
     local rayOrigin = Camera.CFrame.Position
-    local predictedPos = getPredictedPosition(targetHead)  -- учитываем предикт
-    local direction = predictedPos - rayOrigin
-    local distance = direction.Magnitude
-    direction = direction.Unit
-
-    -- Очень важный blacklist: игнорируем только локального игрока и самого врага
-    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local result = workspace:Raycast(rayOrigin, direction * distance, rayParams)
-
-    -- Если луч вообще ничего не задел — видно
+    local rayDir = targetHead.Position - rayOrigin
+    local rayDistance = rayDir.Magnitude
+    rayDir = rayDir.Unit
+    
+    -- Оптимизация: используем глобальный rayParams
+    local blacklist = {}
+    if localChar then
+        table.insert(blacklist, localChar)
+    end
+    
+    local targetChar = targetHead.Parent
+    if targetChar then
+        table.insert(blacklist, targetChar)
+    end
+    
+    -- Добавляем DoorBase в исключения
+    local doorParts = getDoorBaseParts()
+    for _, doorPart in ipairs(doorParts) do
+        table.insert(blacklist, doorPart)
+    end
+    
+    rayParams.FilterDescendantsInstances = blacklist
+    
+    local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
+    
     if not result then
         return true
+    else
+        local hit = result.Instance
+        return hit == targetHead or hit:IsDescendantOf(targetHead)
     end
-
-    -- Если луч попал в САМУ цель (голову или любую часть её тела) — считаем видимой
-    if result.Instance and result.Instance:IsDescendantOf(targetHead.Parent) then
-        return true
-    end
-
-    -- Всё остальное (двери, стекло, стены, машины и т.д.) — НЕВИДИМО
-    return false
 end
 
 -- Проверка валидности цели
@@ -958,7 +984,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nСтабильный aimlock активирован - цель будет удерживаться до выхода из FOV\nESP оптимизирован - автоматически удаляется при выходе из зоны видимости",
+    Content = "Script loaded successfully!\nDoorBase добавлен в исключения wallcheck\nAimlock теперь будет работать через дверные проемы",
     Duration = 5,
     Image = 4483362458,
 })
