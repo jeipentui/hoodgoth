@@ -172,7 +172,8 @@ local function isTargetVisible(targetHead, localChar)
         end
         
         -- Если попали в DoorBase или DFrame - игнорируем (стрелять можно)
-        if hit.Name == "DoorBase" or hit.Name == "DFrame" then
+        -- Если попали в DFrame - игнорируем (стрелять можно)
+        if hit.Name == "DFrame" then
             return true
         end
         
