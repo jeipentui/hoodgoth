@@ -11,21 +11,34 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
--- Window
+-- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "thw club",
     LoadingTitle = "Loading Interface...",
     LoadingSubtitle = "by thw",
-    ConfigurationSaving = {Enabled = true, FolderName = "thw-club", FileName = "config"},
-    KeySystem = false
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "thw-club",
+        FileName = "config"
+    },
+    KeySystem = false,
+    KeySettings = {
+        Title = "Key System",
+        Subtitle = "Enter key",
+        Note = "No method of obtaining the key is provided",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"Key1", "Key2"}
+    }
 })
 
--- Tabs
+-- Create Tabs
 local RageTab = Window:CreateTab("Ragebot")
 local ESPTab = Window:CreateTab("ESP")
 local MiscTab = Window:CreateTab("Misc")
 
---==================== Ragebot ====================
+--==================== Ragebot Variables ====================
 local aimbotEnabled = false
 local autofireEnabled = false
 local keyHeld = false
@@ -34,18 +47,39 @@ local showFOV = false
 local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
-local currentTarget = nil
+
+-- Добавляем переменные для стабильного aimlock
+local currentTarget = nil -- Текущая цель
+local targetLocked = false -- Флаг блокировки цели
+
+-- Глобальный RaycastParams для оптимизации
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+rayParams.IgnoreWater = true
+
+-- Кеш для blacklist
+local blacklistCache = {}
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
 fovCircle.Color = fovColor
 fovCircle.Thickness = 2
-fovCircle.NumSides = 32
+fovCircle.NumSides = 100
+local lastMousePos = Vector2.new()
+local lastFOV = fov
 
+--==================== Weapon Prediction ====================
 local weaponBulletSpeeds = {
-    ["Beretta"] = 1624, ["G-17"] = 1850, ["UZI"] = 2250, ["Mare"] = 2000,
-    ["Deagle"] = 2200, ["SKS"] = 3750, ["M1911"] = 2230, ["AKS-74U"] = 3000,
-    ["FNP-45"] = 1500, ["TEC-9"] = 2100,
+    ["Beretta"] = 1624,
+    ["G-17"] = 1850,
+    ["UZI"] = 2250,
+    ["Mare"] = 2000,
+    ["Deagle"] = 2200,
+    ["SKS"] = 3750,
+    ["M1911"] = 2230,
+    ["AKS-74U"] = 3000,
+    ["FNP-45"] = 1500,
+    ["TEC-9"] = 2100,
 }
 
 local function getCurrentWeaponSpeed()
@@ -64,79 +98,135 @@ local function isFriend(plr)
     return false
 end
 
+--==================== Downed Check ====================
 local function isTargetDowned(targetCharacter)
-    if not targetCharacter then return false end
     local targetName = targetCharacter.Name
     local charStat = CharStats:FindFirstChild(targetName)
     if not charStat then return false end
     local downedValue = charStat:FindFirstChild("Downed")
-    return downedValue and downedValue:IsA("BoolValue") and downedValue.Value
+    if downedValue and downedValue:IsA("BoolValue") then
+        return downedValue.Value
+    end
+    return false
 end
 
+--==================== Visibility & Prediction ====================
 local function hasSpawnShield(plr)
     return plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
 end
 
+-- Функция проверки находится ли цель в FOV
 local function isTargetInFOV(targetHead)
     if not targetHead then return false end
+    
     local mousePos = UIS:GetMouseLocation()
     local pos, onscreen = Camera:WorldToScreenPoint(targetHead.Position)
+    
     if not onscreen then return false end
-    return (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude <= fov
+    
+    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+    return dist <= fov
 end
 
+-- Оптимизированная функция предсказания
 local function getPredictedPosition(target)
     local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
     if not hrp then return target.Position end
+    
     local dir = hrp.Position - Camera.CFrame.Position
     local dist = dir.Magnitude
     local t = dist / getCurrentWeaponSpeed()
+    
     return target.Position + hrp.Velocity * t
 end
 
-local rayParams = RaycastParams.new()
-rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-rayParams.IgnoreWater = true
+-- Оптимизированная функция получения blacklist
+local function getBlacklist(localChar, targetChar)
+    local cacheKey = tostring(localChar) .. "_" .. tostring(targetChar)
+    
+    if not blacklistCache[cacheKey] then
+        blacklistCache[cacheKey] = {localChar, targetChar}
+    else
+        local t = blacklistCache[cacheKey]
+        t[1] = localChar
+        t[2] = targetChar
+    end
+    
+    return blacklistCache[cacheKey]
+end
 
+-- Проверка видимости цели (wallcheck) с умным исключением DFrame
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
-    if not targetHead or not localChar then return false end
     
     local rayOrigin = Camera.CFrame.Position
     local rayDir = targetHead.Position - rayOrigin
     local rayDistance = rayDir.Magnitude
     rayDir = rayDir.Unit
     
-    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
+    -- Оптимизация: используем кешированный blacklist
+    local targetChar = targetHead.Parent
+    rayParams.FilterDescendantsInstances = getBlacklist(localChar, targetChar)
+    
     local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
     
-    if not result then return true end
-    
-    local hit = result.Instance
-    if hit == targetHead or hit:IsDescendantOf(targetHead) then return true end
-    
-    if hit.Name == "DFrame" then
-        local newOrigin = result.Position + rayDir * 0.1
-        local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
-        if remainingDistance > 0 then
-            rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent, hit}
-            local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
-            return not secondResult or (secondResult.Instance == targetHead or secondResult.Instance:IsDescendantOf(targetHead))
-        end
+    if not result then
         return true
+    else
+        local hit = result.Instance
+        
+        -- Если попали в цель - видимо
+        if hit == targetHead or hit:IsDescendantOf(targetHead) then
+            return true
+        end
+        
+        -- Если попали в DFrame - проверяем, что за ним
+        if hit.Name == "DFrame" then
+            -- Делаем второй raycast от точки после DFrame
+            local newOrigin = result.Position + rayDir * 0.1  -- Немного отходим от DFrame
+            local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
+            
+            if remainingDistance > 0 then
+                -- Добавляем DFrame в игнор для второго raycast
+                local newBlacklist = getBlacklist(localChar, targetChar)
+                table.insert(newBlacklist, hit)  -- Игнорируем сам DFrame
+                
+                rayParams.FilterDescendantsInstances = newBlacklist
+                local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
+                
+                if not secondResult then
+                    return true  -- Ничего не задели после DFrame
+                else
+                    local secondHit = secondResult.Instance
+                    -- Проверяем, попали ли в цель после DFrame
+                    return secondHit == targetHead or secondHit:IsDescendantOf(targetHead)
+                end
+            else
+                return true  -- DFrame очень близко к цели
+            end
+        end
+        
+        -- Все остальное - невидимо
+        return false
     end
-    
-    return false
 end
 
+-- Проверка валидности цели
 local function isValidTarget(plr, targetHead)
-    if not plr or not plr.Character or isFriend(plr) or not targetHead then return false end
+    if not plr or not plr.Character then return false end
+    if isFriend(plr) then return false end
+    if not targetHead then return false end
+    
     local char = plr.Character
     local humanoid = char:FindFirstChild("Humanoid")
-    if not humanoid or humanoid.Health <= 0 or hasSpawnShield(plr) then return false end
-    return not isTargetDowned(char)
+    if not humanoid or humanoid.Health <= 0 then return false end
+    if hasSpawnShield(plr) then return false end
+    if isTargetDowned(char) then return false end
+    
+    return true
 end
 
+-- Получение ближайшей цели к курсору (оптимизированная - только в FOV)
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
@@ -149,33 +239,96 @@ local function getNearestToCursor()
             if char then
                 local head = char:FindFirstChild("Head")
                 if head then
+                    -- 1. Сначала позиция на экране
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
+                        -- 2. Проверка FOV (самое дешевое)
                         local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist and isValidTarget(plr, head) and isTargetVisible(head, localChar) then
-                            minDist = dist
-                            nearest = head
+                        if dist < minDist then
+                            -- 3. Только если в FOV - проверяем валидность цели
+                            if isValidTarget(plr, head) then
+                                -- 4. Только если валидна - проверяем видимость
+                                if isTargetVisible(head, localChar) then
+                                    minDist = dist
+                                    nearest = head
+                                end
+                            end
                         end
                     end
                 end
             end
         end
     end
+
     return nearest
 end
 
+-- Функция для получения/обновления цели (оптимизированная)
+local function getTarget()
+    -- Если у нас уже есть цель и она все еще валидна
+    if currentTarget and targetLocked then
+        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
+        
+        -- Быстрая проверка: если игрока нет - сброс
+        if not plr then
+            currentTarget = nil
+            targetLocked = false
+            return nil
+        end
+        
+        -- 1. Сначала проверка FOV (без валидации)
+        if isTargetInFOV(currentTarget) then
+            -- 2. Только если в FOV - проверяем валидность
+            if isValidTarget(plr, currentTarget) then
+                -- 3. Только если валидна - проверяем видимость
+                if isTargetVisible(currentTarget, localPlayer.Character) then
+                    return currentTarget
+                end
+            end
+        end
+        
+        -- Цель вышла из FOV или стала невалидной, сбрасываем
+        currentTarget = nil
+        targetLocked = false
+        return nil
+    end
+    
+    -- Если нет текущей цели, ищем новую
+    if not currentTarget then
+        local newTarget = getNearestToCursor()
+        if newTarget then
+            currentTarget = newTarget
+            targetLocked = true
+        end
+    end
+    
+    return currentTarget
+end
+
+--==================== Input ====================
 UIS.InputBegan:Connect(function(i,g)
     if not g and i.KeyCode == Enum.KeyCode.X then 
         keyHeld = true 
-        if aimbotEnabled then currentTarget = nil end
+        -- При нажатии на клавишу ищем новую цель
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
+        end
     end
 end)
 
 UIS.InputEnded:Connect(function(i)
-    if i.KeyCode == Enum.KeyCode.X then keyHeld = false end
+    if i.KeyCode == Enum.KeyCode.X then 
+        keyHeld = false 
+        -- При отпускании клавиши сбрасываем цель
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
+        end
+    end
 end)
 
---==================== ESP ====================
+--==================== ESP System ====================
 local ESP_HPEnabled = false
 local Box_ESP_Enabled = false
 local ESP_NameEnabled = false
@@ -184,205 +337,477 @@ local ESP_WeaponEnabled = false
 local ESP_MaxDistance = 1500
 local Settings = {ESP_Color=Color3.fromRGB(255,0,0), Friend_Color=Color3.fromRGB(0,255,0)}
 
+-- Таблицы для хранения ESP объектов
 local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
 local ESP_Boxes = {}
-local ESP_Players = {} -- Массив игроков для ESP
+local partCache = {}
+local characterCache = {} -- Кеш для персонажей игроков
+local viewportCache = {} -- Кеш для WorldToViewportPoint
 
+-- Функция для полной очистки ESP игрока
 local function cleanupPlayerESP(plr)
-    if ESP_HPText[plr] then ESP_HPText[plr]:Remove() ESP_HPText[plr] = nil end
-    if ESP_NameText[plr] then ESP_NameText[plr]:Remove() ESP_NameText[plr] = nil end
-    if ESP_WeaponText[plr] then ESP_WeaponText[plr]:Remove() ESP_WeaponText[plr] = nil end
+    if ESP_HPText[plr] then
+        if ESP_HPText[plr] then
+            ESP_HPText[plr].Visible = false
+            ESP_HPText[plr]:Remove()
+        end
+        ESP_HPText[plr] = nil
+    end
+    
+    if ESP_NameText[plr] then
+        if ESP_NameText[plr] then
+            ESP_NameText[plr].Visible = false
+            ESP_NameText[plr]:Remove()
+        end
+        ESP_NameText[plr] = nil
+    end
+    
+    if ESP_WeaponText[plr] then
+        if ESP_WeaponText[plr] then
+            ESP_WeaponText[plr].Visible = false
+            ESP_WeaponText[plr]:Remove()
+        end
+        ESP_WeaponText[plr] = nil
+    end
+    
     if ESP_Boxes[plr] then
-        if ESP_Boxes[plr].box then ESP_Boxes[plr].box:Remove() end
-        if ESP_Boxes[plr].boxoutline then ESP_Boxes[plr].boxoutline:Remove() end
+        if ESP_Boxes[plr].box then
+            ESP_Boxes[plr].box.Visible = false
+            ESP_Boxes[plr].box:Remove()
+        end
+        if ESP_Boxes[plr].boxoutline then
+            ESP_Boxes[plr].boxoutline.Visible = false
+            ESP_Boxes[plr].boxoutline:Remove()
+        end
         ESP_Boxes[plr] = nil
+    end
+    
+    -- Очищаем кеши
+    partCache[plr] = nil
+    characterCache[plr] = nil
+    viewportCache[plr] = nil
+end
+
+-- Функция для скрытия ESP игрока (без удаления)
+local function hidePlayerESP(plr)
+    if ESP_HPText[plr] then
+        ESP_HPText[plr].Visible = false
+    end
+    if ESP_NameText[plr] then
+        ESP_NameText[plr].Visible = false
+    end
+    if ESP_WeaponText[plr] then
+        ESP_WeaponText[plr].Visible = false
+    end
+    if ESP_Boxes[plr] then
+        ESP_Boxes[plr].box.Visible = false
+        ESP_Boxes[plr].boxoutline.Visible = false
     end
 end
 
+-- Функция для создания ESP объектов
 local function createESPObjects(plr)
+    -- Сначала очищаем старые объекты, если они есть
     cleanupPlayerESP(plr)
+    
+    -- Текст для HP
     local hpText = Drawing.new("Text")
-    hpText.Visible = false hpText.Color = Settings.ESP_Color hpText.Size = 14 hpText.Center = true hpText.Outline = true
+    hpText.Visible = false
+    hpText.Color = Settings.ESP_Color
+    hpText.Size = 14
+    hpText.Center = true
+    hpText.Outline = true
     ESP_HPText[plr] = hpText
     
+    -- Текст для имени
     local nameText = Drawing.new("Text")
-    nameText.Visible = false nameText.Color = Settings.ESP_Color nameText.Size = 9 nameText.Center = true nameText.Outline = true
+    nameText.Visible = false
+    nameText.Color = Settings.ESP_Color
+    nameText.Size = 9
+    nameText.Center = true
+    nameText.Outline = true
     ESP_NameText[plr] = nameText
     
+    -- Текст для оружия
     local weaponText = Drawing.new("Text")
-    weaponText.Visible = false weaponText.Color = Settings.ESP_Color weaponText.Size = 12 weaponText.Center = true weaponText.Outline = true
+    weaponText.Visible = false
+    weaponText.Color = Settings.ESP_Color
+    weaponText.Size = 12
+    weaponText.Center = true
+    weaponText.Outline = true
     ESP_WeaponText[plr] = weaponText
     
-    local box = Drawing.new("Square") box.Visible = false box.Thickness = 1 box.Color = Settings.ESP_Color
-    local boxoutline = Drawing.new("Square") boxoutline.Visible = false boxoutline.Thickness = 1 boxoutline.Color = Settings.ESP_Color
+    -- Box для Box ESP
+    local box = Drawing.new("Square")
+    box.Visible = false
+    box.Thickness = 1
+    box.Color = Settings.ESP_Color
+    
+    local boxoutline = Drawing.new("Square")
+    boxoutline.Visible = false
+    boxoutline.Thickness = 1
+    boxoutline.Color = Settings.ESP_Color
+    
     ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
+    
+    -- Инициализируем кеш частей
+    partCache[plr] = {}
+    characterCache[plr] = plr.Character
+    
+    -- Кешируем части персонажа
+    if plr.Character then
+        for _, part in ipairs(plr.Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
+            end
+        end
+        
+        -- Подключаем обработчик изменения персонажа
+        plr.CharacterAdded:Connect(function(char)
+            characterCache[plr] = char
+            partCache[plr] = {}
+            
+            task.wait(0.1) -- Даем время на загрузку
+            
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    partCache[plr][part] = true
+                end
+            end
+        end)
+    end
 end
 
--- Функция для инициализации игрока в ESP системе
-local function initESPPlayer(plr)
-    if plr == localPlayer then return end
+-- Функция для проверки, нужно ли создать ESP
+local function shouldCreateESP(plr)
+    local char = plr.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
+        return false
+    end
     
-    -- Добавляем игрока в массив
-    ESP_Players[plr] = true
+    local hrp = char.HumanoidRootPart
+    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
     
-    -- Создаем ESP объекты
-    createESPObjects(plr)
+    return dist <= ESP_MaxDistance
+end
+
+-- Функция для получения углов 3D бокса
+local function get3DBoxCorners(hrp)
+    local cf = hrp.CFrame
+    local size = Vector3.new(4, 6, 1.5)
+
+    return {
+        cf * Vector3.new(-size.X/2, size.Y/2, 0),
+        cf * Vector3.new( size.X/2, size.Y/2, 0),
+        cf * Vector3.new(-size.X/2,-size.Y/2, 0),
+        cf * Vector3.new( size.X/2,-size.Y/2, 0),
+    }
+end
+
+-- Кеширование WorldToViewportPoint точек
+local function cacheViewportPoints(plr)
+    local char = plr.Character
+    if not char then 
+        viewportCache[plr] = nil
+        return 
+    end
     
-    -- Обработчик изменения персонажа
-    plr.CharacterAdded:Connect(function(char)
-        task.wait(0.3) -- Даем время на загрузку
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        viewportCache[plr] = nil
+        return 
+    end
+    
+    -- Создаем или обновляем кеш
+    if not viewportCache[plr] then
+        viewportCache[plr] = {}
+    end
+    
+    -- Кешируем позицию головы
+    local head = char:FindFirstChild("Head")
+    if head then
+        local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+        viewportCache[plr].head = {pos = Vector2.new(headPos.X, headPos.Y), visible = headVisible, z = headPos.Z}
+    else
+        viewportCache[plr].head = nil
+    end
+    
+    -- Кешируем углы для Box ESP (только если включен Box ESP)
+    if Box_ESP_Enabled then
+        local corners = get3DBoxCorners(hrp)
+        viewportCache[plr].boxCorners = {}
+        
+        for i, corner in ipairs(corners) do
+            local pos, visible = Camera:WorldToViewportPoint(corner)
+            viewportCache[plr].boxCorners[i] = {pos = Vector2.new(pos.X, pos.Y), visible = visible, z = pos.Z}
+        end
+    else
+        viewportCache[plr].boxCorners = nil
+    end
+end
+
+--==================== Update ESP ====================
+local function UpdateESP(plr)
+    -- Проверяем, включен ли вообще какой-либо ESP
+    if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
+        if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
+            hidePlayerESP(plr)
+        end
+        return
+    end
+    
+    local char = plr.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
+        -- Игрок мертв или нет персонажа - удаляем ESP
+        if ESP_HPText[plr] then
+            cleanupPlayerESP(plr)
+        end
+        return
+    end
+    
+    local hrp = char.HumanoidRootPart
+    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+    
+    -- Если игрок ВНЕ зоны видимости
+    if dist > ESP_MaxDistance then
+        -- Если у него есть ESP объекты - скрываем их
+        if ESP_HPText[plr] then
+            hidePlayerESP(plr)
+        end
+        return
+    end
+    
+    -- Если игрок В зоне видимости, но ESP объектов нет - создаем их
+    if not ESP_HPText[plr] then
         createESPObjects(plr)
-    end)
+    end
     
-    -- Обработчик смерти персонажа
-    local function setupHumanoid()
-        local char = plr.Character
-        if char then
-            local humanoid = char:WaitForChild("Humanoid", 2)
-            if humanoid then
-                humanoid.Died:Connect(function()
-                    task.wait(0.1)
-                    createESPObjects(plr)
-                end)
+    -- Проверяем, не изменился ли персонаж
+    if characterCache[plr] ~= char then
+        characterCache[plr] = char
+        partCache[plr] = {}
+        
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
             end
         end
     end
     
-    if plr.Character then setupHumanoid() end
-    plr.CharacterAdded:Connect(setupHumanoid)
+    -- Кешируем точки обзора
+    cacheViewportPoints(plr)
+    
+    -- Если игрока нет на экране - скрываем ESP
+    if not viewportCache[plr] or not viewportCache[plr].head or not viewportCache[plr].head.visible then
+        hidePlayerESP(plr)
+        return
+    end
+    
+    local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
+    local hpText = ESP_HPText[plr]
+    local nameText = ESP_NameText[plr]
+    local weaponText = ESP_WeaponText[plr]
+    local boxes = ESP_Boxes[plr]
+    
+    -- Используем кешированные точки
+    local headCache = viewportCache[plr].head
+    if headCache then
+        local headPos = headCache.pos
+        
+        -- HP Text
+        if ESP_HPEnabled and hpText then
+            local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
+            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
+            hpText.Position = Vector2.new(headPos.X + 20, headPos.Y)
+            hpText.Text = math.floor(hp) .. " HP"
+            hpText.Color = hpColor
+            hpText.Visible = true
+        elseif hpText then
+            hpText.Visible = false
+        end
+        
+        -- Name Text
+        if ESP_NameEnabled and nameText then
+            nameText.Position = Vector2.new(headPos.X, headPos.Y - 15)
+            nameText.Text = plr.Name
+            nameText.Color = color
+            nameText.Visible = true
+        elseif nameText then
+            nameText.Visible = false
+        end
+        
+        -- Weapon Text
+        if ESP_WeaponEnabled and weaponText then
+            local tool = char:FindFirstChildOfClass("Tool")
+            weaponText.Position = Vector2.new(headPos.X, headPos.Y + 15)
+            weaponText.Text = tool and tool.Name or "None"
+            weaponText.Color = color
+            weaponText.Visible = true
+        elseif weaponText then
+            weaponText.Visible = false
+        end
+    else
+        if hpText then hpText.Visible = false end
+        if nameText then nameText.Visible = false end
+        if weaponText then weaponText.Visible = false end
+    end
+
+    -- Box ESP
+    if Box_ESP_Enabled and boxes then
+        local boxCorners = viewportCache[plr] and viewportCache[plr].boxCorners
+        
+        if boxCorners then
+            local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
+            local anyVisible = false
+            
+            for _, corner in ipairs(boxCorners) do
+                if corner.visible and corner.z > 0 then
+                    anyVisible = true
+                    minX = math.min(minX, corner.pos.X)
+                    minY = math.min(minY, corner.pos.Y)
+                    maxX = math.max(maxX, corner.pos.X)
+                    maxY = math.max(maxY, corner.pos.Y)
+                end
+            end
+            
+            if anyVisible then
+                local w, h = maxX - minX, maxY - minY
+                local pos = Vector2.new(minX, minY)
+                
+                boxes.box.Position = pos
+                boxes.box.Size = Vector2.new(w, h)
+                boxes.box.Color = color
+                boxes.box.Visible = true
+                
+                boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
+                boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
+                boxes.boxoutline.Color = color
+                boxes.boxoutline.Visible = true
+            else
+                boxes.box.Visible = false
+                boxes.boxoutline.Visible = false
+            end
+        else
+            boxes.box.Visible = false
+            boxes.boxoutline.Visible = false
+        end
+    elseif boxes then
+        boxes.box.Visible = false
+        boxes.boxoutline.Visible = false
+    end
 end
 
--- Инициализируем всех существующих игроков
+--==================== Инициализация игроков ====================
+local function initPlayer(plr)
+    if plr == localPlayer then return end
+    
+    -- Создаем ESP объекты только если игрок в зоне видимости
+    if shouldCreateESP(plr) then
+        createESPObjects(plr)
+    end
+    
+    -- Подключаем обработчик смерти/возрождения
+    plr.CharacterAdded:Connect(function(char)
+        if shouldCreateESP(plr) then
+            createESPObjects(plr)
+        end
+    end)
+end
+
+-- Инициализируем существующих игроков
 for _, plr in pairs(Players:GetPlayers()) do
     if plr ~= localPlayer then
-        initESPPlayer(plr)
+        initPlayer(plr)
     end
 end
 
 -- Обработчики добавления/удаления игроков
 Players.PlayerAdded:Connect(function(plr)
     if plr ~= localPlayer then
-        initESPPlayer(plr)
+        initPlayer(plr)
     end
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
     cleanupPlayerESP(plr)
-    ESP_Players[plr] = nil
 end)
 
-local function UpdateESP(plr)
-    if not ESP_Players[plr] then return end
-    
-    local hasAnyESP = ESP_HPEnabled or ESP_NameEnabled or ESP_WeaponEnabled or Box_ESP_Enabled
-    if not hasAnyESP then return end
-    
-    local char = plr.Character
-    if not char then return end
-    
-    local humanoid = char:FindFirstChild("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not hrp or humanoid.Health <= 0 then return end
-    
-    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-    if dist > ESP_MaxDistance then return end
-    
-    local head = char:FindFirstChild("Head")
-    if not head then return end
-    
-    local headPos, onscreen = Camera:WorldToViewportPoint(head.Position)
-    if not onscreen then return end
-    
-    local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-    local screenPos = Vector2.new(headPos.X, headPos.Y)
-    
-    -- HP
-    if ESP_HPEnabled and ESP_HPText[plr] then
-        local hp = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
-        local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/humanoid.MaxHealth)/3,1,1) or color
-        ESP_HPText[plr].Position = Vector2.new(screenPos.X + 20, screenPos.Y)
-        ESP_HPText[plr].Text = math.floor(hp) .. " HP"
-        ESP_HPText[plr].Color = hpColor
-        ESP_HPText[plr].Visible = true
-    elseif ESP_HPText[plr] then ESP_HPText[plr].Visible = false end
-    
-    -- Name
-    if ESP_NameEnabled and ESP_NameText[plr] then
-        ESP_NameText[plr].Position = Vector2.new(screenPos.X, screenPos.Y - 15)
-        ESP_NameText[plr].Text = plr.Name
-        ESP_NameText[plr].Color = color
-        ESP_NameText[plr].Visible = true
-    elseif ESP_NameText[plr] then ESP_NameText[plr].Visible = false end
-    
-    -- Weapon
-    if ESP_WeaponEnabled and ESP_WeaponText[plr] then
-        local tool = char:FindFirstChildOfClass("Tool")
-        ESP_WeaponText[plr].Position = Vector2.new(screenPos.X, screenPos.Y + 15)
-        ESP_WeaponText[plr].Text = tool and tool.Name or "None"
-        ESP_WeaponText[plr].Color = color
-        ESP_WeaponText[plr].Visible = true
-    elseif ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible = false end
+--==================== Fullbright ====================
+local fullbrightEnabled = false
+local originalLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    Ambient = Lighting.Ambient
+}
 
-    -- Box
-    if Box_ESP_Enabled and ESP_Boxes[plr] then
-        local cf = hrp.CFrame
-        local size = Vector3.new(4, 6, 1.5)
-        local corners = {
-            cf * Vector3.new(-size.X/2, size.Y/2, 0),
-            cf * Vector3.new(size.X/2, size.Y/2, 0),
-            cf * Vector3.new(-size.X/2,-size.Y/2, 0),
-            cf * Vector3.new(size.X/2,-size.Y/2, 0)
-        }
-        
-        local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
-        local anyVisible = false
-        
-        for i = 1, 4 do
-            local pos, visible = Camera:WorldToViewportPoint(corners[i])
-            if visible and pos.Z > 0 then
-                anyVisible = true
-                minX = math.min(minX, pos.X) minY = math.min(minY, pos.Y)
-                maxX = math.max(maxX, pos.X) maxY = math.max(maxY, pos.Y)
-            end
-        end
-        
-        if anyVisible then
-            local w, h = maxX - minX, maxY - minY
-            local pos = Vector2.new(minX, minY)
-            ESP_Boxes[plr].box.Position = pos ESP_Boxes[plr].box.Size = Vector2.new(w, h)
-            ESP_Boxes[plr].box.Color = color ESP_Boxes[plr].box.Visible = true
-            ESP_Boxes[plr].boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
-            ESP_Boxes[plr].boxoutline.Size = Vector2.new(w + 2, h + 2)
-            ESP_Boxes[plr].boxoutline.Color = color ESP_Boxes[plr].boxoutline.Visible = true
-        else
-            ESP_Boxes[plr].box.Visible = false ESP_Boxes[plr].boxoutline.Visible = false
-        end
-    elseif ESP_Boxes[plr] then
-        ESP_Boxes[plr].box.Visible = false ESP_Boxes[plr].boxoutline.Visible = false
+local targetLighting = {
+    Brightness = 2,
+    ClockTime = 14,
+    FogEnd = 100000,
+    GlobalShadows = false,
+    Ambient = Color3.fromRGB(255,255,255)
+}
+
+local function enableFullbright()
+    for k, v in pairs(targetLighting) do
+        Lighting[k] = v
+    end
+end
+
+local function disableFullbright()
+    for k, v in pairs(originalLighting) do
+        Lighting[k] = v
     end
 end
 
 --==================== UI Elements ====================
+
+-- Rage Tab
 local AimlockToggle = RageTab:CreateToggle({
-    Name = "Aimlock", CurrentValue = false, Flag = "AimlockToggle",
-    Callback = function(Value) aimbotEnabled = Value if not Value then currentTarget = nil end end,
+    Name = "Aimlock",
+    CurrentValue = false,
+    Flag = "AimlockToggle",
+    Callback = function(Value)
+        aimbotEnabled = Value
+        if not Value then
+            currentTarget = nil
+            targetLocked = false
+        end
+    end,
 })
 
 local AutofireToggle = RageTab:CreateToggle({
-    Name = "Autofire", CurrentValue = false, Flag = "AutofireToggle",
-    Callback = function(Value) autofireEnabled = Value end,
+    Name = "Autofire",
+    CurrentValue = false,
+    Flag = "AutofireToggle",
+    Callback = function(Value)
+        autofireEnabled = Value
+    end,
 })
 
 local WallcheckToggle = RageTab:CreateToggle({
-    Name = "Wallcheck", CurrentValue = true, Flag = "WallcheckToggle",
-    Callback = function(Value) wallCheckEnabled = Value end,
+    Name = "Wallcheck",
+    CurrentValue = true,
+    Flag = "WallcheckToggle",
+    Callback = function(Value)
+        wallCheckEnabled = Value
+    end,
 })
 
 local FOVSlider = RageTab:CreateSlider({
-    Name = "FOV Aim", Range = {50, 500}, Increment = 10, Suffix = "px",
-    CurrentValue = 100, Flag = "FOVSlider", Callback = function(Value) fov = Value end,
+    Name = "FOV Aim",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "px",
+    CurrentValue = 100,
+    Flag = "FOVSlider",
+    Callback = function(Value)
+        fov = Value
+    end,
 })
 
 local FOVCircleToggle = RageTab:CreateButton({
@@ -390,84 +815,131 @@ local FOVCircleToggle = RageTab:CreateButton({
     Callback = function()
         showFOV = not showFOV
         fovCircle.Visible = showFOV
-        Rayfield:Notify({Title = "FOV Circle", Content = showFOV and "Enabled" or "Disabled", Duration = 1, Image = 4483362458})
+        Rayfield:Notify({
+            Title = "FOV Circle",
+            Content = showFOV and "Enabled" or "Disabled",
+            Duration = 1,
+            Image = 4483362458,
+        })
     end,
 })
 
 local FOVColorPicker = RageTab:CreateColorPicker({
-    Name = "FOV Circle Color", Color = Color3.new(1,1,1), Flag = "FOVColor",
-    Callback = function(Value) fovColor = Value fovCircle.Color = Value end
+    Name = "FOV Circle Color",
+    Color = Color3.new(1,1,1),
+    Flag = "FOVColor",
+    Callback = function(Value)
+        fovColor = Value
+        fovCircle.Color = Value
+    end
 })
 
 local FriendListLabel = RageTab:CreateLabel("Friend List: " .. table.concat(FriendList, ", "))
 
 local AddFriendInput = RageTab:CreateInput({
-    Name = "Add Friend", PlaceholderText = "Enter username", RemoveTextAfterFocusLost = false,
+    Name = "Add Friend",
+    PlaceholderText = "Enter username",
+    RemoveTextAfterFocusLost = false,
     Callback = function(Text)
-        if Text ~= "" then table.insert(FriendList, Text) FriendListLabel:Set("Friend List: " .. table.concat(FriendList, ", ")) end
+        if Text ~= "" then
+            table.insert(FriendList, Text)
+            FriendListLabel:Set("Friend List: " .. table.concat(FriendList, ", "))
+        end
     end,
 })
 
 local ClearFriendsButton = RageTab:CreateButton({
     Name = "Clear Friend List",
     Callback = function()
-        FriendList = {} FriendListLabel:Set("Friend List: (empty)")
-        Rayfield:Notify({Title = "Friend List", Content = "Friend list cleared", Duration = 2, Image = 4483362458})
+        FriendList = {}
+        FriendListLabel:Set("Friend List: (empty)")
+        Rayfield:Notify({
+            Title = "Friend List",
+            Content = "Friend list cleared",
+            Duration = 2,
+            Image = 4483362458,
+        })
     end,
 })
 
+-- ESP Tab
 local HPToggle = ESPTab:CreateToggle({
-    Name = "Health ESP", CurrentValue = false, Flag = "HPToggle",
-    Callback = function(Value) ESP_HPEnabled = Value end,
+    Name = "Health ESP",
+    CurrentValue = false,
+    Flag = "HPToggle",
+    Callback = function(Value)
+        ESP_HPEnabled = Value
+    end,
 })
 
 local HPDynamicToggle = ESPTab:CreateToggle({
-    Name = "Dynamic Health Color", CurrentValue = false, Flag = "HPDynamicToggle",
-    Callback = function(Value) ESP_HPDynamicEnabled = Value end,
+    Name = "Dynamic Health Color",
+    CurrentValue = false,
+    Flag = "HPDynamicToggle",
+    Callback = function(Value)
+        ESP_HPDynamicEnabled = Value
+    end,
 })
 
 local BoxToggle = ESPTab:CreateToggle({
-    Name = "Box ESP", CurrentValue = false, Flag = "BoxToggle",
-    Callback = function(Value) Box_ESP_Enabled = Value end,
+    Name = "Box ESP",
+    CurrentValue = false,
+    Flag = "BoxToggle",
+    Callback = function(Value)
+        Box_ESP_Enabled = Value
+    end,
 })
 
 local NameToggle = ESPTab:CreateToggle({
-    Name = "Name ESP", CurrentValue = false, Flag = "NameToggle",
-    Callback = function(Value) ESP_NameEnabled = Value end,
+    Name = "Name ESP",
+    CurrentValue = false,
+    Flag = "NameToggle",
+    Callback = function(Value)
+        ESP_NameEnabled = Value
+    end,
 })
 
 local WeaponToggle = ESPTab:CreateToggle({
-    Name = "Weapon ESP", CurrentValue = false, Flag = "WeaponToggle",
-    Callback = function(Value) ESP_WeaponEnabled = Value end,
+    Name = "Weapon ESP",
+    CurrentValue = false,
+    Flag = "WeaponToggle",
+    Callback = function(Value)
+        ESP_WeaponEnabled = Value
+    end,
 })
 
 local ESPColorPicker = ESPTab:CreateColorPicker({
-    Name = "ESP Color", Color = Color3.fromRGB(255,0,0), Flag = "ESPColor",
-    Callback = function(Value) Settings.ESP_Color = Value end
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255,0,0),
+    Flag = "ESPColor",
+    Callback = function(Value)
+        Settings.ESP_Color = Value
+    end
 })
 
 local ESPDistanceSlider = ESPTab:CreateSlider({
-    Name = "Max ESP Distance", Range = {1, 1500}, Increment = 50, Suffix = "studs",
-    CurrentValue = 1500, Flag = "ESPDistance", Callback = function(Value) ESP_MaxDistance = Value end,
+    Name = "Max ESP Distance",
+    Range = {1, 1500},
+    Increment = 50,
+    Suffix = "studs",
+    CurrentValue = 1500,
+    Flag = "ESPDistance",
+    Callback = function(Value)
+        ESP_MaxDistance = Value
+    end,
 })
 
-local fullbrightEnabled = false
-local originalLighting = {
-    Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd, GlobalShadows = Lighting.GlobalShadows,
-    Ambient = Lighting.Ambient
-}
-
+-- Misc Tab
 local FullbrightToggle = MiscTab:CreateToggle({
-    Name = "Fullbright", CurrentValue = false, Flag = "FullbrightToggle",
+    Name = "Fullbright",
+    CurrentValue = false,
+    Flag = "FullbrightToggle",
     Callback = function(Value)
         fullbrightEnabled = Value
         if Value then
-            Lighting.Brightness = 2 Lighting.ClockTime = 14
-            Lighting.FogEnd = 100000 Lighting.GlobalShadows = false
-            Lighting.Ambient = Color3.fromRGB(255,255,255)
+            enableFullbright()
         else
-            for k, v in pairs(originalLighting) do Lighting[k] = v end
+            disableFullbright()
         end
     end,
 })
@@ -475,57 +947,78 @@ local FullbrightToggle = MiscTab:CreateToggle({
 local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
-        for plr, _ in pairs(ESP_HPText) do cleanupPlayerESP(plr) end
-        fovCircle:Remove() Rayfield:Destroy()
+        -- Очищаем все ESP объекты перед уничтожением
+        for plr, _ in pairs(ESP_HPText) do
+            cleanupPlayerESP(plr)
+        end
+        fovCircle:Remove()
+        Rayfield:Destroy()
     end,
 })
 
---==================== Main Loop ====================
+--==================== Render Loop ====================
 local currentTool
 
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle
-    if showFOV then
-        local mousePos = UIS:GetMouseLocation()
-        fovCircle.Position = mousePos
-        fovCircle.Radius = fov
-        fovCircle.Visible = true
-    else
+    -- FOV Circle оптимизация
+    if not aimbotEnabled or not showFOV then
         fovCircle.Visible = false
+    else
+        local mousePos = UIS:GetMouseLocation()
+        if mousePos ~= lastMousePos or fov ~= lastFOV then
+            fovCircle.Position = mousePos
+            fovCircle.Radius = fov
+            fovCircle.Visible = true
+            lastMousePos = mousePos
+            lastFOV = fov
+        end
     end
 
-    -- Aimlock
+    -- Aimlock и Autofire
     if aimbotEnabled and keyHeld then
-        if not currentTarget then
-            currentTarget = getNearestToCursor()
-        end
+        local targetHead = getTarget()
         
-        if currentTarget then
-            local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
-            if plr and isValidTarget(plr, currentTarget) then
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(currentTarget))
+        if targetHead then
+            local plr = Players:GetPlayerFromCharacter(targetHead.Parent)
+            local validTarget = plr and isValidTarget(plr, targetHead)
+            
+            if validTarget then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
+                
                 if autofireEnabled then
                     currentTool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
-                    if currentTool then currentTool:Activate() end
+                    if currentTool then 
+                        currentTool:Activate() 
+                    end
                 end
             else
                 currentTarget = nil
-                if currentTool then currentTool:Deactivate() currentTool = nil end
+                targetLocked = false
+                if currentTool then 
+                    currentTool:Deactivate() 
+                    currentTool = nil 
+                end
             end
         else
-            if currentTool then currentTool:Deactivate() currentTool = nil end
+            if currentTool then 
+                currentTool:Deactivate() 
+                currentTool = nil 
+            end
         end
     else
-        currentTarget = nil
-        if currentTool then currentTool:Deactivate() currentTool = nil end
+        if currentTool then 
+            currentTool:Deactivate() 
+            currentTool = nil 
+        end
     end
 
-    -- ESP Update (ВСЕ игроки каждый кадр)
-    for plr, _ in pairs(ESP_Players) do
-        if plr and plr.Parent then
+    -- ESP Update для всех игроков
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer and plr.Parent then
             UpdateESP(plr)
         end
     end
 end)
 
+-- Initialize UI
 Rayfield:LoadConfiguration()
