@@ -11,6 +11,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
+-- Локальные ссылки для оптимизации
+local table_insert = table.insert
+local math_floor = math.floor
+local math_min = math.min
+local math_max = math.max
+local math_clamp = math.clamp
+local Vector2_new = Vector2.new
+
 -- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "thw club",
@@ -39,6 +47,7 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 local currentTarget = nil
+local targetLocked = false
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
@@ -108,7 +117,6 @@ local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 rayParams.IgnoreWater = true
 
--- ВЕРНУЛ второй raycast для DFrame
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
@@ -124,10 +132,8 @@ local function isTargetVisible(targetHead, localChar)
     if not result then return true end
     
     local hit = result.Instance
-    
     if hit == targetHead or hit:IsDescendantOf(targetHead) then return true end
     
-    -- ВТОРОЙ RAYCAST ДЛЯ DFrame
     if hit.Name == "DFrame" then
         local newOrigin = result.Position + rayDir * 0.1
         local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
@@ -153,6 +159,7 @@ local function isValidTarget(plr, targetHead)
     return not isTargetDowned(char)
 end
 
+-- Оптимизированная функция получения ближайшей цели
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
@@ -167,11 +174,13 @@ local function getNearestToCursor()
                 if head then
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
-                        local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist then
-                            if dist <= fov and isValidTarget(plr, head) and isTargetVisible(head, localChar) then
-                                minDist = dist
-                                nearest = head
+                        local dist = (Vector2_new(pos.X, pos.Y) - mousePos).Magnitude
+                        if dist < minDist and dist <= fov then
+                            if isValidTarget(plr, head) then
+                                if isTargetVisible(head, localChar) then
+                                    minDist = dist
+                                    nearest = head
+                                end
                             end
                         end
                     end
@@ -182,21 +191,61 @@ local function getNearestToCursor()
     return nearest
 end
 
+local function getTarget()
+    if currentTarget and targetLocked then
+        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
+        
+        if not plr then
+            currentTarget = nil
+            targetLocked = false
+            return nil
+        end
+        
+        if isTargetInFOV(currentTarget) then
+            if isValidTarget(plr, currentTarget) then
+                if isTargetVisible(currentTarget, localPlayer.Character) then
+                    return currentTarget
+                end
+            end
+        end
+        
+        currentTarget = nil
+        targetLocked = false
+        return nil
+    end
+    
+    if not currentTarget then
+        local newTarget = getNearestToCursor()
+        if newTarget then
+            currentTarget = newTarget
+            targetLocked = true
+        end
+    end
+    
+    return currentTarget
+end
+
 UIS.InputBegan:Connect(function(i,g)
     if not g and i.KeyCode == Enum.KeyCode.X then 
         keyHeld = true 
-        currentTarget = nil
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
+        end
     end
 end)
 
 UIS.InputEnded:Connect(function(i)
     if i.KeyCode == Enum.KeyCode.X then 
         keyHeld = false 
-        currentTarget = nil
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
+        end
     end
 end)
 
---==================== ESP System ====================
+--==================== ESP System (ОПТИМИЗИРОВАННЫЙ) ====================
 local ESP_HPEnabled = false
 local Box_ESP_Enabled = false
 local ESP_NameEnabled = false
@@ -209,33 +258,69 @@ local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
 local ESP_Boxes = {}
-local PlayerCache = {}
+local partCache = {}
+local characterCache = {}
+local PlayerList = {} -- Массив для быстрого доступа
 
+-- Оптимизация №2: Создание ESP объектов один раз, без удаления
 local function createESPObjects(plr)
-    if ESP_HPText[plr] then return end
+    if ESP_HPText[plr] then return end -- Уже создано
     
     local hpText = Drawing.new("Text")
-    hpText.Visible = false hpText.Color = Settings.ESP_Color hpText.Size = 14
-    hpText.Center = true hpText.Outline = true
+    hpText.Visible = false
+    hpText.Color = Settings.ESP_Color
+    hpText.Size = 14
+    hpText.Center = true
+    hpText.Outline = true
     ESP_HPText[plr] = hpText
     
     local nameText = Drawing.new("Text")
-    nameText.Visible = false nameText.Color = Settings.ESP_Color nameText.Size = 9
-    nameText.Center = true nameText.Outline = true
+    nameText.Visible = false
+    nameText.Color = Settings.ESP_Color
+    nameText.Size = 9
+    nameText.Center = true
+    nameText.Outline = true
     ESP_NameText[plr] = nameText
     
     local weaponText = Drawing.new("Text")
-    weaponText.Visible = false weaponText.Color = Settings.ESP_Color weaponText.Size = 12
-    weaponText.Center = true weaponText.Outline = true
+    weaponText.Visible = false
+    weaponText.Color = Settings.ESP_Color
+    weaponText.Size = 12
+    weaponText.Center = true
+    weaponText.Outline = true
     ESP_WeaponText[plr] = weaponText
     
     local box = Drawing.new("Square")
-    box.Visible = false box.Thickness = 1 box.Color = Settings.ESP_Color
+    box.Visible = false
+    box.Thickness = 1
+    box.Color = Settings.ESP_Color
+    
     local boxoutline = Drawing.new("Square")
-    boxoutline.Visible = false boxoutline.Thickness = 1 boxoutline.Color = Settings.ESP_Color
+    boxoutline.Visible = false
+    boxoutline.Thickness = 1
+    boxoutline.Color = Settings.ESP_Color
+    
     ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
+    
+    -- Оптимизация №4: Кеширование частей персонажа
+    local function cacheParts(char)
+        partCache[plr] = {}
+        if char then
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    table_insert(partCache[plr], part)
+                end
+            end
+        end
+    end
+    
+    characterCache[plr] = plr.Character
+    if plr.Character then
+        cacheParts(plr.Character)
+    end
 end
 
+-- Оптимизация №2: Только скрываем, не удаляем
 local function hidePlayerESP(plr)
     if ESP_HPText[plr] then ESP_HPText[plr].Visible = false end
     if ESP_NameText[plr] then ESP_NameText[plr].Visible = false end
@@ -246,41 +331,36 @@ local function hidePlayerESP(plr)
     end
 end
 
-local function cleanupPlayerESP(plr)
-    if ESP_HPText[plr] then ESP_HPText[plr]:Remove() ESP_HPText[plr] = nil end
-    if ESP_NameText[plr] then ESP_NameText[plr]:Remove() ESP_NameText[plr] = nil end
-    if ESP_WeaponText[plr] then ESP_WeaponText[plr]:Remove() ESP_WeaponText[plr] = nil end
-    if ESP_Boxes[plr] then
-        if ESP_Boxes[plr].box then ESP_Boxes[plr].box:Remove() end
-        if ESP_Boxes[plr].boxoutline then ESP_Boxes[plr].boxoutline:Remove() end
-        ESP_Boxes[plr] = nil
-    end
-    PlayerCache[plr] = nil
-end
-
+-- Оптимизация №9: Перехват добавления/удаления игроков
 local function initPlayer(plr)
     if plr == localPlayer then return end
     
-    PlayerCache[plr] = {
-        lastUpdate = 0,
-        headPos = Vector2.new(0, 0),
-        onscreen = false
-    }
-    
+    table_insert(PlayerList, plr)
     createESPObjects(plr)
     
-    plr.CharacterAdded:Connect(function()
-        task.wait(0.3)
-        createESPObjects(plr)
+    -- Оптимизация №4: Обработчик изменения персонажа
+    plr.CharacterAdded:Connect(function(char)
+        characterCache[plr] = char
+        partCache[plr] = {}
+        
+        if char then
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    table_insert(partCache[plr], part)
+                end
+            end
+        end
     end)
 end
 
+-- Инициализируем существующих игроков
 for _, plr in pairs(Players:GetPlayers()) do
     if plr ~= localPlayer then
         initPlayer(plr)
     end
 end
 
+-- Оптимизация №9: Обработчики добавления/удаления игроков
 Players.PlayerAdded:Connect(function(plr)
     if plr ~= localPlayer then
         initPlayer(plr)
@@ -288,23 +368,48 @@ Players.PlayerAdded:Connect(function(plr)
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
-    cleanupPlayerESP(plr)
+    -- Удаляем из массива
+    for i = #PlayerList, 1, -1 do
+        if PlayerList[i] == plr then
+            table.remove(PlayerList, i)
+            break
+        end
+    end
+    
+    -- Скрываем ESP
+    hidePlayerESP(plr)
+    
+    -- Очищаем кеш
+    ESP_HPText[plr] = nil
+    ESP_NameText[plr] = nil
+    ESP_WeaponText[plr] = nil
+    ESP_Boxes[plr] = nil
+    partCache[plr] = nil
+    characterCache[plr] = nil
 end)
 
-local espUpdateIndex = 1
-local espUpdateBatch = 2
-local lastFrameTime = tick()
+local function shouldCreateESP(plr)
+    local char = plr.Character
+    if not char then return false end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return false end
+    
+    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+    return dist <= ESP_MaxDistance
+end
 
 local function UpdateESP(plr)
-    if not PlayerCache[plr] then return end
-    
-    local hasAnyESP = ESP_HPEnabled or ESP_NameEnabled or ESP_WeaponEnabled or Box_ESP_Enabled
-    if not hasAnyESP then
+    -- Проверяем, включен ли вообще какой-либо ESP
+    if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
         hidePlayerESP(plr)
         return
     end
     
-    local char = plr.Character
+    local char = characterCache[plr]
     if not char then
         hidePlayerESP(plr)
         return
@@ -329,6 +434,7 @@ local function UpdateESP(plr)
         return
     end
     
+    -- Оптимизация №3: Один вызов WorldToViewportPoint
     local headPos, onscreen = Camera:WorldToViewportPoint(head.Position)
     if not onscreen then
         hidePlayerESP(plr)
@@ -336,32 +442,42 @@ local function UpdateESP(plr)
     end
     
     local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-    local screenPos = Vector2.new(headPos.X, headPos.Y)
+    local screenPos = Vector2_new(headPos.X, headPos.Y)
     
+    -- HP Text
     if ESP_HPEnabled and ESP_HPText[plr] then
-        local hp = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
+        local hp = math_clamp(humanoid.Health, 0, humanoid.MaxHealth)
         local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/humanoid.MaxHealth)/3,1,1) or color
-        ESP_HPText[plr].Position = Vector2.new(screenPos.X + 20, screenPos.Y)
-        ESP_HPText[plr].Text = math.floor(hp) .. " HP"
+        ESP_HPText[plr].Position = Vector2_new(screenPos.X + 20, screenPos.Y)
+        ESP_HPText[plr].Text = math_floor(hp) .. " HP"
         ESP_HPText[plr].Color = hpColor
         ESP_HPText[plr].Visible = true
-    elseif ESP_HPText[plr] then ESP_HPText[plr].Visible = false end
+    elseif ESP_HPText[plr] then
+        ESP_HPText[plr].Visible = false
+    end
     
+    -- Name Text
     if ESP_NameEnabled and ESP_NameText[plr] then
-        ESP_NameText[plr].Position = Vector2.new(screenPos.X, screenPos.Y - 15)
+        ESP_NameText[plr].Position = Vector2_new(screenPos.X, screenPos.Y - 15)
         ESP_NameText[plr].Text = plr.Name
         ESP_NameText[plr].Color = color
         ESP_NameText[plr].Visible = true
-    elseif ESP_NameText[plr] then ESP_NameText[plr].Visible = false end
+    elseif ESP_NameText[plr] then
+        ESP_NameText[plr].Visible = false
+    end
     
+    -- Weapon Text
     if ESP_WeaponEnabled and ESP_WeaponText[plr] then
         local tool = char:FindFirstChildOfClass("Tool")
-        ESP_WeaponText[plr].Position = Vector2.new(screenPos.X, screenPos.Y + 15)
+        ESP_WeaponText[plr].Position = Vector2_new(screenPos.X, screenPos.Y + 15)
         ESP_WeaponText[plr].Text = tool and tool.Name or "None"
         ESP_WeaponText[plr].Color = color
         ESP_WeaponText[plr].Visible = true
-    elseif ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible = false end
+    elseif ESP_WeaponText[plr] then
+        ESP_WeaponText[plr].Visible = false
+    end
 
+    -- Box ESP
     if Box_ESP_Enabled and ESP_Boxes[plr] then
         local cf = hrp.CFrame
         local size = Vector3.new(4, 6, 1.5)
@@ -379,24 +495,33 @@ local function UpdateESP(plr)
             local pos, visible = Camera:WorldToViewportPoint(corners[i])
             if visible and pos.Z > 0 then
                 anyVisible = true
-                minX = math.min(minX, pos.X) minY = math.min(minY, pos.Y)
-                maxX = math.max(maxX, pos.X) maxY = math.max(maxY, pos.Y)
+                minX = math_min(minX, pos.X)
+                minY = math_min(minY, pos.Y)
+                maxX = math_max(maxX, pos.X)
+                maxY = math_max(maxY, pos.Y)
             end
         end
         
         if anyVisible then
             local w, h = maxX - minX, maxY - minY
-            local pos = Vector2.new(minX, minY)
-            ESP_Boxes[plr].box.Position = pos ESP_Boxes[plr].box.Size = Vector2.new(w, h)
-            ESP_Boxes[plr].box.Color = color ESP_Boxes[plr].box.Visible = true
-            ESP_Boxes[plr].boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
-            ESP_Boxes[plr].boxoutline.Size = Vector2.new(w + 2, h + 2)
-            ESP_Boxes[plr].boxoutline.Color = color ESP_Boxes[plr].boxoutline.Visible = true
+            local pos = Vector2_new(minX, minY)
+            
+            ESP_Boxes[plr].box.Position = pos
+            ESP_Boxes[plr].box.Size = Vector2_new(w, h)
+            ESP_Boxes[plr].box.Color = color
+            ESP_Boxes[plr].box.Visible = true
+            
+            ESP_Boxes[plr].boxoutline.Position = Vector2_new(pos.X - 1, pos.Y - 1)
+            ESP_Boxes[plr].boxoutline.Size = Vector2_new(w + 2, h + 2)
+            ESP_Boxes[plr].boxoutline.Color = color
+            ESP_Boxes[plr].boxoutline.Visible = true
         else
-            ESP_Boxes[plr].box.Visible = false ESP_Boxes[plr].boxoutline.Visible = false
+            ESP_Boxes[plr].box.Visible = false
+            ESP_Boxes[plr].boxoutline.Visible = false
         end
     elseif ESP_Boxes[plr] then
-        ESP_Boxes[plr].box.Visible = false ESP_Boxes[plr].boxoutline.Visible = false
+        ESP_Boxes[plr].box.Visible = false
+        ESP_Boxes[plr].boxoutline.Visible = false
     end
 end
 
@@ -407,7 +532,10 @@ local AimlockToggle = RageTab:CreateToggle({
     Flag = "AimlockToggle",
     Callback = function(Value)
         aimbotEnabled = Value
-        if not Value then currentTarget = nil end
+        if not Value then
+            currentTarget = nil
+            targetLocked = false
+        end
     end,
 })
 
@@ -464,7 +592,7 @@ local AddFriendInput = RageTab:CreateInput({
     RemoveTextAfterFocusLost = false,
     Callback = function(Text)
         if Text ~= "" then
-            table.insert(FriendList, Text)
+            table_insert(FriendList, Text)
             FriendListLabel:Set("Friend List: " .. table.concat(FriendList, ", "))
         end
     end,
@@ -538,10 +666,32 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 
 local fullbrightEnabled = false
 local originalLighting = {
-    Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd, GlobalShadows = Lighting.GlobalShadows,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
     Ambient = Lighting.Ambient
 }
+
+local targetLighting = {
+    Brightness = 2,
+    ClockTime = 14,
+    FogEnd = 100000,
+    GlobalShadows = false,
+    Ambient = Color3.fromRGB(255,255,255)
+}
+
+local function enableFullbright()
+    for k, v in pairs(targetLighting) do
+        Lighting[k] = v
+    end
+end
+
+local function disableFullbright()
+    for k, v in pairs(originalLighting) do
+        Lighting[k] = v
+    end
+end
 
 local FullbrightToggle = MiscTab:CreateToggle({
     Name = "Fullbright",
@@ -550,11 +700,9 @@ local FullbrightToggle = MiscTab:CreateToggle({
     Callback = function(Value)
         fullbrightEnabled = Value
         if Value then
-            Lighting.Brightness = 2 Lighting.ClockTime = 14
-            Lighting.FogEnd = 100000 Lighting.GlobalShadows = false
-            Lighting.Ambient = Color3.fromRGB(255,255,255)
+            enableFullbright()
         else
-            for k, v in pairs(originalLighting) do Lighting[k] = v end
+            disableFullbright()
         end
     end,
 })
@@ -562,32 +710,24 @@ local FullbrightToggle = MiscTab:CreateToggle({
 local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
-        for plr, _ in pairs(ESP_HPText) do cleanupPlayerESP(plr) end
+        -- Очищаем все ESP объекты перед уничтожением
+        for plr, _ in pairs(ESP_HPText) do
+            if ESP_HPText[plr] then
+                ESP_HPText[plr]:Remove()
+            end
+        end
         fovCircle:Remove()
         Rayfield:Destroy()
     end,
 })
 
---==================== Главный цикл ====================
+--==================== Render Loop ====================
 local currentTool
-local playersArray = {}
-
-local function updatePlayersArray()
-    playersArray = {}
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= localPlayer then
-            table.insert(playersArray, plr)
-        end
-    end
-end
-
-updatePlayersArray()
-Players.PlayerAdded:Connect(updatePlayersArray)
-Players.PlayerRemoving:Connect(updatePlayersArray)
+local espUpdateIndex = 1
+local espUpdateBatch = 2 -- 2 игрока за кадр для 60 FPS
 
 RunService.RenderStepped:Connect(function()
-    local frameStart = tick()
-    
+    -- FOV Circle
     if showFOV then
         local mousePos = UIS:GetMouseLocation()
         fovCircle.Position = mousePos
@@ -597,37 +737,52 @@ RunService.RenderStepped:Connect(function()
         fovCircle.Visible = false
     end
 
+    -- Aimlock и Autofire
     if aimbotEnabled and keyHeld then
-        if not currentTarget then
-            currentTarget = getNearestToCursor()
-        end
+        local targetHead = getTarget()
         
-        if currentTarget then
-            local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
-            if plr and isValidTarget(plr, currentTarget) then
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(currentTarget))
+        if targetHead then
+            local plr = Players:GetPlayerFromCharacter(targetHead.Parent)
+            local validTarget = plr and isValidTarget(plr, targetHead)
+            
+            if validTarget then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
+                
                 if autofireEnabled then
                     currentTool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
-                    if currentTool then currentTool:Activate() end
+                    if currentTool then 
+                        currentTool:Activate() 
+                    end
                 end
             else
                 currentTarget = nil
-                if currentTool then currentTool:Deactivate() currentTool = nil end
+                targetLocked = false
+                if currentTool then 
+                    currentTool:Deactivate() 
+                    currentTool = nil 
+                end
             end
         else
-            if currentTool then currentTool:Deactivate() currentTool = nil end
+            if currentTool then 
+                currentTool:Deactivate() 
+                currentTool = nil 
+            end
         end
     else
-        if currentTool then currentTool:Deactivate() currentTool = nil end
+        if currentTool then 
+            currentTool:Deactivate() 
+            currentTool = nil 
+        end
     end
 
-    local playerCount = #playersArray
+    -- ESP Update для 2 игроков за кадр (60 FPS)
+    local playerCount = #PlayerList
     if playerCount > 0 then
         local startIndex = espUpdateIndex
-        local endIndex = math.min(startIndex + 1, playerCount)
+        local endIndex = math.min(startIndex + espUpdateBatch - 1, playerCount)
         
         for i = startIndex, endIndex do
-            local plr = playersArray[i]
+            local plr = PlayerList[i]
             if plr and plr.Parent then
                 UpdateESP(plr)
             end
@@ -638,11 +793,7 @@ RunService.RenderStepped:Connect(function()
             espUpdateIndex = 1
         end
     end
-    
-    local frameTime = tick() - frameStart
-    if frameTime < 0.016 then
-        wait(0.016 - frameTime)
-    end
 end)
 
+-- Initialize UI
 Rayfield:LoadConfiguration()
