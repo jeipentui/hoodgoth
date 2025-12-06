@@ -112,7 +112,7 @@ local function hasSpawnShield(plr)
     return plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
 end
 
--- Функция проверки находится ли цель в FOV
+-- Функция проверки находится ли цель в FOV (без raycast)
 local function isTargetInFOV(targetHead)
     if not targetHead then return false end
     
@@ -137,10 +137,15 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Проверка видимости цели (wallcheck) с умным исключением DFrame
+-- ПРОВЕРКА ВИДИМОСТИ ТОЛЬКО КОГДА ЦЕЛЬ В FOV
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
+    if not targetHead or not localChar then return false end
     
+    -- Сначала проверяем FOV (без raycast)
+    if not isTargetInFOV(targetHead) then return false end
+    
+    -- ТОЛЬКО если в FOV - делаем raycast
     local rayOrigin = Camera.CFrame.Position
     local rayDir = targetHead.Position - rayOrigin
     local rayDistance = rayDir.Magnitude
@@ -190,7 +195,7 @@ local function isTargetVisible(targetHead, localChar)
     end
 end
 
--- Проверка валидности цели
+-- Проверка валидности цели (без raycast)
 local function isValidTarget(plr, targetHead)
     if not plr or not plr.Character then return false end
     if isFriend(plr) then return false end
@@ -205,7 +210,7 @@ local function isValidTarget(plr, targetHead)
     return true
 end
 
--- Получение ближайшей цели к курсору (оптимизированная - только в FOV)
+-- Получение ближайшей цели к курсору (СНАЧАЛА FOV, ПОТОМ ВСЕ ОСТАЛЬНОЕ)
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
@@ -226,7 +231,7 @@ local function getNearestToCursor()
                         if dist < minDist then
                             -- 3. Только если в FOV - проверяем валидность цели
                             if isValidTarget(plr, head) then
-                                -- 4. Только если валидна - проверяем видимость
+                                -- 4. Только если валидна - проверяем видимость (RAYCAST ТОЛЬКО ЗДЕСЬ)
                                 if isTargetVisible(head, localChar) then
                                     minDist = dist
                                     nearest = head
@@ -242,7 +247,7 @@ local function getNearestToCursor()
     return nearest
 end
 
--- Функция для получения/обновления цели (оптимизированная)
+-- Функция для получения/обновления цели
 local function getTarget()
     -- Если у нас уже есть цель и она все еще валидна
     if currentTarget and targetLocked then
@@ -255,11 +260,11 @@ local function getTarget()
             return nil
         end
         
-        -- 1. Сначала проверка FOV (без валидации)
+        -- 1. Сначала проверка FOV (без валидации и raycast)
         if isTargetInFOV(currentTarget) then
             -- 2. Только если в FOV - проверяем валидность
             if isValidTarget(plr, currentTarget) then
-                -- 3. Только если валидна - проверяем видимость
+                -- 3. Только если валидна - проверяем видимость (RAYCAST ТОЛЬКО ЗДЕСЬ)
                 if isTargetVisible(currentTarget, localPlayer.Character) then
                     return currentTarget
                 end
@@ -321,19 +326,75 @@ local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
 local ESP_Boxes = {}
-local partCache = {} -- Оптимизация: используем массивы вместо таблиц для частей
+local partCache = {}
 local characterCache = {} -- Кеш для персонажей игроков
+local viewportCache = {} -- Кеш для WorldToViewportPoint
 
--- Оптимизация: функция для WorldToViewportPoint с кешированием
-local cam = workspace.CurrentCamera
-local function WTVP(v3)
-    return cam:WorldToViewportPoint(v3)
+-- Функция для полной очистки ESP игрока
+local function cleanupPlayerESP(plr)
+    if ESP_HPText[plr] then
+        if ESP_HPText[plr] then
+            ESP_HPText[plr].Visible = false
+            ESP_HPText[plr]:Remove()
+        end
+        ESP_HPText[plr] = nil
+    end
+    
+    if ESP_NameText[plr] then
+        if ESP_NameText[plr] then
+            ESP_NameText[plr].Visible = false
+            ESP_NameText[plr]:Remove()
+        end
+        ESP_NameText[plr] = nil
+    end
+    
+    if ESP_WeaponText[plr] then
+        if ESP_WeaponText[plr] then
+            ESP_WeaponText[plr].Visible = false
+            ESP_WeaponText[plr]:Remove()
+        end
+        ESP_WeaponText[plr] = nil
+    end
+    
+    if ESP_Boxes[plr] then
+        if ESP_Boxes[plr].box then
+            ESP_Boxes[plr].box.Visible = false
+            ESP_Boxes[plr].box:Remove()
+        end
+        if ESP_Boxes[plr].boxoutline then
+            ESP_Boxes[plr].boxoutline.Visible = false
+            ESP_Boxes[plr].boxoutline:Remove()
+        end
+        ESP_Boxes[plr] = nil
+    end
+    
+    -- Очищаем кеши
+    partCache[plr] = nil
+    characterCache[plr] = nil
+    viewportCache[plr] = nil
 end
 
--- Оптимизация №2: Функция для создания ESP объектов один раз
+-- Функция для скрытия ESP игрока (без удаления)
+local function hidePlayerESP(plr)
+    if ESP_HPText[plr] then
+        ESP_HPText[plr].Visible = false
+    end
+    if ESP_NameText[plr] then
+        ESP_NameText[plr].Visible = false
+    end
+    if ESP_WeaponText[plr] then
+        ESP_WeaponText[plr].Visible = false
+    end
+    if ESP_Boxes[plr] then
+        ESP_Boxes[plr].box.Visible = false
+        ESP_Boxes[plr].boxoutline.Visible = false
+    end
+end
+
+-- Функция для создания ESP объектов
 local function createESPObjects(plr)
-    -- Не создаем заново если уже есть
-    if ESP_HPText[plr] then return end
+    -- Сначала очищаем старые объекты, если они есть
+    cleanupPlayerESP(plr)
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -375,15 +436,15 @@ local function createESPObjects(plr)
     
     ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
     
-    -- Инициализируем кеш персонажа
+    -- Инициализируем кеш частей
+    partCache[plr] = {}
     characterCache[plr] = plr.Character
     
-    -- Оптимизация №4: Кеширование частей персонажа один раз
+    -- Кешируем части персонажа
     if plr.Character then
-        partCache[plr] = {}
-        for _, p in ipairs(plr.Character:GetChildren()) do
-            if p:IsA("BasePart") then
-                partCache[plr][#partCache[plr] + 1] = p
+        for _, part in ipairs(plr.Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
             end
         end
         
@@ -392,49 +453,15 @@ local function createESPObjects(plr)
             characterCache[plr] = char
             partCache[plr] = {}
             
-            task.wait(0.1)
+            task.wait(0.1) -- Даем время на загрузку
             
-            for _, p in ipairs(char:GetChildren()) do
-                if p:IsA("BasePart") then
-                    partCache[plr][#partCache[plr] + 1] = p
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    partCache[plr][part] = true
                 end
             end
         end)
     end
-end
-
--- Оптимизация: только скрываем ESP, не удаляем
-local function hidePlayerESP(plr)
-    if ESP_HPText[plr] then ESP_HPText[plr].Visible = false end
-    if ESP_NameText[plr] then ESP_NameText[plr].Visible = false end
-    if ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible = false end
-    if ESP_Boxes[plr] then
-        ESP_Boxes[plr].box.Visible = false
-        ESP_Boxes[plr].boxoutline.Visible = false
-    end
-end
-
--- Функция для полной очистки ESP игрока (только при удалении игрока)
-local function cleanupPlayerESP(plr)
-    if ESP_HPText[plr] then
-        ESP_HPText[plr]:Remove()
-        ESP_HPText[plr] = nil
-    end
-    if ESP_NameText[plr] then
-        ESP_NameText[plr]:Remove()
-        ESP_NameText[plr] = nil
-    end
-    if ESP_WeaponText[plr] then
-        ESP_WeaponText[plr]:Remove()
-        ESP_WeaponText[plr] = nil
-    end
-    if ESP_Boxes[plr] then
-        ESP_Boxes[plr].box:Remove()
-        ESP_Boxes[plr].boxoutline:Remove()
-        ESP_Boxes[plr] = nil
-    end
-    partCache[plr] = nil
-    characterCache[plr] = nil
 end
 
 -- Функция для проверки, нужно ли создать ESP
@@ -463,11 +490,53 @@ local function get3DBoxCorners(hrp)
     }
 end
 
+-- Кеширование WorldToViewportPoint точек
+local function cacheViewportPoints(plr)
+    local char = plr.Character
+    if not char then 
+        viewportCache[plr] = nil
+        return 
+    end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        viewportCache[plr] = nil
+        return 
+    end
+    
+    -- Создаем или обновляем кеш
+    if not viewportCache[plr] then
+        viewportCache[plr] = {}
+    end
+    
+    -- Кешируем позицию головы
+    local head = char:FindFirstChild("Head")
+    if head then
+        local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+        viewportCache[plr].head = {pos = Vector2.new(headPos.X, headPos.Y), visible = headVisible, z = headPos.Z}
+    else
+        viewportCache[plr].head = nil
+    end
+    
+    -- Кешируем углы для Box ESP (только если включен Box ESP)
+    if Box_ESP_Enabled then
+        local corners = get3DBoxCorners(hrp)
+        viewportCache[plr].boxCorners = {}
+        
+        for i, corner in ipairs(corners) do
+            local pos, visible = Camera:WorldToViewportPoint(corner)
+            viewportCache[plr].boxCorners[i] = {pos = Vector2.new(pos.X, pos.Y), visible = visible, z = pos.Z}
+        end
+    else
+        viewportCache[plr].boxCorners = nil
+    end
+end
+
 --==================== Update ESP ====================
 local function UpdateESP(plr)
     -- Проверяем, включен ли вообще какой-либо ESP
     if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
-        if ESP_HPText[plr] then
+        if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
             hidePlayerESP(plr)
         end
         return
@@ -475,9 +544,9 @@ local function UpdateESP(plr)
     
     local char = plr.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
-        -- Игрок мертв или нет персонажа - скрываем ESP
+        -- Игрок мертв или нет персонажа - удаляем ESP
         if ESP_HPText[plr] then
-            hidePlayerESP(plr)
+            cleanupPlayerESP(plr)
         end
         return
     end
@@ -494,20 +563,28 @@ local function UpdateESP(plr)
         return
     end
     
-    -- Если игрок В зоне видимости, но ESP объектов нет - создаем их один раз
+    -- Если игрок В зоне видимости, но ESP объектов нет - создаем их
     if not ESP_HPText[plr] then
         createESPObjects(plr)
     end
     
-    -- Получаем позицию головы на экране (Оптимизация №3)
-    local head = char:FindFirstChild("Head")
-    if not head then
-        hidePlayerESP(plr)
-        return
+    -- Проверяем, не изменился ли персонаж
+    if characterCache[plr] ~= char then
+        characterCache[plr] = char
+        partCache[plr] = {}
+        
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
+            end
+        end
     end
     
-    local headPos, onscreen = WTVP(head.Position)
-    if not onscreen then
+    -- Кешируем точки обзора
+    cacheViewportPoints(plr)
+    
+    -- Если игрока нет на экране - скрываем ESP
+    if not viewportCache[plr] or not viewportCache[plr].head or not viewportCache[plr].head.visible then
         hidePlayerESP(plr)
         return
     end
@@ -518,71 +595,84 @@ local function UpdateESP(plr)
     local weaponText = ESP_WeaponText[plr]
     local boxes = ESP_Boxes[plr]
     
-    local screenPos = Vector2.new(headPos.X, headPos.Y)
-    
-    -- HP Text
-    if ESP_HPEnabled and hpText then
-        local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
-        local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
-        hpText.Position = Vector2.new(screenPos.X + 20, screenPos.Y)
-        hpText.Text = math.floor(hp) .. " HP"
-        hpText.Color = hpColor
-        hpText.Visible = true
-    elseif hpText then
-        hpText.Visible = false
-    end
-    
-    -- Name Text
-    if ESP_NameEnabled and nameText then
-        nameText.Position = Vector2.new(screenPos.X, screenPos.Y - 15)
-        nameText.Text = plr.Name
-        nameText.Color = color
-        nameText.Visible = true
-    elseif nameText then
-        nameText.Visible = false
-    end
-    
-    -- Weapon Text
-    if ESP_WeaponEnabled and weaponText then
-        local tool = char:FindFirstChildOfClass("Tool")
-        weaponText.Position = Vector2.new(screenPos.X, screenPos.Y + 15)
-        weaponText.Text = tool and tool.Name or "None"
-        weaponText.Color = color
-        weaponText.Visible = true
-    elseif weaponText then
-        weaponText.Visible = false
+    -- Используем кешированные точки
+    local headCache = viewportCache[plr].head
+    if headCache then
+        local headPos = headCache.pos
+        
+        -- HP Text
+        if ESP_HPEnabled and hpText then
+            local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
+            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
+            hpText.Position = Vector2.new(headPos.X + 20, headPos.Y)
+            hpText.Text = math.floor(hp) .. " HP"
+            hpText.Color = hpColor
+            hpText.Visible = true
+        elseif hpText then
+            hpText.Visible = false
+        end
+        
+        -- Name Text
+        if ESP_NameEnabled and nameText then
+            nameText.Position = Vector2.new(headPos.X, headPos.Y - 15)
+            nameText.Text = plr.Name
+            nameText.Color = color
+            nameText.Visible = true
+        elseif nameText then
+            nameText.Visible = false
+        end
+        
+        -- Weapon Text
+        if ESP_WeaponEnabled and weaponText then
+            local tool = char:FindFirstChildOfClass("Tool")
+            weaponText.Position = Vector2.new(headPos.X, headPos.Y + 15)
+            weaponText.Text = tool and tool.Name or "None"
+            weaponText.Color = color
+            weaponText.Visible = true
+        elseif weaponText then
+            weaponText.Visible = false
+        end
+    else
+        if hpText then hpText.Visible = false end
+        if nameText then nameText.Visible = false end
+        if weaponText then weaponText.Visible = false end
     end
 
     -- Box ESP
     if Box_ESP_Enabled and boxes then
-        local corners = get3DBoxCorners(hrp)
-        local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
-        local anyVisible = false
+        local boxCorners = viewportCache[plr] and viewportCache[plr].boxCorners
         
-        for i = 1, 4 do
-            local pos, visible = WTVP(corners[i])
-            if visible and pos.Z > 0 then
-                anyVisible = true
-                minX = math.min(minX, pos.X)
-                minY = math.min(minY, pos.Y)
-                maxX = math.max(maxX, pos.X)
-                maxY = math.max(maxY, pos.Y)
+        if boxCorners then
+            local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
+            local anyVisible = false
+            
+            for _, corner in ipairs(boxCorners) do
+                if corner.visible and corner.z > 0 then
+                    anyVisible = true
+                    minX = math.min(minX, corner.pos.X)
+                    minY = math.min(minY, corner.pos.Y)
+                    maxX = math.max(maxX, corner.pos.X)
+                    maxY = math.max(maxY, corner.pos.Y)
+                end
             end
-        end
-        
-        if anyVisible then
-            local w, h = maxX - minX, maxY - minY
-            local pos = Vector2.new(minX, minY)
             
-            boxes.box.Position = pos
-            boxes.box.Size = Vector2.new(w, h)
-            boxes.box.Color = color
-            boxes.box.Visible = true
-            
-            boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
-            boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
-            boxes.boxoutline.Color = color
-            boxes.boxoutline.Visible = true
+            if anyVisible then
+                local w, h = maxX - minX, maxY - minY
+                local pos = Vector2.new(minX, minY)
+                
+                boxes.box.Position = pos
+                boxes.box.Size = Vector2.new(w, h)
+                boxes.box.Color = color
+                boxes.box.Visible = true
+                
+                boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
+                boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
+                boxes.boxoutline.Color = color
+                boxes.boxoutline.Visible = true
+            else
+                boxes.box.Visible = false
+                boxes.boxoutline.Visible = false
+            end
         else
             boxes.box.Visible = false
             boxes.boxoutline.Visible = false
@@ -597,8 +687,17 @@ end
 local function initPlayer(plr)
     if plr == localPlayer then return end
     
-    -- Создаем ESP объекты сразу
-    createESPObjects(plr)
+    -- Создаем ESP объекты только если игрок в зоне видимости
+    if shouldCreateESP(plr) then
+        createESPObjects(plr)
+    end
+    
+    -- Подключаем обработчик смерти/возрождения
+    plr.CharacterAdded:Connect(function(char)
+        if shouldCreateESP(plr) then
+            createESPObjects(plr)
+        end
+    end)
 end
 
 -- Инициализируем существующих игроков
@@ -868,7 +967,6 @@ RunService.RenderStepped:Connect(function()
             local validTarget = plr and isValidTarget(plr, targetHead)
             
             if validTarget then
-                -- Оптимизация №6: Предсказание только для видимых целей
                 Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
                 
                 if autofireEnabled then
@@ -898,7 +996,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP Update для всех игроков каждый кадр
+    -- ESP Update для всех игроков
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer and plr.Parent then
             UpdateESP(plr)
