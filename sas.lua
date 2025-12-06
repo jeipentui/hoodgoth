@@ -226,7 +226,7 @@ local function isValidTarget(plr, targetHead)
     return true
 end
 
--- Получение ближайшей цели к курсору
+-- Получение ближайшей цели к курсору (оптимизированная - только в FOV)
 local function getNearestToCursor()
     local nearest = nil
     local minDist = fov
@@ -238,13 +238,21 @@ local function getNearestToCursor()
             local char = plr.Character
             if char then
                 local head = char:FindFirstChild("Head")
-                if head and isValidTarget(plr, head) then
+                if head then
+                    -- 1. Сначала позиция на экране
                     local pos, onscreen = Camera:WorldToScreenPoint(head.Position)
                     if onscreen then
+                        -- 2. Проверка FOV (самое дешевое)
                         local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < minDist and isTargetVisible(head, localChar) then
-                            minDist = dist
-                            nearest = head
+                        if dist < minDist then
+                            -- 3. Только если в FOV - проверяем валидность цели
+                            if isValidTarget(plr, head) then
+                                -- 4. Только если валидна - проверяем видимость
+                                if isTargetVisible(head, localChar) then
+                                    minDist = dist
+                                    nearest = head
+                                end
+                            end
                         end
                     end
                 end
@@ -255,27 +263,34 @@ local function getNearestToCursor()
     return nearest
 end
 
--- Функция для получения/обновления цели
+-- Функция для получения/обновления цели (оптимизированная)
 local function getTarget()
     -- Если у нас уже есть цель и она все еще валидна
     if currentTarget and targetLocked then
         local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
-        if plr and isValidTarget(plr, currentTarget) then
-            -- Проверяем, находится ли цель все еще в FOV и видима
-            if isTargetInFOV(currentTarget) and isTargetVisible(currentTarget, localPlayer.Character) then
-                return currentTarget
-            else
-                -- Цель вышла из FOV или стала невидимой, сбрасываем
-                currentTarget = nil
-                targetLocked = false
-                return nil
-            end
-        else
-            -- Цель стала невалидной
+        
+        -- Быстрая проверка: если игрока нет - сброс
+        if not plr then
             currentTarget = nil
             targetLocked = false
             return nil
         end
+        
+        -- 1. Сначала проверка FOV (без валидации)
+        if isTargetInFOV(currentTarget) then
+            -- 2. Только если в FOV - проверяем валидность
+            if isValidTarget(plr, currentTarget) then
+                -- 3. Только если валидна - проверяем видимость
+                if isTargetVisible(currentTarget, localPlayer.Character) then
+                    return currentTarget
+                end
+            end
+        end
+        
+        -- Цель вышла из FOV или стала невалидной, сбрасываем
+        currentTarget = nil
+        targetLocked = false
+        return nil
     end
     
     -- Если нет текущей цели, ищем новую
@@ -1007,9 +1022,3 @@ end)
 
 -- Initialize UI
 Rayfield:LoadConfiguration()
-Rayfield:Notify({
-    Title = "thw club",
-    Content = "Script loaded successfully!\nDFrame теперь проверяется правильно - aimlock не будет целиться через стены\nОптимизация применена: кеширование, минимизация вычислений",
-    Duration = 5,
-    Image = 4483362458,
-})
