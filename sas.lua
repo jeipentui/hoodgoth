@@ -137,7 +137,7 @@ local function getPredictedPosition(target)
     return target.Position + hrp.Velocity * t
 end
 
--- Проверка видимости цели (wallcheck) с исключением DoorBase и DFrame
+-- Проверка видимости цели (wallcheck) с умным исключением DFrame
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
     
@@ -171,10 +171,33 @@ local function isTargetVisible(targetHead, localChar)
             return true
         end
         
-        -- Если попали в DoorBase или DFrame - игнорируем (стрелять можно)
-        -- Если попали в DFrame - игнорируем (стрелять можно)
+        -- Если попали в DFrame - проверяем, что за ним
         if hit.Name == "DFrame" then
-            return true
+            -- Делаем второй raycast от точки после DFrame
+            local newOrigin = result.Position + rayDir * 0.1  -- Немного отходим от DFrame
+            local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
+            
+            if remainingDistance > 0 then
+                -- Добавляем DFrame в игнор для второго raycast
+                local newBlacklist = {}
+                for _, obj in ipairs(blacklist) do
+                    table.insert(newBlacklist, obj)
+                end
+                table.insert(newBlacklist, hit)  -- Игнорируем сам DFrame
+                
+                rayParams.FilterDescendantsInstances = newBlacklist
+                local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
+                
+                if not secondResult then
+                    return true  -- Ничего не задели после DFrame
+                else
+                    local secondHit = secondResult.Instance
+                    -- Проверяем, попали ли в цель после DFrame
+                    return secondHit == targetHead or secondHit:IsDescendantOf(targetHead)
+                end
+            else
+                return true  -- DFrame очень близко к цели
+            end
         end
         
         -- Все остальное - невидимо
@@ -972,7 +995,7 @@ end)
 Rayfield:LoadConfiguration()
 Rayfield:Notify({
     Title = "thw club",
-    Content = "Script loaded successfully!\nDoorBase и DFrame добавлены в исключения wallcheck",
+    Content = "Script loaded successfully!\nDFrame теперь проверяется правильно - aimlock не будет целиться через стены",
     Duration = 5,
     Image = 4483362458,
 })
