@@ -464,16 +464,19 @@ local function createESPObjects(plr)
     end
 end
 
--- Функция для проверки, нужно ли создать ESP
-local function shouldCreateESP(plr)
+-- Функция для проверки, нужно ли создавать ESP (проверка дистанции)
+local function isPlayerInRange(plr)
+    if not plr or not plr.Character then return false end
+    
     local char = plr.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    
+    if not hrp or not humanoid or humanoid.Health <= 0 then
         return false
     end
     
-    local hrp = char.HumanoidRootPart
     local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-    
     return dist <= ESP_MaxDistance
 end
 
@@ -532,11 +535,20 @@ local function cacheViewportPoints(plr)
     end
 end
 
---==================== Update ESP ====================
-local function UpdateESP(plr)
+-- Оптимизированная функция обновления ESP для одного игрока
+local function updatePlayerESP(plr)
     -- Проверяем, включен ли вообще какой-либо ESP
     if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
         if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
+            hidePlayerESP(plr)
+        end
+        return
+    end
+    
+    -- Проверяем дистанцию
+    if not isPlayerInRange(plr) then
+        -- Игрок вне дистанции - скрываем ESP
+        if ESP_HPText[plr] then
             hidePlayerESP(plr)
         end
         return
@@ -547,18 +559,6 @@ local function UpdateESP(plr)
         -- Игрок мертв или нет персонажа - удаляем ESP
         if ESP_HPText[plr] then
             cleanupPlayerESP(plr)
-        end
-        return
-    end
-    
-    local hrp = char.HumanoidRootPart
-    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-    
-    -- Если игрок ВНЕ зоны видимости
-    if dist > ESP_MaxDistance then
-        -- Если у него есть ESP объекты - скрываем их
-        if ESP_HPText[plr] then
-            hidePlayerESP(plr)
         end
         return
     end
@@ -687,16 +687,10 @@ end
 local function initPlayer(plr)
     if plr == localPlayer then return end
     
-    -- Создаем ESP объекты только если игрок в зоне видимости
-    if shouldCreateESP(plr) then
-        createESPObjects(plr)
-    end
-    
     -- Подключаем обработчик смерти/возрождения
     plr.CharacterAdded:Connect(function(char)
-        if shouldCreateESP(plr) then
-            createESPObjects(plr)
-        end
+        -- Удаляем старые ESP объекты при смене персонажа
+        cleanupPlayerESP(plr)
     end)
 end
 
@@ -996,10 +990,16 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP Update для всех игроков
+    -- ESP Update ТОЛЬКО для игроков в дистанции
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer and plr.Parent then
-            UpdateESP(plr)
+            -- Проверяем дистанцию перед обновлением ESP
+            if isPlayerInRange(plr) then
+                updatePlayerESP(plr)
+            elseif ESP_HPText[plr] then
+                -- Если игрок вне дистанции, скрываем ESP
+                hidePlayerESP(plr)
+            end
         end
     end
 end)
