@@ -330,6 +330,11 @@ local partCache = {}
 local characterCache = {} -- Кеш для персонажей игроков
 local viewportCache = {} -- Кеш для WorldToViewportPoint
 
+-- Кеш для игроков в зоне видимости (чтобы не проверять всех каждый кадр)
+local playersInRange = {}
+local lastDistanceCheck = 0
+local DISTANCE_CHECK_INTERVAL = 0.2 -- Проверяем дистанцию раз в 0.2 секунды
+
 -- Функция для полной очистки ESP игрока
 local function cleanupPlayerESP(plr)
     if ESP_HPText[plr] then
@@ -372,6 +377,7 @@ local function cleanupPlayerESP(plr)
     partCache[plr] = nil
     characterCache[plr] = nil
     viewportCache[plr] = nil
+    playersInRange[plr] = nil
 end
 
 -- Функция для скрытия ESP игрока (без удаления)
@@ -447,37 +453,46 @@ local function createESPObjects(plr)
                 partCache[plr][part] = true
             end
         end
-        
-        -- Подключаем обработчик изменения персонажа
-        plr.CharacterAdded:Connect(function(char)
-            characterCache[plr] = char
-            partCache[plr] = {}
-            
-            task.wait(0.1) -- Даем время на загрузку
-            
-            for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then
-                    partCache[plr][part] = true
-                end
-            end
-        end)
     end
 end
 
--- Функция для проверки, нужно ли создавать ESP (проверка дистанции)
-local function isPlayerInRange(plr)
-    if not plr or not plr.Character then return false end
+-- Проверка дистанции с кешированием
+local function updatePlayersInRangeCache()
+    local currentTime = tick()
     
-    local char = plr.Character
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char:FindFirstChild("Humanoid")
-    
-    if not hrp or not humanoid or humanoid.Health <= 0 then
-        return false
+    -- Проверяем дистанцию только если прошло достаточно времени
+    if currentTime - lastDistanceCheck < DISTANCE_CHECK_INTERVAL then
+        return
     end
     
-    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-    return dist <= ESP_MaxDistance
+    lastDistanceCheck = currentTime
+    
+    local cameraPos = Camera.CFrame.Position
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer and plr.Character then
+            local char = plr.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char:FindFirstChild("Humanoid")
+            
+            if hrp and humanoid and humanoid.Health > 0 then
+                local dist = (cameraPos - hrp.Position).Magnitude
+                local isInRange = dist <= ESP_MaxDistance
+                
+                -- Обновляем кеш
+                playersInRange[plr] = isInRange
+                
+                -- Если игрок вышел из дистанции - скрываем ESP
+                if not isInRange and ESP_HPText[plr] then
+                    hidePlayerESP(plr)
+                end
+            else
+                playersInRange[plr] = false
+            end
+        else
+            playersInRange[plr] = false
+        end
+    end
 end
 
 -- Функция для получения углов 3D бокса
@@ -493,7 +508,7 @@ local function get3DBoxCorners(hrp)
     }
 end
 
--- Кеширование WorldToViewportPoint точек
+-- Кеширование WorldToViewportPoint точек (только для видимых игроков)
 local function cacheViewportPoints(plr)
     local char = plr.Character
     if not char then 
@@ -540,15 +555,6 @@ local function updatePlayerESP(plr)
     -- Проверяем, включен ли вообще какой-либо ESP
     if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
         if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
-            hidePlayerESP(plr)
-        end
-        return
-    end
-    
-    -- Проверяем дистанцию
-    if not isPlayerInRange(plr) then
-        -- Игрок вне дистанции - скрываем ESP
-        if ESP_HPText[plr] then
             hidePlayerESP(plr)
         end
         return
@@ -991,15 +997,14 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- ESP Update ТОЛЬКО для игроков в дистанции
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= localPlayer and plr.Parent then
-            -- Проверяем дистанцию перед обновлением ESP
-            if isPlayerInRange(plr) then
-                updatePlayerESP(plr)
-            elseif ESP_HPText[plr] then
-                -- Если игрок вне дистанции, скрываем ESP
-                hidePlayerESP(plr)
-            end
+    updatePlayersInRangeCache() -- Обновляем кеш дистанции
+    
+    for plr, isInRange in pairs(playersInRange) do
+        if isInRange then
+            updatePlayerESP(plr)
+        elseif ESP_HPText[plr] then
+            -- Если игрок вне дистанции, скрываем ESP
+            hidePlayerESP(plr)
         end
     end
 end)
