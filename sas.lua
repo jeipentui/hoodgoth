@@ -6,7 +6,6 @@ local UIS = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
-local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
@@ -804,36 +803,6 @@ Players.PlayerRemoving:Connect(function(plr)
     cleanupPlayerESP(plr)
 end)
 
---==================== Fullbright ====================
-local fullbrightEnabled = false
-local originalLighting = {
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd,
-    GlobalShadows = Lighting.GlobalShadows,
-    Ambient = Lighting.Ambient
-}
-
-local targetLighting = {
-    Brightness = 2,
-    ClockTime = 14,
-    FogEnd = 100000,
-    GlobalShadows = false,
-    Ambient = Color3.fromRGB(255,255,255)
-}
-
-local function enableFullbright()
-    for k, v in pairs(targetLighting) do
-        Lighting[k] = v
-    end
-end
-
-local function disableFullbright()
-    for k, v in pairs(originalLighting) do
-        Lighting[k] = v
-    end
-end
-
 --==================== UI Elements ====================
 
 -- Rage Tab
@@ -1053,20 +1022,6 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 })
 
 -- Misc Tab
-local FullbrightToggle = MiscTab:CreateToggle({
-    Name = "Fullbright",
-    CurrentValue = false,
-    Flag = "FullbrightToggle",
-    Callback = function(Value)
-        fullbrightEnabled = Value
-        if Value then
-            enableFullbright()
-        else
-            disableFullbright()
-        end
-    end,
-})
-
 local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
