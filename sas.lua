@@ -47,9 +47,9 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- Настройки биндов (ПО УМОЛЧАНИЮ НЕТ БИНДА)
-local aimlockKey = nil  -- Нет бинда по умолчанию
-local aimlockKeyName = "Not Set"
+-- Настройки биндов (ПОЛНОСТЬЮ БЕЗ БИНДА ПО УМОЛЧАНИЮ)
+local aimlockKey = nil  -- АБСОЛЮТНО НЕТ БИНДА
+local aimlockKeyName = "Not Set (Click to set)"
 local isRecordingKeybind = false
 local lastKeyPressed = nil
 
@@ -304,7 +304,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             lastKeyPressed = input.KeyCode
             isRecordingKeybind = false
             
-            -- Обновляем бинд
+            -- Устанавливаем бинд
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
@@ -328,7 +328,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         return
     end
     
-    -- Проверка бинда aimlock (только если бинд установлен)
+    -- Проверка бинда aimlock (РАБОТАЕТ ТОЛЬКО ЕСЛИ БИНД УСТАНОВЛЕН)
     if aimlockKey and input.KeyCode == aimlockKey then
         keyHeld = true
         -- При нажатии на клавишу ищем новую цель
@@ -340,7 +340,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 UIS.InputEnded:Connect(function(input)
-    -- Проверка бинда aimlock (только если бинд установлен)
+    -- Проверка бинда aimlock (РАБОТАЕТ ТОЛЬКО ЕСЛИ БИНД УСТАНОВЛЕН)
     if aimlockKey and input.KeyCode == aimlockKey then
         keyHeld = false
         -- При отпускании клавиши сбрасываем цель
@@ -350,48 +350,6 @@ UIS.InputEnded:Connect(function(input)
         end
     end
 end)
-
--- Функция для установки нового бинда
-local function setAimlockKey(keyCode)
-    if keyCode then
-        aimlockKey = keyCode
-        aimlockKeyName = tostring(keyCode):gsub("Enum.KeyCode.", "")
-    else
-        aimlockKey = nil
-        aimlockKeyName = "Not Set"
-    end
-    
-    -- Обновляем UI
-    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-    
-    -- Сохраняем в конфиг
-    if Window.ConfigurationSaving.Enabled then
-        local config = Window:GetConfiguration()
-        config.AimlockKey = aimlockKeyName
-        Window:SetConfiguration(config)
-    end
-end
-
--- Функция для сброса бинда
-local function clearAimlockKey()
-    aimlockKey = nil
-    aimlockKeyName = "Not Set"
-    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-    
-    Rayfield:Notify({
-        Title = "Keybind Cleared",
-        Content = "Aimlock key has been cleared",
-        Duration = 2,
-        Image = 4483362458,
-    })
-    
-    -- Сохраняем в конфиг
-    if Window.ConfigurationSaving.Enabled then
-        local config = Window:GetConfiguration()
-        config.AimlockKey = nil
-        Window:SetConfiguration(config)
-    end
-end
 
 --==================== ESP System ====================
 local Box_ESP_Enabled = false
@@ -817,19 +775,19 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- Метка для отображения текущего бинда
+-- Метка для отображения текущего бинда (можно кликнуть для установки)
 local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: " .. aimlockKeyName)
 
 -- Кнопка для установки бинда
 local SetAimlockKeyButton = RageTab:CreateButton({
-    Name = "Set Aimlock Key",
+    Name = "Set Aimlock Keybind",
     Callback = function()
         isRecordingKeybind = true
-        AimlockKeybindLabel:Set("Press any key...")
+        AimlockKeybindLabel:Set("Press any keyboard key...")
         
         Rayfield:Notify({
             Title = "Recording Keybind",
-            Content = "Press any keyboard key to set as aimlock key",
+            Content = "Press any keyboard key to set as aimlock keybind",
             Duration = 3,
             Image = 4483362458,
         })
@@ -853,9 +811,25 @@ local SetAimlockKeyButton = RageTab:CreateButton({
 
 -- Кнопка для очистки бинда
 local ClearAimlockKeyButton = RageTab:CreateButton({
-    Name = "Clear Aimlock Key",
+    Name = "Clear Aimlock Keybind",
     Callback = function()
-        clearAimlockKey()
+        aimlockKey = nil
+        aimlockKeyName = "Not Set (Click to set)"
+        AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+        
+        Rayfield:Notify({
+            Title = "Keybind Cleared",
+            Content = "Aimlock keybind has been cleared",
+            Duration = 2,
+            Image = 4483362458,
+        })
+        
+        -- Сохраняем в конфиг
+        if Window.ConfigurationSaving.Enabled then
+            local config = Window:GetConfiguration()
+            config.AimlockKey = nil
+            Window:SetConfiguration(config)
+        end
     end,
 })
 
@@ -1039,7 +1013,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimlock и Autofire (работает только если бинд установлен и зажат)
+    -- Aimlock и Autofire (работает ТОЛЬКО если бинд установлен и зажат)
     if aimbotEnabled and aimlockKey and keyHeld then
         local targetHead = getTarget()
         
@@ -1101,7 +1075,7 @@ local function loadSavedKeybind()
         local config = Window:GetConfiguration()
         if config and config.AimlockKey then
             local keyString = config.AimlockKey
-            if keyString ~= "Not Set" and keyString ~= "" then
+            if keyString and keyString ~= "" then
                 local success, keyCode = pcall(function()
                     return Enum.KeyCode[keyString]
                 end)
@@ -1110,10 +1084,14 @@ local function loadSavedKeybind()
                     aimlockKey = keyCode
                     aimlockKeyName = keyString
                     AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                else
+                    aimlockKey = nil
+                    aimlockKeyName = "Not Set (Click to set)"
+                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
                 end
             else
                 aimlockKey = nil
-                aimlockKeyName = "Not Set"
+                aimlockKeyName = "Not Set (Click to set)"
                 AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             end
         end
