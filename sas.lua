@@ -46,6 +46,7 @@ local showFOV = false
 local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
+local SilentAimEnabled = false -- Новая переменная для Silent Aim
 
 -- Добавляем переменные для оптимизированного Wallcheck
 local wallCheckParts = {}
@@ -253,6 +254,31 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
+        end
+    end,
+})
+
+-- Silent Aim Toggle
+local SilentAimToggle = RageTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAimToggle",
+    Callback = function(Value)
+        SilentAimEnabled = Value
+        if Value then
+            Rayfield:Notify({
+                Title = "Silent Aim",
+                Content = "Silent Aim активирован (через __namecall)",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Silent Aim",
+                Content = "Silent Aim деактивирован",
+                Duration = 2,
+                Image = 4483362458,
+            })
         end
     end,
 })
@@ -560,6 +586,74 @@ local function getTarget()
     
     return currentTarget
 end
+
+--==================== Silent Aim ====================
+local function setupSilentAim()
+    local success, err = pcall(function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        
+        local oldNamecall = mt.__namecall
+        
+        mt.__namecall = newcclosure(function(self, ...)
+            local args = {...}
+            local method = getnamecallmethod()
+            
+            -- Проверяем, что это нужный нам RemoteEvent
+            if method == "FireServer"
+               and SilentAimEnabled
+               and self.Name == "GNX_S"
+               and aimbotEnabled
+               and aimlockKey
+               and keyHeld then
+                
+                local targetHead = getTarget()
+                if targetHead then
+                    local predicted = getPredictedPosition(targetHead)
+                    
+                    -- Подмена позиции попадания (5-й аргумент - это позиция)
+                    if args[5] then
+                        args[5] = predicted
+                    end
+                    
+                    -- Подмена направления (6-й аргумент - это направление пули)
+                    if args[6] and type(args[6]) == "table" then
+                        local origin = Camera.CFrame.Position
+                        local dir = (predicted - origin).Unit
+                        args[6] = { dir }
+                    end
+                    
+                    print("[Silent Aim] Подмена траектории на цель:", targetHead.Parent.Name)
+                end
+            end
+            
+            return oldNamecall(self, unpack(args))
+        end)
+        
+        setreadonly(mt, true)
+        
+        print("[Silent Aim] Установлен через __namecall")
+        return true
+    end)
+    
+    if not success then
+        print("[Silent Aim] Ошибка установки:", err)
+        Rayfield:Notify({
+            Title = "Silent Aim Error",
+            Content = "Не удалось установить Silent Aim",
+            Duration = 3,
+            Image = 4483362458,
+        })
+        return false
+    end
+    return true
+end
+
+-- Запускаем Silent Aim при старте
+task.spawn(function()
+    task.wait(2) -- Ждем загрузки игры
+    setupSilentAim()
+end)
 
 --==================== NoFall Function ====================
 local function startNoFall()
@@ -1204,6 +1298,7 @@ local DestroyUIButton = MiscTab:CreateButton({
 
 -- Запускаем первичное сканирование при старте
 task.spawn(function()
+    task.wait(1)
     scanAllPartsOnce()
     
     -- Сканируем динамические парты периодически
