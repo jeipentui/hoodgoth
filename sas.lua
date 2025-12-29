@@ -47,11 +47,10 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- Настройки биндов (ПОЛНОСТЬЮ БЕЗ БИНДА ПО УМОЛЧАНИЮ)
-local aimlockKey = nil  -- АБСОЛЮТНО НЕТ БИНДА
+-- Настройки биндов
+local aimlockKey = nil
 local aimlockKeyName = "Not Set"
 local isRecordingKeybind = false
-local lastKeyPressed = nil
 
 -- Добавляем переменные для стабильного aimlock
 local currentTarget = nil -- Текущая цель
@@ -72,16 +71,7 @@ local lastFOV = fov
 
 --==================== NoFall Variables ====================
 local isNoFallEnabled = false
-local player = game:GetService("Players").LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local hrp = character:WaitForChild("HumanoidRootPart")
-
-local isFlying = false
-local lastYPosition = hrp.Position.Y
-local isSitting = false
-local fallThreshold = -1
-local maxStableY = 50
+local noFallConnection = nil
 
 --==================== UI Elements ====================
 
@@ -445,80 +435,74 @@ local function startNoFall()
     if isNoFallEnabled then return end
     isNoFallEnabled = true
     
-    -- При смене персонажа
-    player.CharacterAdded:Connect(function(newChar)
-        character = newChar
-        humanoid = newChar:WaitForChild("Humanoid")
-        hrp = newChar:WaitForChild("HumanoidRootPart")
-        isFlying = false
-        
-        pcall(function()
-            humanoid.PlatformStand = false -- Отключаем платформу
-        end)
-        
-        lastYPosition = hrp.Position.Y
-    end)
-
-    -- Основной цикл NoFall
-    RunService.Heartbeat:Connect(function()
+    print("[NoFall] Активирован")
+    
+    -- Останавливаем предыдущее подключение если есть
+    if noFallConnection then
+        noFallConnection:Disconnect()
+        noFallConnection = nil
+    end
+    
+    -- Создаем новое подключение
+    noFallConnection = RunService.Heartbeat:Connect(function()
         if not isNoFallEnabled then return end
         
-        -- Проверяем сидит ли персонаж
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not hrp then return end
+        
+        -- Если персонаж сидит - не трогаем
         if humanoid.SeatPart then
-            if isFlying then
-                isFlying = false
-                pcall(function()
-                    humanoid.PlatformStand = false -- Отключаем платформу
-                end)
-            end
-            isSitting = true
-            return
-        else
-            isSitting = false
-        end
-        
-        local currentY = hrp.Position.Y
-        local yDifference = currentY - lastYPosition
-        lastYPosition = currentY
-        
-        -- Если падаем и еще не летим
-        if yDifference < fallThreshold and not isFlying and not isSitting then
-            isFlying = true
-            pcall(function()
-                humanoid.PlatformStand = true -- ВКЛЮЧАЕМ ПЛАТФОРМУ
-            end)
-        end
-        
-        -- Если Y стабилен - выключаем
-        if isFlying and math.abs(yDifference) < 0.01 then
-            isFlying = false
-            pcall(function()
-                humanoid.PlatformStand = false -- Отключаем платформу
-            end)
+            pcall(function() humanoid.PlatformStand = false end)
             return
         end
         
-        -- Если летим - фиксируем позицию
-        if isFlying then
+        -- Получаем вертикальную скорость
+        local verticalVelocity = hrp.Velocity.Y
+        
+        -- Если падаем слишком быстро
+        if verticalVelocity < -50 then
+            pcall(function() humanoid.PlatformStand = true end)
+            
+            -- Фиксируем горизонтальную позицию
             local position = hrp.Position
-            local _, _, zAngle = hrp.Orientation:ToEulerAnglesYXZ()
-            hrp.CFrame = CFrame.new(position) * CFrame.Angles(0, math.rad(zAngle), 0)
-            hrp.Velocity = Vector3.new(0, hrp.Velocity.Y, 0)
+            hrp.CFrame = CFrame.new(position.X, position.Y, position.Z)
+            hrp.Velocity = Vector3.new(0, verticalVelocity, 0)
+        else
+            pcall(function() humanoid.PlatformStand = false end)
+        end
+        
+        -- Восстанавливаем здоровье если оно упало
+        if humanoid.Health < humanoid.MaxHealth then
+            humanoid.Health = humanoid.MaxHealth
         end
     end)
-    
-    print("NoFall с PlatformStand активирован!")
 end
 
 local function stopNoFall()
     isNoFallEnabled = false
-    isFlying = false
     
-    pcall(function()
-        humanoid.PlatformStand = false -- Отключаем платформу
-    end)
+    -- Отключаем PlatformStand для текущего персонажа
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            pcall(function() humanoid.PlatformStand = false end)
+        end
+    end
     
-    print("NoFall отключен!")
+    -- Отключаем соединение
+    if noFallConnection then
+        noFallConnection:Disconnect()
+        noFallConnection = nil
+    end
+    
+    print("[NoFall] Деактивирован")
 end
 
 --==================== Input ====================
@@ -1053,28 +1037,31 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 })
 
 -- Misc Tab
--- NoFall Toggle с PlatformStand
 local NoFallToggle = MiscTab:CreateToggle({
     Name = "NoFall Protection",
     CurrentValue = false,
     Flag = "NoFallToggle",
     Callback = function(Value)
         if Value then
-            startNoFall()
-            Rayfield:Notify({
-                Title = "NoFall Activated",
-                Content = "Fall damage protection enabled (PlatformStand)",
-                Duration = 3,
-                Image = 4483362458,
-            })
+            task.spawn(function()
+                startNoFall()
+                Rayfield:Notify({
+                    Title = "NoFall Activated",
+                    Content = "Fall damage protection enabled",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end)
         else
-            stopNoFall()
-            Rayfield:Notify({
-                Title = "NoFall Deactivated",
-                Content = "Fall damage protection disabled",
-                Duration = 2,
-                Image = 4483362458,
-            })
+            task.spawn(function()
+                stopNoFall()
+                Rayfield:Notify({
+                    Title = "NoFall Deactivated",
+                    Content = "Fall damage protection disabled",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end)
         end
     end,
 })
