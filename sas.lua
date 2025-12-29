@@ -308,10 +308,9 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
-            -- Обновляем UI - ПРАВИЛЬНО обновляем метку
+            -- Обновляем UI - ПРАВИЛЬНО используем метод :Set()
             if AimlockKeybindLabel then
-                local textToSet = "Aimlock Key: " .. aimlockKeyName
-                AimlockKeybindLabel.Text = textToSet
+                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             end
             
             Rayfield:Notify({
@@ -442,7 +441,7 @@ end
 -- Функция для создания ESP объектов
 local function createESPObjects(plr)
     -- Сначала очищаем старые объекты, если они есть
-    cleanupPlayerESP(plr)
+        cleanupPlayerESP(plr)
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -796,13 +795,13 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         })
         
         -- Временно меняем текст метки
-        AimlockKeybindLabel.Text = "Aimlock Key: Press any key..."
+        AimlockKeybindLabel:Set("Aimlock Key: Press any key...")
         
         -- Таймер на случай, если пользователь передумал
         task.delay(5, function()
             if isRecordingKeybind then
                 isRecordingKeybind = false
-                AimlockKeybindLabel.Text = "Aimlock Key: " .. aimlockKeyName
+                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
                 
                 Rayfield:Notify({
                     Title = "Keybind Recording Cancelled",
@@ -1065,7 +1064,7 @@ local function loadSavedKeybind()
                 if success and keyCode then
                     aimlockKey = keyCode
                     aimlockKeyName = keyString
-                    AimlockKeybindLabel.Text = "Aimlock Key: " .. aimlockKeyName
+                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
                 end
             end
         end
