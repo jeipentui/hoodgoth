@@ -76,6 +76,11 @@ local weaponBulletSpeeds = {
     ["AKS-74U"] = 3000,
     ["FNP-45"] = 1500,
     ["TEC-9"] = 2100,
+    ["MAC-10"] = 2250,
+    ["Tommy+"] = 2225,
+    ["Tommy"] = 2225,
+    ["MP7"] = 2600,
+    ["Uzi+"] = 2225,
 }
 
 local function getCurrentWeaponSpeed()
