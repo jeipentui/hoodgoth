@@ -308,10 +308,8 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
-            -- Обновляем UI - ВАЖНО: вызываем :Set с правильным текстом
-            if AimlockKeybindLabel then
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-            end
+            -- Обновляем UI
+            AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             
             Rayfield:Notify({
                 Title = "Keybind Set",
@@ -777,22 +775,19 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- Создаем секцию для управления биндами
-local KeybindSection = RageTab:CreateSection("Keybind Settings")
-
 -- Метка для отображения текущего бинда
-local AimlockKeybindLabel = RageTab:CreateLabel("Current Keybind: " .. aimlockKeyName)
+local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: " .. aimlockKeyName)
 
 -- Кнопка для установки бинда
 local SetAimlockKeyButton = RageTab:CreateButton({
-    Name = "Set Aimlock Keybind",
+    Name = "Set Aimlock Key",
     Callback = function()
         isRecordingKeybind = true
         AimlockKeybindLabel:Set("Press any keyboard key...")
         
         Rayfield:Notify({
             Title = "Recording Keybind",
-            Content = "Press any keyboard key to set as aimlock keybind",
+            Content = "Press any keyboard key to set as aimlock key",
             Duration = 3,
             Image = 4483362458,
         })
@@ -801,7 +796,7 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         task.delay(5, function()
             if isRecordingKeybind then
                 isRecordingKeybind = false
-                AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
+                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
                 
                 Rayfield:Notify({
                     Title = "Keybind Recording Cancelled",
@@ -814,32 +809,7 @@ local SetAimlockKeyButton = RageTab:CreateButton({
     end,
 })
 
--- Кнопка для очистки бинда
-local ClearAimlockKeyButton = RageTab:CreateButton({
-    Name = "Clear Aimlock Keybind",
-    Callback = function()
-        aimlockKey = nil
-        aimlockKeyName = "Not Set"
-        AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
-        
-        Rayfield:Notify({
-            Title = "Keybind Cleared",
-            Content = "Aimlock keybind has been cleared",
-            Duration = 2,
-            Image = 4483362458,
-        })
-        
-        -- Сохраняем в конфиг
-        if Window.ConfigurationSaving.Enabled then
-            local config = Window:GetConfiguration()
-            config.AimlockKey = nil
-            Window:SetConfiguration(config)
-        end
-    end,
-})
-
--- Разделитель для лучшей организации
-local AimSettingsSection = RageTab:CreateSection("Aim Settings")
+-- Кнопка для очистки бинда УБРАНА - теперь можно просто переустановить бинд
 
 local AutofireToggle = RageTab:CreateToggle({
     Name = "Autofire",
@@ -894,9 +864,6 @@ local FOVColorPicker = RageTab:CreateColorPicker({
         fovCircle.Color = Value
     end
 })
-
--- Разделитель для Friend List
-local FriendListSection = RageTab:CreateSection("Friend List")
 
 local FriendListLabel = RageTab:CreateLabel("Friend List: " .. table.concat(FriendList, ", "))
 
@@ -1094,9 +1061,7 @@ local function loadSavedKeybind()
                 if success and keyCode then
                     aimlockKey = keyCode
                     aimlockKeyName = keyString
-                    if AimlockKeybindLabel then
-                        AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
-                    end
+                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
                 end
             end
         end
