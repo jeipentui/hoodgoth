@@ -308,10 +308,8 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
-            -- Обновляем UI - ПРАВИЛЬНО используем метод :Set()
-            if AimlockKeybindLabel then
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-            end
+            -- Обновляем UI
+            AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             
             Rayfield:Notify({
                 Title = "Keybind Set",
@@ -441,7 +439,7 @@ end
 -- Функция для создания ESP объектов
 local function createESPObjects(plr)
     -- Сначала очищаем старые объекты, если они есть
-        cleanupPlayerESP(plr)
+    cleanupPlayerESP(plr)
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -777,8 +775,8 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- Метка для отображения текущего бинда
-local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: " .. aimlockKeyName)
+-- Создаем метку ДО использования
+local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: Not Set")
 
 -- Кнопка для установки бинда
 local SetAimlockKeyButton = RageTab:CreateButton({
@@ -795,7 +793,7 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         })
         
         -- Временно меняем текст метки
-        AimlockKeybindLabel:Set("Aimlock Key: Press any key...")
+        AimlockKeybindLabel:Set("Press any keyboard key...")
         
         -- Таймер на случай, если пользователь передумал
         task.delay(5, function()
