@@ -311,147 +311,76 @@ UIS.InputEnded:Connect(function(i)
     end
 end)
 
---==================== Flattened 3D Box ESP System ====================
-local Box3D_Enabled = false
-local ESP_MaxDistance = 1500
+--==================== ESP System ====================
+local Box_ESP_Enabled = false
 local ESP_HPEnabled = false
 local ESP_NameEnabled = false
 local ESP_HPDynamicEnabled = false
 local ESP_WeaponEnabled = false
-local Settings = {
-    ESP_Color = Color3.fromRGB(255,0,0), 
-    Friend_Color = Color3.fromRGB(0,255,0)
-}
+local ESP_MaxDistance = 1500
+local Settings = {ESP_Color=Color3.fromRGB(255,0,0), Friend_Color=Color3.fromRGB(0,255,0)}
 
--- Кеш для ESP объектов
+-- Таблицы для хранения ESP объектов
 local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
-local Box3D_Cache = {}
-local characterCache = {}
+local ESP_Boxes = {}
+local partCache = {}
+local characterCache = {} -- Кеш для персонажей игроков
+local viewportCache = {} -- Кеш для WorldToViewportPoint
+
+-- Кеш для игроков в зоне видимости (чтобы не проверять всех каждый кадр)
 local playersInRange = {}
 local lastDistanceCheck = 0
-local DISTANCE_CHECK_INTERVAL = 0.2
+local DISTANCE_CHECK_INTERVAL = 0.2 -- Проверяем дистанцию раз в 0.2 секунды
 
--- Размеры персонажа для сплюснутого 3D бокса
-local HUMAN_SIZE = {
-    Width = 4,
-    Height = 6,
-    Depth = 1.5  -- Глубина для эффекта 3D (сплюснутая)
-}
-
--- Функция для создания объектов сплюснутого 3D бокса
-local function createFlattenedBox3D(plr)
-    if Box3D_Cache[plr] then return Box3D_Cache[plr] end
-    
-    Box3D_Cache[plr] = {
-        frontBox = Drawing.new("Quad"),      -- Передняя грань (прямоугольник)
-        backBox = Drawing.new("Quad"),       -- Задняя грань (смещенная)
-        connectingLines = {},                -- Соединительные линии
-        visible = false,
-        color = Settings.ESP_Color
-    }
-    
-    local cache = Box3D_Cache[plr]
-    
-    -- Настраиваем переднюю грань
-    cache.frontBox.Visible = false
-    cache.frontBox.Thickness = 1
-    cache.frontBox.Color = Settings.ESP_Color
-    cache.frontBox.Filled = false
-    
-    -- Настраиваем заднюю грань
-    cache.backBox.Visible = false
-    cache.backBox.Thickness = 1
-    cache.backBox.Color = Settings.ESP_Color
-    cache.backBox.Filled = false
-    
-    -- Создаем 4 соединительные линии (сплюснутый эффект)
-    for i = 1, 4 do
-        local line = Drawing.new("Line")
-        line.Visible = false
-        line.Thickness = 1
-        line.Color = Settings.ESP_Color
-        table.insert(cache.connectingLines, line)
-    end
-    
-    return cache
-end
-
--- Функция для скрытия сплюснутого 3D бокса
-local function hideFlattenedBox3D(plr)
-    local cache = Box3D_Cache[plr]
-    if not cache then return end
-    
-    cache.visible = false
-    cache.frontBox.Visible = false
-    cache.backBox.Visible = false
-    
-    for _, line in ipairs(cache.connectingLines) do
-        line.Visible = false
-    end
-end
-
--- Функция для удаления сплюснутого 3D бокса
-local function cleanupFlattenedBox3D(plr)
-    local cache = Box3D_Cache[plr]
-    if not cache then return end
-    
-    if cache.frontBox then
-        cache.frontBox.Visible = false
-        cache.frontBox:Remove()
-    end
-    
-    if cache.backBox then
-        cache.backBox.Visible = false
-        cache.backBox:Remove()
-    end
-    
-    for _, line in ipairs(cache.connectingLines) do
-        if line then
-            line.Visible = false
-            line:Remove()
-        end
-    end
-    
-    Box3D_Cache[plr] = nil
-end
-
--- Функция для очистки ESP игрока
+-- Функция для полной очистки ESP игрока
 local function cleanupPlayerESP(plr)
-    -- Очищаем 3D Box
-    cleanupFlattenedBox3D(plr)
-    
-    -- Очищаем текстовые ESP
     if ESP_HPText[plr] then
-        ESP_HPText[plr].Visible = false
-        ESP_HPText[plr]:Remove()
+        if ESP_HPText[plr] then
+            ESP_HPText[plr].Visible = false
+            ESP_HPText[plr]:Remove()
+        end
         ESP_HPText[plr] = nil
     end
     
     if ESP_NameText[plr] then
-        ESP_NameText[plr].Visible = false
-        ESP_NameText[plr]:Remove()
+        if ESP_NameText[plr] then
+            ESP_NameText[plr].Visible = false
+            ESP_NameText[plr]:Remove()
+        end
         ESP_NameText[plr] = nil
     end
     
     if ESP_WeaponText[plr] then
-        ESP_WeaponText[plr].Visible = false
-        ESP_WeaponText[plr]:Remove()
+        if ESP_WeaponText[plr] then
+            ESP_WeaponText[plr].Visible = false
+            ESP_WeaponText[plr]:Remove()
+        end
         ESP_WeaponText[plr] = nil
     end
     
+    if ESP_Boxes[plr] then
+        if ESP_Boxes[plr].box then
+            ESP_Boxes[plr].box.Visible = false
+            ESP_Boxes[plr].box:Remove()
+        end
+        if ESP_Boxes[plr].boxoutline then
+            ESP_Boxes[plr].boxoutline.Visible = false
+            ESP_Boxes[plr].boxoutline:Remove()
+        end
+        ESP_Boxes[plr] = nil
+    end
+    
     -- Очищаем кеши
+    partCache[plr] = nil
     characterCache[plr] = nil
+    viewportCache[plr] = nil
     playersInRange[plr] = nil
 end
 
 -- Функция для скрытия ESP игрока (без удаления)
 local function hidePlayerESP(plr)
-    -- Скрываем 3D Box
-    hideFlattenedBox3D(plr)
-    
-    -- Скрываем текстовые ESP
     if ESP_HPText[plr] then
         ESP_HPText[plr].Visible = false
     end
@@ -461,62 +390,82 @@ local function hidePlayerESP(plr)
     if ESP_WeaponText[plr] then
         ESP_WeaponText[plr].Visible = false
     end
+    if ESP_Boxes[plr] then
+        ESP_Boxes[plr].box.Visible = false
+        ESP_Boxes[plr].boxoutline.Visible = false
+    end
 end
 
--- Функция для создания текстовых ESP объектов
+-- Функция для создания ESP объектов
 local function createESPObjects(plr)
-    -- Очищаем старые объекты
+    -- Сначала очищаем старые объекты, если они есть
     cleanupPlayerESP(plr)
     
-    -- Создаем 3D Box если нужно
-    if Box3D_Enabled then
-        createFlattenedBox3D(plr)
-    end
+    -- Текст для HP
+    local hpText = Drawing.new("Text")
+    hpText.Visible = false
+    hpText.Color = Settings.ESP_Color
+    hpText.Size = 14
+    hpText.Center = true
+    hpText.Outline = true
+    ESP_HPText[plr] = hpText
     
-    -- Создаем текстовые ESP
-    if ESP_HPEnabled then
-        local hpText = Drawing.new("Text")
-        hpText.Visible = false
-        hpText.Color = Settings.ESP_Color
-        hpText.Size = 14
-        hpText.Center = true
-        hpText.Outline = true
-        ESP_HPText[plr] = hpText
-    end
+    -- Текст для имени
+    local nameText = Drawing.new("Text")
+    nameText.Visible = false
+    nameText.Color = Settings.ESP_Color
+    nameText.Size = 9
+    nameText.Center = true
+    nameText.Outline = true
+    ESP_NameText[plr] = nameText
     
-    if ESP_NameEnabled then
-        local nameText = Drawing.new("Text")
-        nameText.Visible = false
-        nameText.Color = Settings.ESP_Color
-        nameText.Size = 9
-        nameText.Center = true
-        nameText.Outline = true
-        ESP_NameText[plr] = nameText
-    end
+    -- Текст для оружия
+    local weaponText = Drawing.new("Text")
+    weaponText.Visible = false
+    weaponText.Color = Settings.ESP_Color
+    weaponText.Size = 12
+    weaponText.Center = true
+    weaponText.Outline = true
+    ESP_WeaponText[plr] = weaponText
     
-    if ESP_WeaponEnabled then
-        local weaponText = Drawing.new("Text")
-        weaponText.Visible = false
-        weaponText.Color = Settings.ESP_Color
-        weaponText.Size = 12
-        weaponText.Center = true
-        weaponText.Outline = true
-        ESP_WeaponText[plr] = weaponText
-    end
+    -- Box для Box ESP
+    local box = Drawing.new("Square")
+    box.Visible = false
+    box.Thickness = 1
+    box.Color = Settings.ESP_Color
     
-    -- Инициализируем кеш
+    local boxoutline = Drawing.new("Square")
+    boxoutline.Visible = false
+    boxoutline.Thickness = 1
+    boxoutline.Color = Settings.ESP_Color
+    
+    ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
+    
+    -- Инициализируем кеш частей
+    partCache[plr] = {}
     characterCache[plr] = plr.Character
+    
+    -- Кешируем части персонажа
+    if plr.Character then
+        for _, part in ipairs(plr.Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
+            end
+        end
+    end
 end
 
 -- Проверка дистанции с кешированием
 local function updatePlayersInRangeCache()
     local currentTime = tick()
     
+    -- Проверяем дистанцию только если прошло достаточно времени
     if currentTime - lastDistanceCheck < DISTANCE_CHECK_INTERVAL then
         return
     end
     
     lastDistanceCheck = currentTime
+    
     local cameraPos = Camera.CFrame.Position
     
     for _, plr in pairs(Players:GetPlayers()) do
@@ -527,7 +476,15 @@ local function updatePlayersInRangeCache()
             
             if hrp and humanoid and humanoid.Health > 0 then
                 local dist = (cameraPos - hrp.Position).Magnitude
-                playersInRange[plr] = dist <= ESP_MaxDistance
+                local isInRange = dist <= ESP_MaxDistance
+                
+                -- Обновляем кеш
+                playersInRange[plr] = isInRange
+                
+                -- Если игрок вышел из дистанции - скрываем ESP
+                if not isInRange and ESP_HPText[plr] then
+                    hidePlayerESP(plr)
+                end
             else
                 playersInRange[plr] = false
             end
@@ -537,42 +494,25 @@ local function updatePlayersInRangeCache()
     end
 end
 
--- Получение точек для сплюснутого 3D бокса
-local function getFlattenedBoxPoints(hrp, depthScale)
-    if not hrp then return nil end
-    
+-- Функция для получения углов 3D бокса (оптимизированная версия)
+local function get3DBoxCorners(hrp)
     local cf = hrp.CFrame
-    local width = HUMAN_SIZE.Width
-    local height = HUMAN_SIZE.Height
-    local depth = HUMAN_SIZE.Depth * depthScale
-    
-    -- Углы передней грани
-    local frontCorners = {
-        cf * Vector3.new(-width/2, height/2, 0),      -- Верхний левый
-        cf * Vector3.new(width/2, height/2, 0),       -- Верхний правый
-        cf * Vector3.new(width/2, -height/2, 0),      -- Нижний правый
-        cf * Vector3.new(-width/2, -height/2, 0)      -- Нижний левый
-    }
-    
-    -- Углы задней грани (смещены по Z)
-    local backCorners = {
-        cf * Vector3.new(-width/2, height/2, depth),  -- Верхний левый
-        cf * Vector3.new(width/2, height/2, depth),   -- Верхний правый
-        cf * Vector3.new(width/2, -height/2, depth),  -- Нижний правый
-        cf * Vector3.new(-width/2, -height/2, depth)  -- Нижний левый
-    }
-    
+    local size = Vector3.new(4, 6, 1.5)
+
     return {
-        front = frontCorners,
-        back = backCorners
+        cf * Vector3.new(-size.X/2, size.Y/2, 0),
+        cf * Vector3.new( size.X/2, size.Y/2, 0),
+        cf * Vector3.new(-size.X/2,-size.Y/2, 0),
+        cf * Vector3.new( size.X/2,-size.Y/2, 0),
     }
 end
 
--- Кешируем точки обзора для текущего кадра
-local viewportCache = {}
+-- Кеширование WorldToViewportPoint точек (только для видимых игроков)
 local function cacheViewportPoints()
+    -- Очищаем кеш предыдущего кадра
     viewportCache = {}
     
+    -- Кешируем точки только для живых игроков в пределах дистанции
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer and playersInRange[plr] then
             local char = plr.Character
@@ -581,56 +521,32 @@ local function cacheViewportPoints()
                 local humanoid = char:FindFirstChild("Humanoid")
                 
                 if hrp and humanoid and humanoid.Health > 0 then
-                    -- Вычисляем масштаб глубины на основе дистанции (чем дальше - тем сплюснутее)
-                    local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-                    local depthScale = math.clamp(1 - (dist / 1000), 0.1, 0.3)
-                    
-                    -- Получаем точки бокса
-                    local boxPoints = getFlattenedBoxPoints(hrp, depthScale)
-                    if not boxPoints then continue end
-                    
-                    -- Кешируем экранные координаты
+                    -- Создаем или обновляем кеш
                     viewportCache[plr] = {
-                        frontScreen = {},
-                        backScreen = {},
-                        headScreen = nil,
+                        head = nil,
+                        boxCorners = {},
                         anyVisible = false
                     }
                     
-                    local cache = viewportCache[plr]
+                    local data = viewportCache[plr]
                     
-                    -- Преобразуем переднюю грань
-                    local anyFrontVisible = false
-                    for i = 1, 4 do
-                        local screenPos = Camera:WorldToViewportPoint(boxPoints.front[i])
-                        cache.frontScreen[i] = {
-                            pos = Vector2.new(screenPos.X, screenPos.Y),
-                            visible = screenPos.Z > 0
-                        }
-                        if screenPos.Z > 0 then anyFrontVisible = true end
-                    end
-                    
-                    -- Преобразуем заднюю грань
-                    local anyBackVisible = false
-                    for i = 1, 4 do
-                        local screenPos = Camera:WorldToViewportPoint(boxPoints.back[i])
-                        cache.backScreen[i] = {
-                            pos = Vector2.new(screenPos.X, screenPos.Y),
-                            visible = screenPos.Z > 0
-                        }
-                        if screenPos.Z > 0 then anyBackVisible = true end
-                    end
-                    
-                    cache.anyVisible = anyFrontVisible or anyBackVisible
-                    
-                    -- Кешируем голову для текстовых ESP
+                    -- Кешируем позицию головы
                     local head = char:FindFirstChild("Head")
                     if head then
-                        local headPos = Camera:WorldToViewportPoint(head.Position)
-                        cache.headScreen = {
-                            pos = Vector2.new(headPos.X, headPos.Y),
-                            visible = headPos.Z > 0
-                        }
+                        local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+                        data.head = {pos = Vector2.new(headPos.X, headPos.Y), visible = headVisible, z = headPos.Z}
+                        if headVisible then data.anyVisible = true end
+                    end
+                    
+                    -- Кешируем углы для Box ESP (только если включен Box ESP)
+                    if Box_ESP_Enabled then
+                        local corners = get3DBoxCorners(hrp)
+                        
+                        for i, corner in ipairs(corners) do
+                            local pos, visible = Camera:WorldToViewportPoint(corner)
+                            data.boxCorners[i] = {pos = Vector2.new(pos.X, pos.Y), visible = visible, z = pos.Z}
+                            if visible then data.anyVisible = true end
+                        end
                     end
                 end
             end
@@ -638,143 +554,139 @@ local function cacheViewportPoints()
     end
 end
 
--- Обновление сплюснутого 3D бокса
-local function updateFlattenedBox3D()
-    if not Box3D_Enabled then
-        for plr in pairs(Box3D_Cache) do
-            hideFlattenedBox3D(plr)
+-- Оптимизированная функция обновления ESP для одного игрока
+local function updatePlayerESP(plr)
+    -- Проверяем, включен ли вообще какой-либо ESP
+    if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
+        if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
+            hidePlayerESP(plr)
         end
-        return
-    end
-    
-    for plr, cache in pairs(viewportCache) do
-        if cache.anyVisible then
-            -- Проверяем, есть ли бокс в кеше, если нет - создаем
-            if not Box3D_Cache[plr] then
-                createFlattenedBox3D(plr)
-            end
-            
-            local boxData = Box3D_Cache[plr]
-            local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-            
-            -- Рисуем переднюю грань
-            local allFrontVisible = true
-            for i = 1, 4 do
-                if not cache.frontScreen[i] or not cache.frontScreen[i].visible then
-                    allFrontVisible = false
-                    break
-                end
-            end
-            
-            if allFrontVisible then
-                boxData.frontBox.PointA = cache.frontScreen[1].pos
-                boxData.frontBox.PointB = cache.frontScreen[2].pos
-                boxData.frontBox.PointC = cache.frontScreen[3].pos
-                boxData.frontBox.PointD = cache.frontScreen[4].pos
-                boxData.frontBox.Color = color
-                boxData.frontBox.Visible = true
-            else
-                boxData.frontBox.Visible = false
-            end
-            
-            -- Рисуем заднюю грань
-            local allBackVisible = true
-            for i = 1, 4 do
-                if not cache.backScreen[i] or not cache.backScreen[i].visible then
-                    allBackVisible = false
-                    break
-                end
-            end
-            
-            if allBackVisible then
-                boxData.backBox.PointA = cache.backScreen[1].pos
-                boxData.backBox.PointB = cache.backScreen[2].pos
-                boxData.backBox.PointC = cache.backScreen[3].pos
-                boxData.backBox.PointD = cache.backScreen[4].pos
-                boxData.backBox.Color = color
-                boxData.backBox.Visible = true
-            else
-                boxData.backBox.Visible = false
-            end
-            
-            -- Рисуем соединительные линии (сплюснутый эффект)
-            for i = 1, 4 do
-                local line = boxData.connectingLines[i]
-                if cache.frontScreen[i] and cache.frontScreen[i].visible and 
-                   cache.backScreen[i] and cache.backScreen[i].visible then
-                    line.From = cache.frontScreen[i].pos
-                    line.To = cache.backScreen[i].pos
-                    line.Color = color
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            end
-            
-            boxData.visible = true
-            boxData.color = color
-        elseif Box3D_Cache[plr] then
-            hideFlattenedBox3D(plr)
-        end
-    end
-end
-
--- Обновление текстовых ESP
-local function updateTextESP(plr)
-    if not playersInRange[plr] then
-        hidePlayerESP(plr)
         return
     end
     
     local char = plr.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") or char.Humanoid.Health <= 0 then
-        cleanupPlayerESP(plr)
+        -- Игрок мертв или нет персонажа - удаляем ESP
+        if ESP_HPText[plr] then
+            cleanupPlayerESP(plr)
+        end
         return
     end
     
-    -- Если ESP объектов нет - создаем их
-    if not ESP_HPText[plr] and not ESP_NameText[plr] and not ESP_WeaponText[plr] then
+    -- Если игрок В зоне видимости, но ESP объектов нет - создаем их
+    if not ESP_HPText[plr] then
         createESPObjects(plr)
     end
     
-    local cache = viewportCache[plr]
-    if not cache or not cache.headScreen or not cache.headScreen.visible then
+    -- Проверяем, не изменился ли персонаж
+    if characterCache[plr] ~= char then
+        characterCache[plr] = char
+        partCache[plr] = {}
+        
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                partCache[plr][part] = true
+            end
+        end
+    end
+    
+    -- Используем кешированные точки
+    local data = viewportCache[plr]
+    if not data or not data.anyVisible then
         hidePlayerESP(plr)
         return
     end
     
     local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-    local headPos = cache.headScreen.pos
+    local hpText = ESP_HPText[plr]
+    local nameText = ESP_NameText[plr]
+    local weaponText = ESP_WeaponText[plr]
+    local boxes = ESP_Boxes[plr]
     
-    -- Обновляем текстовые ESP
-    if ESP_HPEnabled and ESP_HPText[plr] then
-        local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
-        local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
-        ESP_HPText[plr].Position = Vector2.new(headPos.X + 20, headPos.Y)
-        ESP_HPText[plr].Text = math.floor(hp) .. " HP"
-        ESP_HPText[plr].Color = hpColor
-        ESP_HPText[plr].Visible = true
-    elseif ESP_HPText[plr] then
-        ESP_HPText[plr].Visible = false
+    -- Обновляем текстовые ESP (используя кешированные точки головы)
+    if data.head and data.head.visible then
+        local headPos = data.head.pos
+        
+        -- HP Text
+        if ESP_HPEnabled and hpText then
+            local hp = math.clamp(char.Humanoid.Health, 0, char.Humanoid.MaxHealth)
+            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/char.Humanoid.MaxHealth)/3,1,1) or color
+            hpText.Position = Vector2.new(headPos.X + 20, headPos.Y)
+            hpText.Text = math.floor(hp) .. " HP"
+            hpText.Color = hpColor
+            hpText.Visible = true
+        elseif hpText then
+            hpText.Visible = false
+        end
+        
+        -- Name Text
+        if ESP_NameEnabled and nameText then
+            nameText.Position = Vector2.new(headPos.X, headPos.Y - 15)
+            nameText.Text = plr.Name
+            nameText.Color = color
+            nameText.Visible = true
+        elseif nameText then
+            nameText.Visible = false
+        end
+        
+        -- Weapon Text
+        if ESP_WeaponEnabled and weaponText then
+            local tool = char:FindFirstChildOfClass("Tool")
+            weaponText.Position = Vector2.new(headPos.X, headPos.Y + 15)
+            weaponText.Text = tool and tool.Name or "None"
+            weaponText.Color = color
+            weaponText.Visible = true
+        elseif weaponText then
+            weaponText.Visible = false
+        end
+    else
+        if hpText then hpText.Visible = false end
+        if nameText then nameText.Visible = false end
+        if weaponText then weaponText.Visible = false end
     end
-    
-    if ESP_NameEnabled and ESP_NameText[plr] then
-        ESP_NameText[plr].Position = Vector2.new(headPos.X, headPos.Y - 15)
-        ESP_NameText[plr].Text = plr.Name
-        ESP_NameText[plr].Color = color
-        ESP_NameText[plr].Visible = true
-    elseif ESP_NameText[plr] then
-        ESP_NameText[plr].Visible = false
-    end
-    
-    if ESP_WeaponEnabled and ESP_WeaponText[plr] then
-        local tool = char:FindFirstChildOfClass("Tool")
-        ESP_WeaponText[plr].Position = Vector2.new(headPos.X, headPos.Y + 15)
-        ESP_WeaponText[plr].Text = tool and tool.Name or "None"
-        ESP_WeaponText[plr].Color = color
-        ESP_WeaponText[plr].Visible = true
-    elseif ESP_WeaponText[plr] then
-        ESP_WeaponText[plr].Visible = false
+
+    -- Box ESP
+    if Box_ESP_Enabled and boxes then
+        local boxCorners = data.boxCorners
+        
+        if boxCorners and #boxCorners > 0 then
+            local minX, minY, maxX, maxY = 9e9, 9e9, -9e9, -9e9
+            local anyVisible = false
+            
+            for _, corner in ipairs(boxCorners) do
+                if corner.visible and corner.z > 0 then
+                    anyVisible = true
+                    minX = math.min(minX, corner.pos.X)
+                    minY = math.min(minY, corner.pos.Y)
+                    maxX = math.max(maxX, corner.pos.X)
+                    maxY = math.max(maxY, corner.pos.Y)
+                end
+            end
+            
+            if anyVisible then
+                local w, h = maxX - minX, maxY - minY
+                local pos = Vector2.new(minX, minY)
+                
+                boxes.box.Position = pos
+                boxes.box.Size = Vector2.new(w, h)
+                boxes.box.Color = color
+                boxes.box.Visible = true
+                
+                boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
+                boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
+                boxes.boxoutline.Color = color
+                boxes.boxoutline.Visible = true
+            else
+                boxes.box.Visible = false
+                boxes.boxoutline.Visible = false
+            end
+        else
+            boxes.box.Visible = false
+            boxes.boxoutline.Visible = false
+        end
+    elseif boxes then
+        boxes.box.Visible = false
+        boxes.boxoutline.Visible = false
     end
 end
 
@@ -782,17 +694,21 @@ end
 local function initPlayer(plr)
     if plr == localPlayer then return end
     
+    -- Подключаем обработчик смерти/возрождения
     plr.CharacterAdded:Connect(function(char)
+        -- Удаляем старые ESP объекты при смене персонажа
         cleanupPlayerESP(plr)
     end)
 end
 
+-- Инициализируем существующих игроков
 for _, plr in pairs(Players:GetPlayers()) do
     if plr ~= localPlayer then
         initPlayer(plr)
     end
 end
 
+-- Обработчики добавления/удаления игроков
 Players.PlayerAdded:Connect(function(plr)
     if plr ~= localPlayer then
         initPlayer(plr)
@@ -902,29 +818,6 @@ local ClearFriendsButton = RageTab:CreateButton({
 })
 
 -- ESP Tab
-local Box3DToggle = ESPTab:CreateToggle({
-    Name = "Flattened 3D Box ESP",
-    CurrentValue = false,
-    Flag = "Box3DToggle",
-    Callback = function(Value)
-        Box3D_Enabled = Value
-        
-        -- Если выключаем - скрываем все боксы
-        if not Value then
-            for plr in pairs(Box3D_Cache) do
-                hideFlattenedBox3D(plr)
-            end
-        end
-        
-        Rayfield:Notify({
-            Title = "Flattened 3D Box ESP",
-            Content = Value and "Enabled" or "Disabled",
-            Duration = 1,
-            Image = 4483362458,
-        })
-    end,
-})
-
 local HPToggle = ESPTab:CreateToggle({
     Name = "Health ESP",
     CurrentValue = false,
@@ -940,6 +833,15 @@ local HPDynamicToggle = ESPTab:CreateToggle({
     Flag = "HPDynamicToggle",
     Callback = function(Value)
         ESP_HPDynamicEnabled = Value
+    end,
+})
+
+local BoxToggle = ESPTab:CreateToggle({
+    Name = "Box ESP",
+    CurrentValue = false,
+    Flag = "BoxToggle",
+    Callback = function(Value)
+        Box_ESP_Enabled = Value
     end,
 })
 
@@ -961,51 +863,12 @@ local WeaponToggle = ESPTab:CreateToggle({
     end,
 })
 
--- ОБЩАЯ палитра для всех ESP элементов
 local ESPColorPicker = ESPTab:CreateColorPicker({
     Name = "ESP Color",
     Color = Settings.ESP_Color,
     Flag = "ESPColor",
     Callback = function(Value)
-        -- Обновляем общий цвет
         Settings.ESP_Color = Value
-        
-        -- Обновляем цвет всех существующих 3D боксов
-        for plr, boxData in pairs(Box3D_Cache) do
-            if boxData.visible then
-                local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-                boxData.frontBox.Color = color
-                boxData.backBox.Color = color
-                for _, line in ipairs(boxData.connectingLines) do
-                    line.Color = color
-                end
-                boxData.color = color
-            end
-        end
-        
-        -- Обновляем цвет всех существующих текстовых ESP
-        for plr in pairs(ESP_HPText) do
-            if ESP_HPText[plr] and ESP_HPText[plr].Visible then
-                local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-                if not ESP_HPDynamicEnabled then
-                    ESP_HPText[plr].Color = color
-                end
-            end
-        end
-        
-        for plr in pairs(ESP_NameText) do
-            if ESP_NameText[plr] and ESP_NameText[plr].Visible then
-                local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-                ESP_NameText[plr].Color = color
-            end
-        end
-        
-        for plr in pairs(ESP_WeaponText) do
-            if ESP_WeaponText[plr] and ESP_WeaponText[plr].Visible then
-                local color = isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
-                ESP_WeaponText[plr].Color = color
-            end
-        end
     end
 })
 
@@ -1026,9 +889,6 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         -- Очищаем все ESP объекты перед уничтожением
-        for plr, _ in pairs(Box3D_Cache) do
-            cleanupPlayerESP(plr)
-        end
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
         end
@@ -1100,14 +960,12 @@ RunService.RenderStepped:Connect(function()
     -- 2. Кешируем все точки для текущего кадра
     cacheViewportPoints()
     
-    -- 3. Обновляем сплюснутый 3D Box ESP
-    updateFlattenedBox3D()
-    
-    -- 4. Обновляем текстовые ESP
-    for plr in pairs(playersInRange) do
-        if playersInRange[plr] then
-            updateTextESP(plr)
+    -- 3. Обновляем ESP только для игроков в дистанции
+    for plr, isInRange in pairs(playersInRange) do
+        if isInRange then
+            updatePlayerESP(plr)
         elseif ESP_HPText[plr] then
+            -- Если игрок вне дистанции, скрываем ESP
             hidePlayerESP(plr)
         end
     end
