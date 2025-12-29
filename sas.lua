@@ -949,8 +949,5 @@ local function loadSavedKeybind()
     end
 end
 
--- Загружаем сохраненный бинд при запуске
-loadSavedKeybind()
-
 -- Инициализация UI
 Rayfield:LoadConfiguration()
