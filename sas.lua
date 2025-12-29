@@ -16,7 +16,7 @@ local Window = Rayfield:CreateWindow({
     LoadingTitle = "Loading Interface...",
     LoadingSubtitle = "by thw",
     ConfigurationSaving = {
-        Enabled = true, -- НАСТРОЙКИ ЧИТА СОХРАНЯЮТСЯ
+        Enabled = true,
         FolderName = "thw-club",
         FileName = "config"
     },
@@ -26,7 +26,7 @@ local Window = Rayfield:CreateWindow({
         Subtitle = "Enter key",
         Note = "No method of obtaining the key is provided",
         FileName = "Key",
-        SaveKey = false, -- КЛЮЧЕВАЯ СИСТЕМА ВЫКЛЮЧЕНА
+        SaveKey = false,
         GrabKeyFromSite = false,
         Key = {"Key1", "Key2"}
     }
@@ -46,6 +46,13 @@ local showFOV = false
 local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
+
+-- Добавляем переменные для оптимизированного Wallcheck
+local wallCheckParts = {}
+local lastWallCheckScan = 0
+local WALLCHECK_SCAN_INTERVAL = 5 -- Сканируем динамические парты каждые 5 секунд
+local WALLCHECK_RADIUS = 100 -- Радиус проверки в метрах
+local initialScanDone = false -- Флаг первичного сканирования
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
@@ -72,6 +79,167 @@ local lastFOV = fov
 --==================== NoFall Variables ====================
 local isNoFallEnabled = false
 local noFallConnection = nil
+
+--==================== Функции для оптимизированного Wallcheck ====================
+
+-- Функция для сканирования ВСЕХ партов при запуске (один раз)
+local function scanAllPartsOnce()
+    if initialScanDone then return end
+    initialScanDone = true
+    
+    print("[WallCheck] Начинаем первичное сканирование всех партов...")
+    wallCheckParts = {} -- Очищаем старый список
+    
+    local startTime = tick()
+    local partCount = 0
+    
+    -- Сканируем Workspace и все его дочерние объекты
+    local function scanFolder(folder)
+        for _, obj in pairs(folder:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:IsA("TrussPart") then
+                -- Исключаем персонажей и их части
+                local isCharacterPart = false
+                local parent = obj.Parent
+                
+                while parent do
+                    if parent:IsA("Model") and parent:FindFirstChild("Humanoid") then
+                        isCharacterPart = true
+                        break
+                    end
+                    parent = parent.Parent
+                end
+                
+                if not isCharacterPart then
+                    -- Добавляем только статические парты (не двигающиеся)
+                    if not obj.Anchored or obj.CanCollide then
+                        table.insert(wallCheckParts, {
+                            part = obj,
+                            position = obj.Position,
+                            anchored = obj.Anchored,
+                            canCollide = obj.CanCollide,
+                            isDynamic = not obj.Anchored -- Динамические парты
+                        })
+                        partCount = partCount + 1
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Сканируем основные места
+    scanFolder(workspace)
+    
+    local endTime = tick()
+    print(string.format("[WallCheck] Первичное сканирование завершено: %d партов за %.2f секунд", partCount, endTime - startTime))
+end
+
+-- Функция для сканирования динамических партов в радиусе 100м (каждые 5 секунд)
+local function scanDynamicPartsNearby()
+    local currentTime = tick()
+    
+    -- Проверяем, прошло ли 5 секунд с последнего сканирования
+    if currentTime - lastWallCheckScan < WALLCHECK_SCAN_INTERVAL then
+        return
+    end
+    
+    lastWallCheckScan = currentTime
+    
+    local playerPos = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not playerPos then return end
+    
+    local playerPosition = playerPos.Position
+    local dynamicPartsFound = 0
+    
+    -- Обновляем позиции динамических партов в радиусе 100м
+    for i, partData in ipairs(wallCheckParts) do
+        local part = partData.part
+        if part and part:IsDescendantOf(workspace) then
+            -- Проверяем дистанцию
+            local distance = (playerPosition - part.Position).Magnitude
+            
+            if distance <= WALLCHECK_RADIUS then
+                -- Если парт динамический (не закреплен)
+                if not part.Anchored then
+                    -- Обновляем его позицию
+                    wallCheckParts[i].position = part.Position
+                    dynamicPartsFound = dynamicPartsFound + 1
+                end
+            end
+        else
+            -- Парт удален, удаляем из списка
+            table.remove(wallCheckParts, i)
+        end
+    end
+    
+    if dynamicPartsFound > 0 then
+        print(string.format("[Wallcheck] Обновлено %d динамических партов в радиусе 100м", dynamicPartsFound))
+    end
+end
+
+-- Обновленная функция проверки видимости с оптимизированным Wallcheck
+local function isTargetVisible(targetHead, localChar)
+    if not wallCheckEnabled then return true end
+    if not targetHead or not localChar then return false end
+    
+    -- Сначала проверяем FOV (без raycast)
+    if not isTargetInFOV(targetHead) then return false end
+    
+    -- ТОЛЬКО если в FOV - делаем raycast
+    local rayOrigin = Camera.CFrame.Position
+    local rayDir = targetHead.Position - rayOrigin
+    local rayDistance = rayDir.Magnitude
+    rayDir = rayDir.Unit
+    
+    -- Создаем список для игнора
+    local ignoreList = {localChar, targetHead.Parent}
+    
+    -- Добавляем ВСЕ парты для проверки (только один раз инициализированные)
+    for _, partData in ipairs(wallCheckParts) do
+        if partData.part and partData.part:IsDescendantOf(workspace) then
+            table.insert(ignoreList, partData.part)
+        end
+    end
+    
+    rayParams.FilterDescendantsInstances = ignoreList
+    
+    local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
+    
+    if not result then
+        return true
+    else
+        local hit = result.Instance
+        
+        -- Если попали в цель - видимо
+        if hit == targetHead or hit:IsDescendantOf(targetHead) then
+            return true
+        end
+        
+        -- Если попали в DFrame - проверяем, что за ним
+        if hit.Name == "DFrame" then
+            -- Делаем второй raycast от точки после DFrame
+            local newOrigin = result.Position + rayDir * 0.1
+            local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
+            
+            if remainingDistance > 0 then
+                local newBlacklist = {localChar, targetHead.Parent, hit}
+                rayParams.FilterDescendantsInstances = newBlacklist
+                
+                local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
+                
+                if not secondResult then
+                    return true
+                else
+                    local secondHit = secondResult.Instance
+                    return secondHit == targetHead or secondHit:IsDescendantOf(targetHead)
+                end
+            else
+                return true
+            end
+        end
+        
+        return false
+    end
+end
 
 --==================== UI Elements ====================
 
@@ -142,7 +310,7 @@ local SetAimlockKeyButton = RageTab:CreateButton({
 local AutofireToggle = RageTab:CreateToggle({
     Name = "Autofire",
     CurrentValue = false,
-    Flag = "AutofireToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "AutofireToggle",
     Callback = function(Value)
         autofireEnabled = Value
     end,
@@ -151,9 +319,15 @@ local AutofireToggle = RageTab:CreateToggle({
 local WallcheckToggle = RageTab:CreateToggle({
     Name = "Wallcheck",
     CurrentValue = true,
-    Flag = "WallcheckToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "WallcheckToggle",
     Callback = function(Value)
         wallCheckEnabled = Value
+        if Value then
+            -- При включении Wallcheck сразу обновляем динамические парты
+            task.spawn(function()
+                scanDynamicPartsNearby()
+            end)
+        end
     end,
 })
 
@@ -163,7 +337,7 @@ local FOVSlider = RageTab:CreateSlider({
     Increment = 10,
     Suffix = "px",
     CurrentValue = 100,
-    Flag = "FOVSlider", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "FOVSlider",
     Callback = function(Value)
         fov = Value
     end,
@@ -186,7 +360,7 @@ local FOVCircleToggle = RageTab:CreateButton({
 local FOVColorPicker = RageTab:CreateColorPicker({
     Name = "FOV Circle Color",
     Color = Color3.new(1,1,1),
-    Flag = "FOVColor", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "FOVColor",
     Callback = function(Value)
         fovColor = Value
         fovCircle.Color = Value
@@ -291,64 +465,6 @@ local function getPredictedPosition(target)
     local t = dist / getCurrentWeaponSpeed()
     
     return target.Position + hrp.Velocity * t
-end
-
--- ПРОВЕРКА ВИДИМОСТИ ТОЛЬКО КОГДА ЦЕЛЬ В FOV
-local function isTargetVisible(targetHead, localChar)
-    if not wallCheckEnabled then return true end
-    if not targetHead or not localChar then return false end
-    
-    -- Сначала проверяем FOV (без raycast)
-    if not isTargetInFOV(targetHead) then return false end
-    
-    -- ТОЛЬКО если в FOV - делаем raycast
-    local rayOrigin = Camera.CFrame.Position
-    local rayDir = targetHead.Position - rayOrigin
-    local rayDistance = rayDir.Magnitude
-    rayDir = rayDir.Unit
-    
-    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
-    
-    local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
-    
-    if not result then
-        return true
-    else
-        local hit = result.Instance
-        
-        -- Если попали в цель - видимо
-        if hit == targetHead or hit:IsDescendantOf(targetHead) then
-            return true
-        end
-        
-        -- Если попали в DFrame - проверяем, что за ним
-        if hit.Name == "DFrame" then
-            -- Делаем второй raycast от точки после DFrame
-            local newOrigin = result.Position + rayDir * 0.1  -- Немного отходим от DFrame
-            local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
-            
-            if remainingDistance > 0 then
-                -- Добавляем DFrame в игнор для второго raycast
-                local newBlacklist = {localChar, targetHead.Parent, hit}
-                rayParams.FilterDescendantsInstances = newBlacklist
-                
-                local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
-                
-                if not secondResult then
-                    return true  -- Ничего не задели после DFrame
-                else
-                    local secondHit = secondResult.Instance
-                    -- Проверяем, попали ли в цель после DFrame
-                    return secondHit == targetHead or secondHit:IsDescendantOf(targetHead)
-                end
-            else
-                return true  -- DFrame очень близко к цели
-            end
-        end
-        
-        -- Все остальное - невидимо
-        return false
-    end
 end
 
 -- Проверка валидности цели (без raycast)
@@ -976,7 +1092,7 @@ end)
 local HPToggle = ESPTab:CreateToggle({
     Name = "Health ESP",
     CurrentValue = false,
-    Flag = "HPToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "HPToggle",
     Callback = function(Value)
         ESP_HPEnabled = Value
     end,
@@ -985,7 +1101,7 @@ local HPToggle = ESPTab:CreateToggle({
 local HPDynamicToggle = ESPTab:CreateToggle({
     Name = "Dynamic Health Color",
     CurrentValue = false,
-    Flag = "HPDynamicToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "HPDynamicToggle",
     Callback = function(Value)
         ESP_HPDynamicEnabled = Value
     end,
@@ -994,7 +1110,7 @@ local HPDynamicToggle = ESPTab:CreateToggle({
 local BoxToggle = ESPTab:CreateToggle({
     Name = "Box ESP",
     CurrentValue = false,
-    Flag = "BoxToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "BoxToggle",
     Callback = function(Value)
         Box_ESP_Enabled = Value
     end,
@@ -1003,7 +1119,7 @@ local BoxToggle = ESPTab:CreateToggle({
 local NameToggle = ESPTab:CreateToggle({
     Name = "Name ESP",
     CurrentValue = false,
-    Flag = "NameToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "NameToggle",
     Callback = function(Value)
         ESP_NameEnabled = Value
     end,
@@ -1012,7 +1128,7 @@ local NameToggle = ESPTab:CreateToggle({
 local WeaponToggle = ESPTab:CreateToggle({
     Name = "Weapon ESP",
     CurrentValue = false,
-    Flag = "WeaponToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "WeaponToggle",
     Callback = function(Value)
         ESP_WeaponEnabled = Value
     end,
@@ -1021,7 +1137,7 @@ local WeaponToggle = ESPTab:CreateToggle({
 local ESPColorPicker = ESPTab:CreateColorPicker({
     Name = "ESP Color",
     Color = Settings.ESP_Color,
-    Flag = "ESPColor", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "ESPColor",
     Callback = function(Value)
         Settings.ESP_Color = Value
     end
@@ -1033,7 +1149,7 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
     Increment = 50,
     Suffix = "studs",
     CurrentValue = 1500,
-    Flag = "ESPDistance", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "ESPDistance",
     Callback = function(Value)
         ESP_MaxDistance = Value
     end,
@@ -1043,7 +1159,7 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 local NoFallToggle = MiscTab:CreateToggle({
     Name = "NoFall Protection",
     CurrentValue = false,
-    Flag = "NoFallToggle", -- СОХРАНЯЕТСЯ В КОНФИГЕ
+    Flag = "NoFallToggle",
     Callback = function(Value)
         if Value then
             task.spawn(function()
@@ -1083,6 +1199,20 @@ local DestroyUIButton = MiscTab:CreateButton({
         Rayfield:Destroy()
     end,
 })
+
+--==================== Запускаем оптимизированный Wallcheck ====================
+
+-- Запускаем первичное сканирование при старте
+task.spawn(function()
+    scanAllPartsOnce()
+    
+    -- Сканируем динамические парты периодически
+    while task.wait(WALLCHECK_SCAN_INTERVAL) do
+        if wallCheckEnabled then
+            scanDynamicPartsNearby()
+        end
+    end
+end)
 
 --==================== Render Loop ====================
 local currentTool
