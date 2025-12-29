@@ -308,8 +308,11 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
-            -- Обновляем UI
-            AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+            -- Обновляем UI - ПРАВИЛЬНО обновляем метку
+            if AimlockKeybindLabel then
+                local textToSet = "Aimlock Key: " .. aimlockKeyName
+                AimlockKeybindLabel.Text = textToSet
+            end
             
             Rayfield:Notify({
                 Title = "Keybind Set",
@@ -783,8 +786,8 @@ local SetAimlockKeyButton = RageTab:CreateButton({
     Name = "Set Aimlock Key",
     Callback = function()
         isRecordingKeybind = true
-        AimlockKeybindLabel:Set("Press any keyboard key...")
         
+        -- Показываем в уведомлении, что нужно нажать клавишу
         Rayfield:Notify({
             Title = "Recording Keybind",
             Content = "Press any keyboard key to set as aimlock key",
@@ -792,11 +795,14 @@ local SetAimlockKeyButton = RageTab:CreateButton({
             Image = 4483362458,
         })
         
+        -- Временно меняем текст метки
+        AimlockKeybindLabel.Text = "Aimlock Key: Press any key..."
+        
         -- Таймер на случай, если пользователь передумал
         task.delay(5, function()
             if isRecordingKeybind then
                 isRecordingKeybind = false
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                AimlockKeybindLabel.Text = "Aimlock Key: " .. aimlockKeyName
                 
                 Rayfield:Notify({
                     Title = "Keybind Recording Cancelled",
@@ -808,8 +814,6 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         end)
     end,
 })
-
--- Кнопка для очистки бинда УБРАНА - теперь можно просто переустановить бинд
 
 local AutofireToggle = RageTab:CreateToggle({
     Name = "Autofire",
@@ -1061,7 +1065,7 @@ local function loadSavedKeybind()
                 if success and keyCode then
                     aimlockKey = keyCode
                     aimlockKeyName = keyString
-                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                    AimlockKeybindLabel.Text = "Aimlock Key: " .. aimlockKeyName
                 end
             end
         end
