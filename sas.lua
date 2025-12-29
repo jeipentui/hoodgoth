@@ -71,8 +71,17 @@ local lastMousePos = Vector2.new()
 local lastFOV = fov
 
 --==================== NoFall Variables ====================
-local NoFallThread = nil
-local NoFallRunning = false
+local isNoFallEnabled = false
+local player = game:GetService("Players").LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+local isFlying = false
+local lastYPosition = hrp.Position.Y
+local isSitting = false
+local fallThreshold = -1
+local maxStableY = 50
 
 --==================== UI Elements ====================
 
@@ -432,53 +441,84 @@ local function getTarget()
 end
 
 --==================== NoFall Function ====================
-local function StartNoFall()
-    if NoFallRunning then return end
+local function startNoFall()
+    if isNoFallEnabled then return end
+    isNoFallEnabled = true
     
-    NoFallRunning = true
-    
-    -- Запускаем NoFall в отдельном потоке
-    NoFallThread = task.spawn(function()
-        while NoFallRunning do
-            task.wait()
-            
-            if localPlayer.Character then
-                local char = localPlayer.Character
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                local humanoid = char:FindFirstChild("Humanoid")
-                
-                if hrp and humanoid then
-                    -- Если падаем быстро - защищаем
-                    if hrp.Velocity.Y < -50 then
-                        -- Восстанавливаем здоровье
-                        humanoid.Health = humanoid.MaxHealth
-                        
-                        -- ForceField на 0.1 секунды
-                        local ff = Instance.new("ForceField")
-                        ff.Visible = false
-                        ff.Parent = char
-                        game:GetService("Debris"):AddItem(ff, 0.1)
-                    end
-                    
-                    -- Постоянно восстанавливаем здоровье если оно уменьшилось
-                    if humanoid.Health < humanoid.MaxHealth then
-                        humanoid.Health = humanoid.MaxHealth
-                    end
-                end
+    -- При смене персонажа
+    player.CharacterAdded:Connect(function(newChar)
+        character = newChar
+        humanoid = newChar:WaitForChild("Humanoid")
+        hrp = newChar:WaitForChild("HumanoidRootPart")
+        isFlying = false
+        
+        pcall(function()
+            humanoid.PlatformStand = false -- Отключаем платформу
+        end)
+        
+        lastYPosition = hrp.Position.Y
+    end)
+
+    -- Основной цикл NoFall
+    RunService.Heartbeat:Connect(function()
+        if not isNoFallEnabled then return end
+        
+        -- Проверяем сидит ли персонаж
+        if humanoid.SeatPart then
+            if isFlying then
+                isFlying = false
+                pcall(function()
+                    humanoid.PlatformStand = false -- Отключаем платформу
+                end)
             end
+            isSitting = true
+            return
+        else
+            isSitting = false
+        end
+        
+        local currentY = hrp.Position.Y
+        local yDifference = currentY - lastYPosition
+        lastYPosition = currentY
+        
+        -- Если падаем и еще не летим
+        if yDifference < fallThreshold and not isFlying and not isSitting then
+            isFlying = true
+            pcall(function()
+                humanoid.PlatformStand = true -- ВКЛЮЧАЕМ ПЛАТФОРМУ
+            end)
+        end
+        
+        -- Если Y стабилен - выключаем
+        if isFlying and math.abs(yDifference) < 0.01 then
+            isFlying = false
+            pcall(function()
+                humanoid.PlatformStand = false -- Отключаем платформу
+            end)
+            return
+        end
+        
+        -- Если летим - фиксируем позицию
+        if isFlying then
+            local position = hrp.Position
+            local _, _, zAngle = hrp.Orientation:ToEulerAnglesYXZ()
+            hrp.CFrame = CFrame.new(position) * CFrame.Angles(0, math.rad(zAngle), 0)
+            hrp.Velocity = Vector3.new(0, hrp.Velocity.Y, 0)
         end
     end)
     
-    print("[NoFall] Protection started (safe mode)")
+    print("NoFall с PlatformStand активирован!")
 end
 
-local function StopNoFall()
-    NoFallRunning = false
-    if NoFallThread then
-        task.cancel(NoFallThread)
-        NoFallThread = nil
-    end
-    print("[NoFall] Protection stopped")
+local function stopNoFall()
+    isNoFallEnabled = false
+    isFlying = false
+    
+    pcall(function()
+        humanoid.PlatformStand = false -- Отключаем платформу
+    end)
+    
+    print("NoFall отключен!")
 end
 
 --==================== Input ====================
@@ -1013,22 +1053,22 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 })
 
 -- Misc Tab
--- Безопасный NoFall Toggle
+-- NoFall Toggle с PlatformStand
 local NoFallToggle = MiscTab:CreateToggle({
-    Name = "NoFall Damage",
+    Name = "NoFall Protection",
     CurrentValue = false,
     Flag = "NoFallToggle",
     Callback = function(Value)
         if Value then
-            StartNoFall()
+            startNoFall()
             Rayfield:Notify({
                 Title = "NoFall Activated",
-                Content = "Fall damage protection enabled (safe mode)",
+                Content = "Fall damage protection enabled (PlatformStand)",
                 Duration = 3,
                 Image = 4483362458,
             })
         else
-            StopNoFall()
+            stopNoFall()
             Rayfield:Notify({
                 Title = "NoFall Deactivated",
                 Content = "Fall damage protection disabled",
@@ -1039,59 +1079,11 @@ local NoFallToggle = MiscTab:CreateToggle({
     end,
 })
 
--- Кнопка для загрузки внешнего NoFall
-local ExternalNoFallButton = MiscTab:CreateButton({
-    Name = "Load External NoFall",
-    Callback = function()
-        -- Загружаем отдельный безопасный NoFall
-        loadstring([[
-            local player = game.Players.LocalPlayer
-            local running = true
-            
-            print("[External NoFall] Loading...")
-            task.wait(2)
-            print("[External NoFall] Protection activated!")
-            
-            game:GetService("RunService").Heartbeat:Connect(function()
-                if running and player.Character then
-                    local char = player.Character
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    local humanoid = char:FindFirstChild("Humanoid")
-                    
-                    if hrp and humanoid then
-                        -- Защита от падения
-                        if hrp.Velocity.Y < -50 then
-                            humanoid.Health = humanoid.MaxHealth
-                        end
-                    end
-                end
-            end)
-            
-            -- Toggle key
-            game:GetService("UserInputService").InputBegan:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.F5 then
-                    running = not running
-                    print("[External NoFall]", running and "ON" or "OFF")
-                end
-            end)
-            
-            print("[External NoFall] Press F5 to toggle")
-        ]])()
-        
-        Rayfield:Notify({
-            Title = "External NoFall",
-            Content = "Loaded external fall protection (Press F5 to toggle)",
-            Duration = 4,
-            Image = 4483362458,
-        })
-    end,
-})
-
 local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         -- Останавливаем NoFall
-        StopNoFall()
+        stopNoFall()
         
         -- Очищаем все ESP объекты перед уничтожением
         for plr, _ in pairs(ESP_HPText) do
