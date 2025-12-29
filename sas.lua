@@ -70,6 +70,12 @@ fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
 
+--==================== NoFall Variables ====================
+local NoFallEnabled = false
+local NoFallLastPosition = Vector3.new(0, 0, 0)
+local NoFallHrp = nil
+local NoFallHumanoid = nil
+
 --==================== UI Elements ====================
 
 -- Rage Tab
@@ -427,6 +433,114 @@ local function getTarget()
     return currentTarget
 end
 
+--==================== NoFall Functions ====================
+local function NoFall_SavePosition()
+    if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = localPlayer.Character.HumanoidRootPart
+        NoFallLastPosition = hrp.Position
+    end
+end
+
+local function NoFall_Protect()
+    if NoFallEnabled and localPlayer.Character then
+        local character = localPlayer.Character
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character:FindFirstChild("Humanoid")
+        
+        if hrp and humanoid then
+            -- Сохраняем позицию когда стоим на земле
+            if humanoid.FloorMaterial ~= Enum.Material.Air then
+                NoFallLastPosition = hrp.Position
+            end
+            
+            -- Если падаем слишком быстро - защищаем
+            if hrp.Velocity.Y < -70 then
+                -- Восстанавливаем здоровье
+                humanoid.Health = humanoid.MaxHealth
+                
+                -- Создаем невидимый щит
+                local forceField = Instance.new("ForceField")
+                forceField.Visible = false
+                forceField.Parent = character
+                game:GetService("Debris"):AddItem(forceField, 0.1)
+                
+                -- Анти-гравитация
+                local bodyForce = Instance.new("BodyForce")
+                bodyForce.Force = Vector3.new(0, math.abs(hrp.Velocity.Y) * hrp:GetMass() * 0.3, 0)
+                bodyForce.Parent = hrp
+                game:GetService("Debris"):AddItem(bodyForce, 0.1)
+            end
+            
+            -- Восстанавливаем здоровье если оно уменьшилось во время падения
+            if humanoid.Health < humanoid.MaxHealth and hrp.Velocity.Y < -50 then
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end
+    end
+end
+
+local function NoFall_HookDamage()
+    -- Пытаемся найти Damage RemoteEvents
+    pcall(function()
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                local name = obj.Name:lower()
+                if name:find("damage") or name:find("hurt") or name:find("fall") then
+                    local oldFire = obj.FireServer
+                    obj.FireServer = function(self, ...)
+                        if NoFallEnabled then
+                            local args = {...}
+                            -- Проверяем если это урон от падения
+                            for _, arg in ipairs(args) do
+                                if type(arg) == "string" and arg:lower():find("fall") then
+                                    return nil -- Блокируем
+                                end
+                            end
+                        end
+                        return oldFire(self, ...)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function NoFall_Toggle(value)
+    NoFallEnabled = value
+    
+    if value then
+        -- Инициализируем
+        if localPlayer.Character then
+            NoFallHrp = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            NoFallHumanoid = localPlayer.Character:FindFirstChild("Humanoid")
+            NoFallLastPosition = NoFallHrp and NoFallHrp.Position or Vector3.new(0, 0, 0)
+        end
+        
+        -- Запускаем защиту
+        NoFall_HookDamage()
+        
+        -- Подключаем к Heartbeat
+        RunService.Heartbeat:Connect(NoFall_Protect)
+        RunService.Heartbeat:Connect(NoFall_SavePosition)
+        
+        print("[NoFall] Защита от падения активирована")
+        Rayfield:Notify({
+            Title = "NoFall",
+            Content = "Защита от урона при падении активирована",
+            Duration = 2,
+            Image = 4483362458,
+        })
+    else
+        print("[NoFall] Защита от падения деактивирована")
+        Rayfield:Notify({
+            Title = "NoFall",
+            Content = "Защита от урона при падении деактивирована",
+            Duration = 2,
+            Image = 4483362458,
+        })
+    end
+end
+
 --==================== Input ====================
 UIS.InputBegan:Connect(function(input, gameProcessed)
     -- 🔥 ЕСЛИ мы записываем бинд — НЕ ВЫХОДИМ
@@ -571,7 +685,7 @@ end
 -- Функция для создания ESP объектов
 local function createESPObjects(plr)
     -- Сначала очищаем старые объекты, если они есть
-    cleanupPlayerESP(plr)
+        cleanupPlayerESP(plr)
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -959,6 +1073,16 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
 })
 
 -- Misc Tab
+-- Добавляем NoFall Toggle в Misc Tab
+local NoFallToggle = MiscTab:CreateToggle({
+    Name = "NoFall Damage",
+    CurrentValue = false,
+    Flag = "NoFallToggle",
+    Callback = function(Value)
+        NoFall_Toggle(Value)
+    end,
+})
+
 local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
