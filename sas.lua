@@ -49,7 +49,7 @@ local FriendList = {}
 
 -- Настройки биндов (ПОЛНОСТЬЮ БЕЗ БИНДА ПО УМОЛЧАНИЮ)
 local aimlockKey = nil  -- АБСОЛЮТНО НЕТ БИНДА
-local aimlockKeyName = "Not Set (Click to set)"
+local aimlockKeyName = "Not Set"
 local isRecordingKeybind = false
 local lastKeyPressed = nil
 
@@ -308,8 +308,10 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
             
-            -- Обновляем UI
-            AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+            -- Обновляем UI - ВАЖНО: вызываем :Set с правильным текстом
+            if AimlockKeybindLabel then
+                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+            end
             
             Rayfield:Notify({
                 Title = "Keybind Set",
@@ -775,8 +777,11 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- Метка для отображения текущего бинда (можно кликнуть для установки)
-local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: " .. aimlockKeyName)
+-- Создаем секцию для управления биндами
+local KeybindSection = RageTab:CreateSection("Keybind Settings")
+
+-- Метка для отображения текущего бинда
+local AimlockKeybindLabel = RageTab:CreateLabel("Current Keybind: " .. aimlockKeyName)
 
 -- Кнопка для установки бинда
 local SetAimlockKeyButton = RageTab:CreateButton({
@@ -796,7 +801,7 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         task.delay(5, function()
             if isRecordingKeybind then
                 isRecordingKeybind = false
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
                 
                 Rayfield:Notify({
                     Title = "Keybind Recording Cancelled",
@@ -814,8 +819,8 @@ local ClearAimlockKeyButton = RageTab:CreateButton({
     Name = "Clear Aimlock Keybind",
     Callback = function()
         aimlockKey = nil
-        aimlockKeyName = "Not Set (Click to set)"
-        AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+        aimlockKeyName = "Not Set"
+        AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
         
         Rayfield:Notify({
             Title = "Keybind Cleared",
@@ -832,6 +837,9 @@ local ClearAimlockKeyButton = RageTab:CreateButton({
         end
     end,
 })
+
+-- Разделитель для лучшей организации
+local AimSettingsSection = RageTab:CreateSection("Aim Settings")
 
 local AutofireToggle = RageTab:CreateToggle({
     Name = "Autofire",
@@ -886,6 +894,9 @@ local FOVColorPicker = RageTab:CreateColorPicker({
         fovCircle.Color = Value
     end
 })
+
+-- Разделитель для Friend List
+local FriendListSection = RageTab:CreateSection("Friend List")
 
 local FriendListLabel = RageTab:CreateLabel("Friend List: " .. table.concat(FriendList, ", "))
 
@@ -1075,7 +1086,7 @@ local function loadSavedKeybind()
         local config = Window:GetConfiguration()
         if config and config.AimlockKey then
             local keyString = config.AimlockKey
-            if keyString and keyString ~= "" then
+            if keyString and keyString ~= "" and keyString ~= "Not Set" then
                 local success, keyCode = pcall(function()
                     return Enum.KeyCode[keyString]
                 end)
@@ -1083,16 +1094,10 @@ local function loadSavedKeybind()
                 if success and keyCode then
                     aimlockKey = keyCode
                     aimlockKeyName = keyString
-                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-                else
-                    aimlockKey = nil
-                    aimlockKeyName = "Not Set (Click to set)"
-                    AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                    if AimlockKeybindLabel then
+                        AimlockKeybindLabel:Set("Current Keybind: " .. aimlockKeyName)
+                    end
                 end
-            else
-                aimlockKey = nil
-                aimlockKeyName = "Not Set (Click to set)"
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             end
         end
     end
