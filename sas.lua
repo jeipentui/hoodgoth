@@ -70,6 +70,139 @@ fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
 
+--==================== UI Elements ====================
+
+-- Rage Tab
+local AimlockToggle = RageTab:CreateToggle({
+    Name = "Aimlock",
+    CurrentValue = false,
+    Flag = "AimlockToggle",
+    Callback = function(Value)
+        aimbotEnabled = Value
+        if not Value then
+            currentTarget = nil
+            targetLocked = false
+        end
+    end,
+})
+
+-- 🔽 СОЗДАЕМ LABEL СРАЗУ ПОСЛЕ СОЗДАНИЯ TAB
+local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: Not Set")
+
+-- Кнопка для установки бинда
+local SetAimlockKeyButton = RageTab:CreateButton({
+    Name = "Set Aimlock Key",
+    Callback = function()
+        isRecordingKeybind = true
+        AimlockKeybindLabel:Set("Press any keyboard key...")
+        
+        -- Показываем в уведомлении, что нужно нажать клавишу
+        Rayfield:Notify({
+            Title = "Recording Keybind",
+            Content = "Press any keyboard key to set as aimlock key",
+            Duration = 3,
+            Image = 4483362458,
+        })
+        
+        -- Таймер на случай, если пользователь передумал
+        task.delay(5, function()
+            if isRecordingKeybind then
+                isRecordingKeybind = false
+                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+                
+                Rayfield:Notify({
+                    Title = "Keybind Recording Cancelled",
+                    Content = "Keybind recording timed out",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        end)
+    end,
+})
+
+local AutofireToggle = RageTab:CreateToggle({
+    Name = "Autofire",
+    CurrentValue = false,
+    Flag = "AutofireToggle",
+    Callback = function(Value)
+        autofireEnabled = Value
+    end,
+})
+
+local WallcheckToggle = RageTab:CreateToggle({
+    Name = "Wallcheck",
+    CurrentValue = true,
+    Flag = "WallcheckToggle",
+    Callback = function(Value)
+        wallCheckEnabled = Value
+    end,
+})
+
+local FOVSlider = RageTab:CreateSlider({
+    Name = "FOV Aim",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "px",
+    CurrentValue = 100,
+    Flag = "FOVSlider",
+    Callback = function(Value)
+        fov = Value
+    end,
+})
+
+local FOVCircleToggle = RageTab:CreateButton({
+    Name = "Toggle FOV Circle",
+    Callback = function()
+        showFOV = not showFOV
+        fovCircle.Visible = showFOV
+        Rayfield:Notify({
+            Title = "FOV Circle",
+            Content = showFOV and "Enabled" or "Disabled",
+            Duration = 1,
+            Image = 4483362458,
+        })
+    end,
+})
+
+local FOVColorPicker = RageTab:CreateColorPicker({
+    Name = "FOV Circle Color",
+    Color = Color3.new(1,1,1),
+    Flag = "FOVColor",
+    Callback = function(Value)
+        fovColor = Value
+        fovCircle.Color = Value
+    end
+})
+
+local FriendListLabel = RageTab:CreateLabel("Friend List: " .. table.concat(FriendList, ", "))
+
+local AddFriendInput = RageTab:CreateInput({
+    Name = "Add Friend",
+    PlaceholderText = "Enter username",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text ~= "" then
+            table.insert(FriendList, Text)
+            FriendListLabel:Set("Friend List: " .. table.concat(FriendList, ", "))
+        end
+    end,
+})
+
+local ClearFriendsButton = RageTab:CreateButton({
+    Name = "Clear Friend List",
+    Callback = function()
+        FriendList = {}
+        FriendListLabel:Set("Friend List: (empty)")
+        Rayfield:Notify({
+            Title = "Friend List",
+            Content = "Friend list cleared",
+            Duration = 2,
+            Image = 4483362458,
+        })
+    end,
+})
+
 --==================== Weapon Prediction ====================
 local weaponBulletSpeeds = {
     ["Beretta"] = 1624,
@@ -298,29 +431,30 @@ end
 UIS.InputBegan:Connect(function(input, gameProcessed)
     -- 🔥 ЕСЛИ мы записываем бинд — НЕ ВЫХОДИМ
     if isRecordingKeybind then
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            isRecordingKeybind = false
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
 
-            aimlockKey = input.KeyCode
-            aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
+        isRecordingKeybind = false
 
-            -- ✅ ОБНОВЛЯЕМ UI
-            AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+        aimlockKey = input.KeyCode
+        aimlockKeyName = input.KeyCode.Name
 
-            Rayfield:Notify({
-                Title = "Keybind Set",
-                Content = "Aimlock key set to: " .. aimlockKeyName,
-                Duration = 2,
-                Image = 4483362458,
-            })
-            
-            -- Сохраняем в конфиг
-            if Window.ConfigurationSaving.Enabled then
-                local config = Window:GetConfiguration()
-                config.AimlockKey = aimlockKeyName
-                Window:SetConfiguration(config)
-            end
+        -- 🔥 ТЕПЕРЬ label точно существует
+        AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+
+        Rayfield:Notify({
+            Title = "Keybind Set",
+            Content = "Aimlock key set to: " .. aimlockKeyName,
+            Duration = 2,
+            Image = 4483362458,
+        })
+        
+        -- Сохраняем в конфиг
+        if Window.ConfigurationSaving.Enabled then
+            local config = Window:GetConfiguration()
+            config.AimlockKey = aimlockKeyName
+            Window:SetConfiguration(config)
         end
+        
         return
     end
 
@@ -756,141 +890,6 @@ end)
 Players.PlayerRemoving:Connect(function(plr)
     cleanupPlayerESP(plr)
 end)
-
---==================== UI Elements ====================
-
--- Rage Tab
-local AimlockToggle = RageTab:CreateToggle({
-    Name = "Aimlock",
-    CurrentValue = false,
-    Flag = "AimlockToggle",
-    Callback = function(Value)
-        aimbotEnabled = Value
-        if not Value then
-            currentTarget = nil
-            targetLocked = false
-        end
-    end,
-})
-
--- Создаем метку ДО использования
-local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: Not Set")
-
--- Кнопка для установки бинда
-local SetAimlockKeyButton = RageTab:CreateButton({
-    Name = "Set Aimlock Key",
-    Callback = function()
-        isRecordingKeybind = true
-        
-        -- Показываем в уведомлении, что нужно нажать клавишу
-        Rayfield:Notify({
-            Title = "Recording Keybind",
-            Content = "Press any keyboard key to set as aimlock key",
-            Duration = 3,
-            Image = 4483362458,
-        })
-        
-        -- Временно меняем текст метки
-        AimlockKeybindLabel:Set("Press any keyboard key...")
-        
-        -- Таймер на случай, если пользователь передумал
-        task.delay(5, function()
-            if isRecordingKeybind then
-                isRecordingKeybind = false
-                AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-                
-                Rayfield:Notify({
-                    Title = "Keybind Recording Cancelled",
-                    Content = "Keybind recording timed out",
-                    Duration = 2,
-                    Image = 4483362458,
-                })
-            end
-        end)
-    end,
-})
-
-local AutofireToggle = RageTab:CreateToggle({
-    Name = "Autofire",
-    CurrentValue = false,
-    Flag = "AutofireToggle",
-    Callback = function(Value)
-        autofireEnabled = Value
-    end,
-})
-
-local WallcheckToggle = RageTab:CreateToggle({
-    Name = "Wallcheck",
-    CurrentValue = true,
-    Flag = "WallcheckToggle",
-    Callback = function(Value)
-        wallCheckEnabled = Value
-    end,
-})
-
-local FOVSlider = RageTab:CreateSlider({
-    Name = "FOV Aim",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "px",
-    CurrentValue = 100,
-    Flag = "FOVSlider",
-    Callback = function(Value)
-        fov = Value
-    end,
-})
-
-local FOVCircleToggle = RageTab:CreateButton({
-    Name = "Toggle FOV Circle",
-    Callback = function()
-        showFOV = not showFOV
-        fovCircle.Visible = showFOV
-        Rayfield:Notify({
-            Title = "FOV Circle",
-            Content = showFOV and "Enabled" or "Disabled",
-            Duration = 1,
-            Image = 4483362458,
-        })
-    end,
-})
-
-local FOVColorPicker = RageTab:CreateColorPicker({
-    Name = "FOV Circle Color",
-    Color = Color3.new(1,1,1),
-    Flag = "FOVColor",
-    Callback = function(Value)
-        fovColor = Value
-        fovCircle.Color = Value
-    end
-})
-
-local FriendListLabel = RageTab:CreateLabel("Friend List: " .. table.concat(FriendList, ", "))
-
-local AddFriendInput = RageTab:CreateInput({
-    Name = "Add Friend",
-    PlaceholderText = "Enter username",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        if Text ~= "" then
-            table.insert(FriendList, Text)
-            FriendListLabel:Set("Friend List: " .. table.concat(FriendList, ", "))
-        end
-    end,
-})
-
-local ClearFriendsButton = RageTab:CreateButton({
-    Name = "Clear Friend List",
-    Callback = function()
-        FriendList = {}
-        FriendListLabel:Set("Friend List: (empty)")
-        Rayfield:Notify({
-            Title = "Friend List",
-            Content = "Friend list cleared",
-            Duration = 2,
-            Image = 4483362458,
-        })
-    end,
-})
 
 -- ESP Tab
 local HPToggle = ESPTab:CreateToggle({
