@@ -296,26 +296,21 @@ end
 
 --==================== Input ====================
 UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Обработка записи бинда
+    -- 🔥 ЕСЛИ мы записываем бинд — НЕ ВЫХОДИМ
     if isRecordingKeybind then
         if input.UserInputType == Enum.UserInputType.Keyboard then
-            lastKeyPressed = input.KeyCode
             isRecordingKeybind = false
-            
-            -- Устанавливаем бинд
+
             aimlockKey = input.KeyCode
             aimlockKeyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
-            
-            -- Обновляем UI
+
+            -- ✅ ОБНОВЛЯЕМ UI
             AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-            
-            -- Показываем уведомление с нажатой клавишей
+
             Rayfield:Notify({
                 Title = "Keybind Set",
                 Content = "Aimlock key set to: " .. aimlockKeyName,
-                Duration = 3,
+                Duration = 2,
                 Image = 4483362458,
             })
             
@@ -328,11 +323,13 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         end
         return
     end
-    
-    -- Проверка бинда aimlock (РАБОТАЕТ ТОЛЬКО ЕСЛИ БИНД УСТАНОВЛЕН)
+
+    -- ⛔ обычные инпуты — фильтруем
+    if gameProcessed then return end
+
+    -- Aimlock key (РАБОТАЕТ ТОЛЬКО ЕСЛИ БИНД УСТАНОВЛЕН)
     if aimlockKey and input.KeyCode == aimlockKey then
         keyHeld = true
-        -- При нажатии на клавишу ищем новую цель
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
