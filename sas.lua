@@ -311,10 +311,11 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             -- Обновляем UI
             AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
             
+            -- Показываем уведомление с нажатой клавишей
             Rayfield:Notify({
                 Title = "Keybind Set",
                 Content = "Aimlock key set to: " .. aimlockKeyName,
-                Duration = 2,
+                Duration = 3,
                 Image = 4483362458,
             })
             
