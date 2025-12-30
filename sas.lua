@@ -76,169 +76,169 @@ fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
 
---==================== LEGIT NO FALL ====================
+--==================== NoFall Variables ====================
+local isNoFallEnabled = false
+local noFallConnection = nil
 
-local NoFallEnabled = false
-local NoFallConnection
+--==================== Функции для оптимизированного Wallcheck ====================
 
-local FALL_SPEED_THRESHOLD = -55   -- скорость, при которой начинается риск урона
-local SAFE_FALL_SPEED = -15        -- скорость, до которой гасим падение
-
-local function startNoFall()
-    if NoFallEnabled then return end
-    NoFallEnabled = true
-
-    NoFallConnection = RunService.Heartbeat:Connect(function()
-        if not NoFallEnabled then return end
-
-        local char = localPlayer.Character
-        if not char then return end
-
-        local humanoid = char:FindFirstChild("Humanoid")
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not hrp then return end
-
-        -- если сидим / карабкаемся — не лезем
-        if humanoid.SeatPart or humanoid:GetState() == Enum.HumanoidStateType.Climbing then
-            return
-        end
-
-        local velY = hrp.Velocity.Y
-
-        -- только при РЕАЛЬНОМ падении
-        if velY < FALL_SPEED_THRESHOLD then
-            hrp.Velocity = Vector3.new(
-                hrp.Velocity.X,
-                SAFE_FALL_SPEED,
-                hrp.Velocity.Z
-            )
-        end
-    end)
-
-    print("[NoFall] Legit NoFall enabled")
-end
-
-local function stopNoFall()
-    NoFallEnabled = false
-
-    if NoFallConnection then
-        NoFallConnection:Disconnect()
-        NoFallConnection = nil
-    end
-
-    print("[NoFall] Legit NoFall disabled")
-end
-
---==================== WALLCHECK SYSTEM ====================
-
+-- Функция для сканирования ВСЕХ партов при запуске (один раз)
 local function scanAllPartsOnce()
     if initialScanDone then return end
     initialScanDone = true
     
     print("[WallCheck] Начинаем первичное сканирование всех партов...")
-    wallCheckParts = {}
+    wallCheckParts = {} -- Очищаем старый список
     
     local startTime = tick()
     local partCount = 0
     
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart")
-        and obj.CanCollide
-        and not obj:IsA("TrussPart") then
-
-            -- ❌ исключаем персонажей
-            local parent = obj.Parent
-            local isCharacter = false
-            while parent do
-                if parent:IsA("Model") and parent:FindFirstChild("Humanoid") then
-                    isCharacter = true
-                    break
+    -- Сканируем Workspace и все его дочерние объекты
+    local function scanFolder(folder)
+        for _, obj in pairs(folder:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:IsA("TrussPart") then
+                -- Исключаем персонажей и их части
+                local isCharacterPart = false
+                local parent = obj.Parent
+                
+                while parent do
+                    if parent:IsA("Model") and parent:FindFirstChild("Humanoid") then
+                        isCharacterPart = true
+                        break
+                    end
+                    parent = parent.Parent
                 end
-                parent = parent.Parent
-            end
-
-            if not isCharacter then
-                table.insert(wallCheckParts, {
-                    part = obj,
-                    anchored = obj.Anchored,
-                    canCollide = obj.CanCollide
-                })
-                partCount = partCount + 1
+                
+                if not isCharacterPart then
+                    -- Добавляем только статические парты (не двигающиеся)
+                    if not obj.Anchored or obj.CanCollide then
+                        table.insert(wallCheckParts, {
+                            part = obj,
+                            position = obj.Position,
+                            anchored = obj.Anchored,
+                            canCollide = obj.CanCollide,
+                            isDynamic = not obj.Anchored -- Динамические парты
+                        })
+                        partCount = partCount + 1
+                    end
+                end
             end
         end
     end
-
-    print(string.format(
-        "[WallCheck] Initial scan done: %d parts in %.2f sec",
-        partCount,
-        tick() - startTime
-    ))
+    
+    -- Сканируем основные места
+    scanFolder(workspace)
+    
+    local endTime = tick()
+    print(string.format("[WallCheck] Первичное сканирование завершено: %d партов за %.2f секунд", partCount, endTime - startTime))
 end
 
-local function updateDynamicPartsNearby()
+-- Функция для сканирования динамических партов в радиусе 100м (каждые 5 секунд)
+local function scanDynamicPartsNearby()
     local currentTime = tick()
+    
+    -- Проверяем, прошло ли 5 секунд с последнего сканирования
     if currentTime - lastWallCheckScan < WALLCHECK_SCAN_INTERVAL then
         return
     end
+    
     lastWallCheckScan = currentTime
     
     local playerPos = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not playerPos then return end
     
     local playerPosition = playerPos.Position
-    local validParts = {}
+    local dynamicPartsFound = 0
     
-    for _, partData in ipairs(wallCheckParts) do
+    -- Обновляем позиции динамических партов в радиусе 100м
+    for i, partData in ipairs(wallCheckParts) do
         local part = partData.part
         if part and part:IsDescendantOf(workspace) then
-            if (part.Position - playerPosition).Magnitude <= WALLCHECK_RADIUS then
-                table.insert(validParts, {
-                    part = part,
-                    anchored = part.Anchored,
-                    canCollide = part.CanCollide
-                })
+            -- Проверяем дистанцию
+            local distance = (playerPosition - part.Position).Magnitude
+            
+            if distance <= WALLCHECK_RADIUS then
+                -- Если парт динамический (не закреплен)
+                if not part.Anchored then
+                    -- Обновляем его позицию
+                    wallCheckParts[i].position = part.Position
+                    dynamicPartsFound = dynamicPartsFound + 1
+                end
             end
+        else
+            -- Парт удален, удаляем из списка
+            table.remove(wallCheckParts, i)
         end
     end
     
-    wallCheckParts = validParts
+    if dynamicPartsFound > 0 then
+        print(string.format("[Wallcheck] Обновлено %d динамических партов в радиусе 100м", dynamicPartsFound))
+    end
 end
 
--- Функция проверки видимости цели
+-- Обновленная функция проверки видимости с оптимизированным Wallcheck
 local function isTargetVisible(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
     
-    -- 1. FOV чек
-    if not isTargetInFOV(targetHead) then
-        return false
-    end
+    -- Сначала проверяем FOV (без raycast)
+    if not isTargetInFOV(targetHead) then return false end
     
+    -- ТОЛЬКО если в FOV - делаем raycast
     local rayOrigin = Camera.CFrame.Position
     local rayDir = targetHead.Position - rayOrigin
     local rayDistance = rayDir.Magnitude
     rayDir = rayDir.Unit
     
-    -- 2. blacklist ТОЛЬКО персонажи
-    rayParams.FilterDescendantsInstances = {
-        localChar,
-        targetHead.Parent
-    }
+    -- Создаем список для игнора
+    local ignoreList = {localChar, targetHead.Parent}
+    
+    -- Добавляем ВСЕ парты для проверки (только один раз инициализированные)
+    for _, partData in ipairs(wallCheckParts) do
+        if partData.part and partData.part:IsDescendantOf(workspace) then
+            table.insert(ignoreList, partData.part)
+        end
+    end
+    
+    rayParams.FilterDescendantsInstances = ignoreList
     
     local result = workspace:Raycast(rayOrigin, rayDir * rayDistance, rayParams)
     
-    -- 3. Если ничего не задели — видно
     if not result then
         return true
+    else
+        local hit = result.Instance
+        
+        -- Если попали в цель - видимо
+        if hit == targetHead or hit:IsDescendantOf(targetHead) then
+            return true
+        end
+        
+        -- Если попали в DFrame - проверяем, что за ним
+        if hit.Name == "DFrame" then
+            -- Делаем второй raycast от точки после DFrame
+            local newOrigin = result.Position + rayDir * 0.1
+            local remainingDistance = rayDistance - (newOrigin - rayOrigin).Magnitude
+            
+            if remainingDistance > 0 then
+                local newBlacklist = {localChar, targetHead.Parent, hit}
+                rayParams.FilterDescendantsInstances = newBlacklist
+                
+                local secondResult = workspace:Raycast(newOrigin, rayDir * remainingDistance, rayParams)
+                
+                if not secondResult then
+                    return true
+                else
+                    local secondHit = secondResult.Instance
+                    return secondHit == targetHead or secondHit:IsDescendantOf(targetHead)
+                end
+            else
+                return true
+            end
+        end
+        
+        return false
     end
-    
-    -- 4. Если попали в цель — видно
-    if result.Instance:IsDescendantOf(targetHead.Parent) then
-        return true
-    end
-    
-    -- 5. ИНАЧЕ — СТЕНА
-    return false
 end
 
 --==================== UI Elements ====================
@@ -325,7 +325,7 @@ local WallcheckToggle = RageTab:CreateToggle({
         if Value then
             -- При включении Wallcheck сразу обновляем динамические парты
             task.spawn(function()
-                updateDynamicPartsNearby()
+                scanDynamicPartsNearby()
             end)
         end
     end,
@@ -559,6 +559,81 @@ local function getTarget()
     end
     
     return currentTarget
+end
+
+--==================== NoFall Function ====================
+local function startNoFall()
+    if isNoFallEnabled then return end
+    isNoFallEnabled = true
+    
+    print("[NoFall] Активирован")
+    
+    -- Останавливаем предыдущее подключение если есть
+    if noFallConnection then
+        noFallConnection:Disconnect()
+        noFallConnection = nil
+    end
+    
+    -- Создаем новое подключение
+    noFallConnection = RunService.Heartbeat:Connect(function()
+        if not isNoFallEnabled then return end
+        
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not hrp then return end
+        
+        -- Если персонаж сидит - не трогаем
+        if humanoid.SeatPart then
+            pcall(function() humanoid.PlatformStand = false end)
+            return
+        end
+        
+        -- Получаем вертикальную скорость
+        local verticalVelocity = hrp.Velocity.Y
+        
+        -- Если падаем слишком быстро
+        if verticalVelocity < -50 then
+            pcall(function() humanoid.PlatformStand = true end)
+            
+            -- Фиксируем горизонтальную позицию
+            local position = hrp.Position
+            hrp.CFrame = CFrame.new(position.X, position.Y, position.Z)
+            hrp.Velocity = Vector3.new(0, verticalVelocity, 0)
+        else
+            pcall(function() humanoid.PlatformStand = false end)
+        end
+        
+        -- Восстанавливаем здоровье если оно упало
+        if humanoid.Health < humanoid.MaxHealth then
+            humanoid.Health = humanoid.MaxHealth
+        end
+    end)
+end
+
+local function stopNoFall()
+    isNoFallEnabled = false
+    
+    -- Отключаем PlatformStand для текущего персонажа
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            pcall(function() humanoid.PlatformStand = false end)
+        end
+    end
+    
+    -- Отключаем соединение
+    if noFallConnection then
+        noFallConnection:Disconnect()
+        noFallConnection = nil
+    end
+    
+    print("[NoFall] Деактивирован")
 end
 
 --==================== Input ====================
@@ -1134,7 +1209,7 @@ task.spawn(function()
     -- Сканируем динамические парты периодически
     while task.wait(WALLCHECK_SCAN_INTERVAL) do
         if wallCheckEnabled then
-            updateDynamicPartsNearby()
+            scanDynamicPartsNearby()
         end
     end
 end)
