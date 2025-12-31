@@ -83,6 +83,11 @@ end
 local function WallCheck(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
+    
+    -- ✅ СНАЧАЛА проверяем, что цель в FOV
+    if not InFOV(targetHead.Position) then
+        return false -- цель вне FOV, wallcheck не нужен
+    end
 
     local origin = Camera.CFrame.Position
     local direction = targetHead.Position - origin
@@ -99,8 +104,21 @@ local function WallCheck(targetHead, localChar)
         return true
     end
 
+    local hitInstance = result.Instance
+    
     -- Попали в часть цели → видно
-    if result.Instance:IsDescendantOf(targetHead.Parent) then
+    if hitInstance:IsDescendantOf(targetHead.Parent) then
+        return true
+    end
+
+    -- ✅ ДОБАВЛЯЕМ DFrame КАК ИСКЛЮЧЕНИЕ (ТОЛЬКО ЕСЛИ ЦЕЛЬ В FOV)
+    -- Проверяем по имени объекта
+    if hitInstance.Name == "DFrame" then
+        return true -- игнорируем DFrame, считаем что видно через него
+    end
+    
+    -- ИЛИ проверяем по классу (если такой существует в вашей игре)
+    if hitInstance.ClassName == "DFrame" then
         return true
     end
 
@@ -347,7 +365,8 @@ local function getNearestToCursor()
                     if InFOV(head.Position) then
                         -- 2. Проверяем валидность цели
                         if isValidTarget(plr, head) then
-                            -- 3. Только если валидна - проверяем видимость (WALLCHECK)
+                            -- 3. Только если валидна - проверяем видимость через WallCheck
+                            -- (WallCheck сам проверит FOV внутри себя снова, но это нормально)
                             if WallCheck(head, localChar) then
                                 -- Находим ближайшую к курсору
                                 local mousePos = UIS:GetMouseLocation()
@@ -386,7 +405,8 @@ local function getTarget()
         if InFOV(currentTarget.Position) then
             -- 2. Только если в FOV - проверяем валидность
             if isValidTarget(plr, currentTarget) then
-                -- 3. Только если валидна - проверяем видимость (WALLCHECK)
+                -- 3. Только если валидна - проверяем видимость через WallCheck
+                -- (WallCheck проверит FOV внутри себя)
                 if WallCheck(currentTarget, localPlayer.Character) then
                     return currentTarget
                 end
