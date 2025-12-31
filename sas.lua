@@ -47,71 +47,75 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- NO VISUAL RECOIL С ЗАДЕРЖКОЙ 0.3 СЕК
+-- NO VISUAL RECOIL С ЗАДЕРЖКОЙ 0.3 СЕК (УЛУЧШЕННАЯ ВЕРСИЯ)
 local NoVisualRecoilEnabled = false
-local recoilHookConnection
-local animatorHookConnection
-
 local lastShotTime = 0
 local RECOIL_TAIL = 0.3
+local targetCFrame = Camera.CFrame
 
-local function setupMouseDeltaHook()
-    if recoilHookConnection then recoilHookConnection:Disconnect() end
+-- Подписка на стрельбу инструмента
+local function monitorTool(tool)
+    if not tool then return end
+    tool.Activated:Connect(function()
+        lastShotTime = tick()
+        targetCFrame = Camera.CFrame
+    end)
+end
 
-    recoilHookConnection = RunService.RenderStepped:Connect(function()
-        if not NoVisualRecoilEnabled then return end
-        local char = localPlayer.Character
-        if not char then return end
-
-        local tool = char:FindFirstChildOfClass("Tool")
-        if not tool then return end
-
-        local lastActivation = tool:GetAttribute("LastActivation") or 0
-        local isFiring = (tick() - lastActivation) < 0.2
-
-        if isFiring then
-            lastShotTime = tick()
+-- Следим за текущим инструментом персонажа
+local function setupCharacter(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        monitorTool(tool)
+    end
+    
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            monitorTool(child)
         end
-
-        if tick() - lastShotTime <= RECOIL_TAIL then
-            local delta = UIS:GetMouseDelta()
-            if delta then
-                mousemoverel(-delta.X, -delta.Y)
-            end
+    end)
+    
+    char.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") then
+            lastShotTime = 0
         end
     end)
 end
 
-local function setupAnimatorHook()
-    if animatorHookConnection then animatorHookConnection:Disconnect() end
+-- Подписка на смену персонажа
+localPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    setupCharacter(char)
+end)
 
-    local function onCharAdded(char)
-        task.wait(1)
-        local humanoid = char:WaitForChild("Humanoid")
-        local animator = humanoid:WaitForChild("Animator")
-        animatorHookConnection = animator.AnimationPlayed:Connect(function(track)
-            if not NoVisualRecoilEnabled then return end
-            local name = track.Name:lower()
-            if name:find("recoil") or name:find("fire") or name:find("shoot") then
-                track:Stop()
-            end
-        end)
-    end
-
-    if localPlayer.Character then onCharAdded(localPlayer.Character) end
-    localPlayer.CharacterAdded:Connect(onCharAdded)
+if localPlayer.Character then
+    setupCharacter(localPlayer.Character)
 end
+
+-- Главный хук No Visual Recoil
+local recoilHook = RunService.RenderStepped:Connect(function()
+    if NoVisualRecoilEnabled then
+        if (tick() - lastShotTime <= RECOIL_TAIL) then
+            Camera.CFrame = targetCFrame
+        else
+            local char = localPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                targetCFrame = CFrame.new(Camera.CFrame.Position) * (targetCFrame - targetCFrame.Position)
+            end
+        end
+    end
+end)
 
 local function activateNoVisualRecoil()
     NoVisualRecoilEnabled = true
-    setupMouseDeltaHook()
-    setupAnimatorHook()
+    lastShotTime = 0
+    targetCFrame = Camera.CFrame
 end
 
 local function deactivateNoVisualRecoil()
     NoVisualRecoilEnabled = false
-    if recoilHookConnection then recoilHookConnection:Disconnect() end
-    if animatorHookConnection then animatorHookConnection:Disconnect() end
+    lastShotTime = 0
 end
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
@@ -1077,7 +1081,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        deactivateNoVisualRecoil()
+        if recoilHook then recoilHook:Disconnect() end
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
