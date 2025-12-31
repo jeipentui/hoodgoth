@@ -47,6 +47,11 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
+-- НОВАЯ ПЕРЕМЕННАЯ: No Visual Recoil
+local noVisualRecoilEnabled = false
+local originalViewmodelOffset = Vector3.new(0, 0, 0)
+local originalCameraOffset = Vector3.new(0, 0, 0)
+
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
 local aimlockKeyName = "Not Set"
@@ -141,6 +146,56 @@ local function WallCheck(targetHead, localChar)
     return false
 end
 
+--==================== NO VISUAL RECOIL FUNCTION ====================
+local function setupNoVisualRecoil()
+    if not noVisualRecoilEnabled then
+        return
+    end
+    
+    local char = localPlayer.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    
+    -- Ищем Viewmodel или оружие в руках
+    local viewmodel = workspace:FindFirstChild("Viewmodel") or 
+                     workspace:FindFirstChild("WeaponModel") or
+                     tool:FindFirstChild("Handle") or
+                     tool:FindFirstChild("Part")
+    
+    if viewmodel then
+        -- Сохраняем оригинальные позиции если еще не сохранены
+        if originalViewmodelOffset == Vector3.new(0, 0, 0) then
+            originalViewmodelOffset = viewmodel.Position
+        end
+        
+        -- Фиксируем позицию оружия
+        viewmodel.Position = originalViewmodelOffset
+    end
+    
+    -- Также фиксируем камеру если она двигается при стрельбе
+    local camera = workspace.CurrentCamera
+    if camera and camera:FindFirstChild("RecoilOffset") then
+        if originalCameraOffset == Vector3.new(0, 0, 0) then
+            originalCameraOffset = camera.RecoilOffset.Value
+        end
+        camera.RecoilOffset.Value = Vector3.new(0, 0, 0)
+    end
+    
+    -- Ищем анимации отдачи и останавливаем их
+    for _, animTrack in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
+        if animTrack.Name:find("Recoil") or animTrack.Name:find("Fire") or animTrack.Name:find("Shoot") then
+            animTrack:Stop()
+        end
+    end
+    
+    -- Отключаем эффекты тряски камеры
+    if camera:FindFirstChild("CameraShaker") then
+        camera.CameraShaker:Destroy()
+    end
+end
+
 --==================== UI Elements ====================
 
 -- Rage Tab
@@ -153,6 +208,34 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
+        end
+    end,
+})
+
+-- НОВЫЙ ТОГГЛ: No Visual Recoil
+local NoVisualRecoilToggle = RageTab:CreateToggle({
+    Name = "No Visual Recoil",
+    CurrentValue = false,
+    Flag = "NoVisualRecoilToggle",
+    Callback = function(Value)
+        noVisualRecoilEnabled = Value
+        if Value then
+            Rayfield:Notify({
+                Title = "No Visual Recoil",
+                Content = "Visual recoil has been removed",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        else
+            -- Восстанавливаем оригинальные значения при отключении
+            originalViewmodelOffset = Vector3.new(0, 0, 0)
+            originalCameraOffset = Vector3.new(0, 0, 0)
+            Rayfield:Notify({
+                Title = "No Visual Recoil",
+                Content = "Visual recoil restored to normal",
+                Duration = 2,
+                Image = 4483362458,
+            })
         end
     end,
 })
@@ -1077,6 +1160,11 @@ RunService.RenderStepped:Connect(function()
             lastMousePos = mousePos
             lastFOV = fov
         end
+    end
+
+    -- No Visual Recoil
+    if noVisualRecoilEnabled then
+        setupNoVisualRecoil()
     end
 
     -- Aimlock и Autofire (работает ТОЛЬКО если бинд установлен и зажат)
