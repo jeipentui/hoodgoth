@@ -47,75 +47,47 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- NO VISUAL RECOIL С ЗАДЕРЖКОЙ 0.3 СЕК (УЛУЧШЕННАЯ ВЕРСИЯ)
-local NoVisualRecoilEnabled = false
-local lastShotTime = 0
-local RECOIL_TAIL = 0.3
-local targetCFrame = Camera.CFrame
+-- NO VISUAL RECOIL (ОПТИМИЗИРОВАННАЯ ВЕРСИЯ)
+local noVisualRecoilEnabled = false
+local lastRot = Camera.CFrame - Camera.CFrame.Position
+local recoilHook = nil
 
--- Подписка на стрельбу инструмента
-local function monitorTool(tool)
-    if not tool then return end
-    tool.Activated:Connect(function()
-        lastShotTime = tick()
-        targetCFrame = Camera.CFrame
-    end)
-end
-
--- Следим за текущим инструментом персонажа
-local function setupCharacter(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        monitorTool(tool)
-    end
+local function startNoVisualRecoil()
+    if recoilHook then return end
     
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            monitorTool(child)
-        end
-    end)
+    lastRot = Camera.CFrame - Camera.CFrame.Position
     
-    char.ChildRemoved:Connect(function(child)
-        if child:IsA("Tool") then
-            lastShotTime = 0
-        end
-    end)
-end
-
--- Подписка на смену персонажа
-localPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    setupCharacter(char)
-end)
-
-if localPlayer.Character then
-    setupCharacter(localPlayer.Character)
-end
-
--- Главный хук No Visual Recoil
-local recoilHook = RunService.RenderStepped:Connect(function()
-    if NoVisualRecoilEnabled then
-        if (tick() - lastShotTime <= RECOIL_TAIL) then
-            Camera.CFrame = targetCFrame
-        else
-            local char = localPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                targetCFrame = CFrame.new(Camera.CFrame.Position) * (targetCFrame - targetCFrame.Position)
+    recoilHook = RunService:BindToRenderStep(
+        "NoVisualRecoil",
+        Enum.RenderPriority.Camera.Value + 1,
+        function()
+            if not noVisualRecoilEnabled then
+                lastRot = Camera.CFrame - Camera.CFrame.Position
+                return
             end
-        end
-    end
-end)
 
-local function activateNoVisualRecoil()
-    NoVisualRecoilEnabled = true
-    lastShotTime = 0
-    targetCFrame = Camera.CFrame
+            local cam = Camera.CFrame
+            local pos = cam.Position
+            local rot = cam - pos
+
+            local delta = lastRot:Inverse() * rot
+
+            delta = delta:Lerp(CFrame.new(), 0.85)
+
+            local newRot = lastRot * delta
+            Camera.CFrame = CFrame.new(pos) * newRot
+
+            lastRot = newRot
+        end
+    )
 end
 
-local function deactivateNoVisualRecoil()
-    NoVisualRecoilEnabled = false
-    lastShotTime = 0
+local function stopNoVisualRecoil()
+    if recoilHook then
+        RunService:UnbindFromRenderStep("NoVisualRecoil")
+        recoilHook = nil
+    end
+    lastRot = Camera.CFrame - Camera.CFrame.Position
 end
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
@@ -234,9 +206,9 @@ local NoVisualRecoilToggle = RageTab:CreateToggle({
     Flag = "NoVisualRecoilToggle",
     Callback = function(Value)
         if Value then
-            activateNoVisualRecoil()
+            startNoVisualRecoil()
         else
-            deactivateNoVisualRecoil()
+            stopNoVisualRecoil()
         end
     end,
 })
@@ -1081,7 +1053,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        if recoilHook then recoilHook:Disconnect() end
+        stopNoVisualRecoil()
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
