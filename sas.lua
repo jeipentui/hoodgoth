@@ -84,45 +84,60 @@ local function WallCheck(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
     
-    -- ✅ СНАЧАЛА проверяем, что цель в FOV
+    -- СНАЧАЛА проверяем, что цель в FOV
     if not InFOV(targetHead.Position) then
         return false -- цель вне FOV, wallcheck не нужен
     end
 
     local origin = Camera.CFrame.Position
-    local direction = targetHead.Position - origin
-
+    local direction = (targetHead.Position - origin).Unit
+    local distanceToTarget = (targetHead.Position - origin).Magnitude
+    
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
 
-    local result = workspace:Raycast(origin, direction, rayParams)
-
-    -- НИЧЕГО НЕ ПОПАЛИ → видно
-    if not result then
-        return true
-    end
-
-    local hitInstance = result.Instance
+    -- Первый raycast от камеры до цели
+    local result1 = workspace:Raycast(origin, direction * distanceToTarget, rayParams)
     
-    -- Попали в часть цели → видно
-    if hitInstance:IsDescendantOf(targetHead.Parent) then
-        return true
-    end
-
-    -- ✅ ДОБАВЛЯЕМ DFrame КАК ИСКЛЮЧЕНИЕ (ТОЛЬКО ЕСЛИ ЦЕЛЬ В FOV)
-    -- Проверяем по имени объекта
-    if hitInstance.Name == "DFrame" then
-        return true -- игнорируем DFrame, считаем что видно через него
+    if not result1 then
+        return true -- ничего не попали, цель видна
     end
     
-    -- ИЛИ проверяем по классу (если такой существует в вашей игре)
-    if hitInstance.ClassName == "DFrame" then
+    local hit1 = result1.Instance
+    
+    -- Попали в саму цель
+    if hit1:IsDescendantOf(targetHead.Parent) then
         return true
     end
-
-    -- Попали в стену → НЕ видно
+    
+    -- ✅ Если попали в DFrame, проверяем что ЗА ним
+    if hit1.Name == "DFrame" or hit1.ClassName == "DFrame" then
+        -- Делаем второй raycast от точки ЗА DFrame до цели
+        local newOrigin = result1.Position + (direction * 0.5)
+        local remainingDistance = distanceToTarget - (newOrigin - origin).Magnitude
+        
+        if remainingDistance > 0 then
+            local result2 = workspace:Raycast(newOrigin, direction * remainingDistance, rayParams)
+            
+            if not result2 then
+                return true -- за DFrame ничего нет, цель видна
+            end
+            
+            local hit2 = result2.Instance
+            
+            -- Проверяем, попали ли в цель ЗА DFrame
+            if hit2:IsDescendantOf(targetHead.Parent) then
+                return true -- за DFrame сразу цель
+            end
+            
+            -- За DFrame есть ДРУГАЯ стена → не видно
+            return false
+        end
+    end
+    
+    -- Попали в не-DFrame объект → стена
     return false
 end
 
@@ -366,7 +381,6 @@ local function getNearestToCursor()
                         -- 2. Проверяем валидность цели
                         if isValidTarget(plr, head) then
                             -- 3. Только если валидна - проверяем видимость через WallCheck
-                            -- (WallCheck сам проверит FOV внутри себя снова, но это нормально)
                             if WallCheck(head, localChar) then
                                 -- Находим ближайшую к курсору
                                 local mousePos = UIS:GetMouseLocation()
@@ -406,7 +420,6 @@ local function getTarget()
             -- 2. Только если в FOV - проверяем валидность
             if isValidTarget(plr, currentTarget) then
                 -- 3. Только если валидна - проверяем видимость через WallCheck
-                -- (WallCheck проверит FOV внутри себя)
                 if WallCheck(currentTarget, localPlayer.Character) then
                     return currentTarget
                 end
