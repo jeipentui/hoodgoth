@@ -10,14 +10,65 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
--- NO VISUAL RECOIL (ТВОЯ ОРИГИНАЛЬНАЯ ВЕРСИЯ)
+-- ==============================
+-- NO VISUAL RECOIL (СОВМЕЩЕННАЯ ВЕРСИЯ)
+-- ==============================
 local noVisualRecoilEnabled = false
 local lastPitch = 0
 local recoilHook = nil
+local fullRecoilEnabled = false
 
 local function startNoVisualRecoil()
     if recoilHook then return end
     
+    -- Сначала убиваем системную отдачу
+    if fullRecoilEnabled then
+        -- 1. УБИВАЕМ CameraShake / Spring / Recoil modules
+        for _,v in pairs(getgc(true)) do
+            if typeof(v) == "table" then
+                -- CameraShaker / Shake modules
+                if rawget(v, "Shake") and typeof(v.Shake) == "function" then
+                    v.Shake = function() end
+                end
+                if rawget(v, "AddShake") then
+                    v.AddShake = function() end
+                end
+                if rawget(v, "StartShake") then
+                    v.StartShake = function() end
+                end
+
+                -- Spring recoil (самый частый)
+                if rawget(v, "Update") and rawget(v, "Velocity") and rawget(v, "Position") then
+                    v.Update = function()
+                        v.Position = Vector3.zero
+                        v.Velocity = Vector3.zero
+                        return CFrame.new()
+                    end
+                end
+            end
+        end
+
+        -- 2. УБИРАЕМ VIEWMODEL SWAY (если трясло руки)
+        for _,v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Motor6D") then
+                v.Transform = CFrame.new()
+            end
+        end
+
+        -- 3. ЗАЩИТА: если новые модули подгрузятся позже
+        task.spawn(function()
+            while noVisualRecoilEnabled and fullRecoilEnabled do
+                task.wait(1)
+                for _,v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Motor6D") then
+                        v.Transform = CFrame.new()
+                    end
+                end
+            end
+        end)
+    end
+    
+    -- Потом запускаем плавное устранение остатков
     recoilHook = RunService:BindToRenderStep(
         "NoVisualRecoil",
         Enum.RenderPriority.Camera.Value + 2,
@@ -45,69 +96,6 @@ local function stopNoVisualRecoil()
         RunService:UnbindFromRenderStep("NoVisualRecoil")
         recoilHook = nil
     end
-end
-
--- ==============================
--- FULL NO VISUAL RECOIL
--- Kill CameraShake / Spring / Bob
--- ==============================
-local fullNoRecoilEnabled = false
-
-local function startFullNoVisualRecoil()
-    if fullNoRecoilEnabled then return end
-    fullNoRecoilEnabled = true
-    
-    -- 1. УБИВАЕМ CameraShake / Spring / Recoil modules
-    for _,v in pairs(getgc(true)) do
-        if typeof(v) == "table" then
-
-            -- CameraShaker / Shake modules
-            if rawget(v, "Shake") and typeof(v.Shake) == "function" then
-                v.Shake = function() end
-            end
-            if rawget(v, "AddShake") then
-                v.AddShake = function() end
-            end
-            if rawget(v, "StartShake") then
-                v.StartShake = function() end
-            end
-
-            -- Spring recoil (самый частый)
-            if rawget(v, "Update") and rawget(v, "Velocity") and rawget(v, "Position") then
-                v.Update = function()
-                    v.Position = Vector3.zero
-                    v.Velocity = Vector3.zero
-                    return CFrame.new()
-                end
-            end
-        end
-    end
-
-    -- 2. УБИРАЕМ VIEWMODEL SWAY (если трясло руки)
-    for _,v in pairs(workspace:GetDescendants()) do
-        if v:IsA("Motor6D") then
-            v.Transform = CFrame.new()
-        end
-    end
-
-    -- 3. ЗАЩИТА: если новые модули подгрузятся позже
-    task.spawn(function()
-        while fullNoRecoilEnabled do
-            task.wait(1)
-            for _,v in pairs(workspace:GetDescendants()) do
-                if v:IsA("Motor6D") then
-                    v.Transform = CFrame.new()
-                end
-            end
-        end
-    end)
-
-    print("[FullNoVisualRecoil] FULLY ENABLED")
-end
-
-local function stopFullNoVisualRecoil()
-    fullNoRecoilEnabled = false
-    print("[FullNoVisualRecoil] DISABLED")
 end
 
 -- Create Window
@@ -271,15 +259,16 @@ local NoVisualRecoilToggle = RageTab:CreateToggle({
     end,
 })
 
-local FullNoVisualRecoilToggle = RageTab:CreateToggle({
-    Name = "FULL No Visual Recoil",
+local FullRecoilToggle = RageTab:CreateToggle({
+    Name = "AGGRESSIVE Anti-Recoil",
     CurrentValue = false,
-    Flag = "FullNoVisualRecoilToggle",
+    Flag = "FullRecoilToggle",
     Callback = function(Value)
-        if Value then
-            startFullNoVisualRecoil()
-        else
-            stopFullNoVisualRecoil()
+        fullRecoilEnabled = Value
+        -- Если антиотдача уже включена, перезапускаем её с новыми настройками
+        if noVisualRecoilEnabled then
+            stopNoVisualRecoil()
+            startNoVisualRecoil()
         end
     end,
 })
@@ -1125,7 +1114,6 @@ local DestroyUIButton = MiscTab:CreateButton({
     Callback = function()
         stopNoFall()
         stopNoVisualRecoil()
-        stopFullNoVisualRecoil()
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
