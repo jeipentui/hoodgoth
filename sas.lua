@@ -47,40 +47,64 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- SMART NO VISUAL RECOIL
+-- NO VISUAL RECOIL (TOOL ACTIVATE VERSION)
 local NoVisualRecoilEnabled = false
-local recoilOffset = CFrame.new()
-local lastCameraCF = Camera.CFrame
-local recoilHook = nil
+local recoilHookConnection
+local animatorHookConnection
 
-local function startNoVisualRecoil()
-    if recoilHook then return end
-    
-    recoilHook = RunService.RenderStepped:Connect(function()
-        if not NoVisualRecoilEnabled then
-            lastCameraCF = Camera.CFrame
-            return
+local function setupMouseDeltaHook()
+    if recoilHookConnection then recoilHookConnection:Disconnect() end
+
+    recoilHookConnection = RunService.RenderStepped:Connect(function()
+        if not NoVisualRecoilEnabled then return end
+        local char = localPlayer.Character
+        if not char then return end
+
+        local tool = char:FindFirstChildOfClass("Tool")
+        if not tool then return end
+
+        local lastActivation = tool:GetAttribute("LastActivation") or 0
+        local isFiring = (tick() - lastActivation) < 0.2
+
+        if isFiring then
+            local delta = UIS:GetMouseDelta()
+            if delta then
+                mousemoverel(-delta.X, -delta.Y)
+            end
         end
-
-        local currentCF = Camera.CFrame
-        local pos = currentCF.Position
-
-        local deltaRot = (lastCameraCF - lastCameraCF.Position):Inverse() * (currentCF - pos)
-
-        local neutralizedRot = deltaRot:Lerp(CFrame.new(), 0.9)
-
-        Camera.CFrame = CFrame.new(pos) * (lastCameraCF - lastCameraCF.Position) * neutralizedRot
-
-        lastCameraCF = Camera.CFrame
     end)
 end
 
-local function stopNoVisualRecoil()
-    if recoilHook then
-        recoilHook:Disconnect()
-        recoilHook = nil
+local function setupAnimatorHook()
+    if animatorHookConnection then animatorHookConnection:Disconnect() end
+
+    local function onCharAdded(char)
+        task.wait(1)
+        local humanoid = char:WaitForChild("Humanoid")
+        local animator = humanoid:WaitForChild("Animator")
+        animatorHookConnection = animator.AnimationPlayed:Connect(function(track)
+            if not NoVisualRecoilEnabled then return end
+            local name = track.Name:lower()
+            if name:find("recoil") or name:find("fire") or name:find("shoot") then
+                track:Stop()
+            end
+        end)
     end
-    lastCameraCF = Camera.CFrame
+
+    if localPlayer.Character then onCharAdded(localPlayer.Character) end
+    localPlayer.CharacterAdded:Connect(onCharAdded)
+end
+
+local function activateNoVisualRecoil()
+    NoVisualRecoilEnabled = true
+    setupMouseDeltaHook()
+    setupAnimatorHook()
+end
+
+local function deactivateNoVisualRecoil()
+    NoVisualRecoilEnabled = false
+    if recoilHookConnection then recoilHookConnection:Disconnect() end
+    if animatorHookConnection then animatorHookConnection:Disconnect() end
 end
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
@@ -193,18 +217,15 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- SMART NO VISUAL RECOIL TOGGLE
 local NoVisualRecoilToggle = RageTab:CreateToggle({
     Name = "No Visual Recoil",
     CurrentValue = false,
     Flag = "NoVisualRecoilToggle",
     Callback = function(Value)
-        NoVisualRecoilEnabled = Value
-        
         if Value then
-            startNoVisualRecoil()
+            activateNoVisualRecoil()
         else
-            stopNoVisualRecoil()
+            deactivateNoVisualRecoil()
         end
     end,
 })
@@ -1049,7 +1070,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        stopNoVisualRecoil()
+        deactivateNoVisualRecoil()
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
