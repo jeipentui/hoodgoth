@@ -47,10 +47,13 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- NO VISUAL RECOIL (TOOL ACTIVATE VERSION)
+-- NO VISUAL RECOIL С ЗАДЕРЖКОЙ 0.3 СЕК
 local NoVisualRecoilEnabled = false
 local recoilHookConnection
 local animatorHookConnection
+
+local lastShotTime = 0
+local RECOIL_TAIL = 0.3
 
 local function setupMouseDeltaHook()
     if recoilHookConnection then recoilHookConnection:Disconnect() end
@@ -67,6 +70,10 @@ local function setupMouseDeltaHook()
         local isFiring = (tick() - lastActivation) < 0.2
 
         if isFiring then
+            lastShotTime = tick()
+        end
+
+        if tick() - lastShotTime <= RECOIL_TAIL then
             local delta = UIS:GetMouseDelta()
             if delta then
                 mousemoverel(-delta.X, -delta.Y)
