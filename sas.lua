@@ -47,10 +47,11 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- НОВАЯ ПЕРЕМЕННАЯ: No Visual Recoil
+-- НАСТРОЙКИ NO VISUAL RECOIL (ПЕРЕХВАТ КАМЕРЫ)
 local noVisualRecoilEnabled = false
-local originalViewmodelOffset = Vector3.new(0, 0, 0)
-local originalCameraOffset = Vector3.new(0, 0, 0)
+local cameraHookEnabled = false
+local originalCameraCFrame = nil
+local cameraHookConnection = nil
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
@@ -68,6 +69,196 @@ fovCircle.Thickness = 2
 fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
+
+--==================== НОВЫЙ NO VISUAL RECOIL (ПЕРЕХВАТ КАМЕРЫ) ====================
+
+-- Функция для перехвата и нейтрализации отдачи камеры
+local function setupCameraRecoilHook()
+    if not noVisualRecoilEnabled or cameraHookEnabled then
+        return
+    end
+    
+    print("[NoRecoil] Setting up camera recoil hook...")
+    
+    -- Сохраняем оригинальный CFrame камеры
+    originalCameraCFrame = Camera.CFrame
+    
+    -- Метод 1: Перехват обновлений камеры через RenderStepped
+    cameraHookConnection = RunService.RenderStepped:Connect(function()
+        if not noVisualRecoilEnabled then
+            return
+        end
+        
+        -- Фиксируем камеру на её оригинальной позиции (без отдачи)
+        if originalCameraCFrame then
+            -- Сохраняем текущее направление взгляда
+            local lookVector = Camera.CFrame.LookVector
+            
+            -- Устанавливаем камеру с фиксированной позицией, но сохраняем направление
+            Camera.CFrame = CFrame.new(originalCameraCFrame.Position) * CFrame.lookAt(
+                originalCameraCFrame.Position,
+                originalCameraCFrame.Position + lookVector
+            )
+        end
+    end)
+    
+    cameraHookEnabled = true
+    print("[NoRecoil] Camera hook activated")
+end
+
+-- Метод 2: Перехват конкретных событий отдачи
+local function interceptRecoilEvents()
+    if not noVisualRecoilEnabled then
+        return
+    end
+    
+    -- Поиск и нейтрализация событий отдачи
+    local function neutralizeRecoilEvent(eventName)
+        -- Проверяем ReplicatedStorage на события отдачи
+        local remoteEvent = ReplicatedStorage:FindFirstChild(eventName)
+        if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+            local originalFireServer = remoteEvent.FireServer
+            remoteEvent.FireServer = function(self, ...)
+                -- Сервер получает оригинальные параметры
+                return originalFireServer(self, ...)
+            end
+        end
+    end
+    
+    -- Список возможных событий отдачи
+    local recoilEvents = {
+        "RecoilEvent",
+        "ApplyRecoil",
+        "CameraShake",
+        "FireWeapon",
+        "Shoot",
+        "WeaponFired"
+    }
+    
+    for _, eventName in pairs(recoilEvents) do
+        pcall(neutralizeRecoilEvent, eventName)
+    end
+end
+
+-- Метод 3: Перехват анимаций отдачи
+local function interceptRecoilAnimations()
+    if not noVisualRecoilEnabled then
+        return
+    end
+    
+    local char = localPlayer.Character
+    if not char then return end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    -- Останавливаем все анимации отдачи
+    for _, animTrack in pairs(humanoid:GetPlayingAnimationTracks()) do
+        local animName = animTrack.Name:lower()
+        if animName:find("recoil") or animName:find("fire") or animName:find("shoot") then
+            animTrack:Stop()
+        end
+    end
+end
+
+-- Метод 4: Нейтрализация визуальных эффектов отдачи
+local function neutralizeVisualEffects()
+    if not noVisualRecoilEnabled then
+        return
+    end
+    
+    -- Удаление эффектов тряски
+    local cameraShaker = Camera:FindFirstChild("CameraShaker")
+    if cameraShaker then
+        cameraShaker:Destroy()
+    end
+    
+    -- Удаление эффектов блума/размытия
+    for _, effect in pairs(Camera:GetChildren()) do
+        if effect:IsA("BlurEffect") or effect:IsA("DepthOfFieldEffect") then
+            if effect.Name:find("Recoil") or effect.Name:find("Fire") then
+                effect.Enabled = false
+            end
+        end
+    end
+    
+    -- Фиксация оружия во вьюмоделе
+    local viewmodels = workspace:FindFirstChild("Viewmodels") or workspace:FindFirstChild("Viewmodel")
+    if viewmodels then
+        for _, weapon in pairs(viewmodels:GetDescendants()) do
+            if weapon:IsA("BasePart") then
+                -- Отключаем физику и фиксируем позицию
+                if weapon:FindFirstChild("BodyPosition") then
+                    weapon.BodyPosition:Destroy()
+                end
+                if weapon:FindFirstChild("BodyGyro") then
+                    weapon.BodyGyro:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- Основная функция активации no visual recoil
+local function activateNoVisualRecoil()
+    if cameraHookEnabled then
+        return
+    end
+    
+    print("[NoRecoil] Activating no visual recoil...")
+    
+    -- Запускаем все методы
+    setupCameraRecoilHook()
+    
+    -- Периодические проверки и нейтрализации
+    local periodicCheck = RunService.Heartbeat:Connect(function()
+        if not noVisualRecoilEnabled then
+            periodicCheck:Disconnect()
+            return
+        end
+        
+        interceptRecoilAnimations()
+        neutralizeVisualEffects()
+        
+        -- Обновляем оригинальную позицию камеры если игрок движется
+        if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = localPlayer.Character.HumanoidRootPart
+            if hrp and (not originalCameraCFrame or (hrp.Position - originalCameraCFrame.Position).Magnitude > 5) then
+                originalCameraCFrame = CFrame.new(hrp.Position + Vector3.new(0, 1.5, 0))
+            end
+        end
+    end)
+    
+    -- Одноразовый перехват событий
+    interceptRecoilEvents()
+    
+    Rayfield:Notify({
+        Title = "No Visual Recoil",
+        Content = "Visual recoil removed. Server sees real recoil values.",
+        Duration = 3,
+        Image = 4483362458,
+    })
+end
+
+-- Функция деактивации
+local function deactivateNoVisualRecoil()
+    if cameraHookConnection then
+        cameraHookConnection:Disconnect()
+        cameraHookConnection = nil
+    end
+    
+    cameraHookEnabled = false
+    originalCameraCFrame = nil
+    
+    print("[NoRecoil] Camera hook deactivated")
+    
+    Rayfield:Notify({
+        Title = "No Visual Recoil",
+        Content = "Visual recoil restored to normal",
+        Duration = 2,
+        Image = 4483362458,
+    })
+end
 
 --==================== НОВЫЙ WALLCHECK ====================
 
@@ -146,56 +337,6 @@ local function WallCheck(targetHead, localChar)
     return false
 end
 
---==================== NO VISUAL RECOIL FUNCTION ====================
-local function setupNoVisualRecoil()
-    if not noVisualRecoilEnabled then
-        return
-    end
-    
-    local char = localPlayer.Character
-    if not char then return end
-    
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return end
-    
-    -- Ищем Viewmodel или оружие в руках
-    local viewmodel = workspace:FindFirstChild("Viewmodel") or 
-                     workspace:FindFirstChild("WeaponModel") or
-                     tool:FindFirstChild("Handle") or
-                     tool:FindFirstChild("Part")
-    
-    if viewmodel then
-        -- Сохраняем оригинальные позиции если еще не сохранены
-        if originalViewmodelOffset == Vector3.new(0, 0, 0) then
-            originalViewmodelOffset = viewmodel.Position
-        end
-        
-        -- Фиксируем позицию оружия
-        viewmodel.Position = originalViewmodelOffset
-    end
-    
-    -- Также фиксируем камеру если она двигается при стрельбе
-    local camera = workspace.CurrentCamera
-    if camera and camera:FindFirstChild("RecoilOffset") then
-        if originalCameraOffset == Vector3.new(0, 0, 0) then
-            originalCameraOffset = camera.RecoilOffset.Value
-        end
-        camera.RecoilOffset.Value = Vector3.new(0, 0, 0)
-    end
-    
-    -- Ищем анимации отдачи и останавливаем их
-    for _, animTrack in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
-        if animTrack.Name:find("Recoil") or animTrack.Name:find("Fire") or animTrack.Name:find("Shoot") then
-            animTrack:Stop()
-        end
-    end
-    
-    -- Отключаем эффекты тряски камеры
-    if camera:FindFirstChild("CameraShaker") then
-        camera.CameraShaker:Destroy()
-    end
-end
-
 --==================== UI Elements ====================
 
 -- Rage Tab
@@ -212,33 +353,26 @@ local AimlockToggle = RageTab:CreateToggle({
     end,
 })
 
--- НОВЫЙ ТОГГЛ: No Visual Recoil
+-- НОВЫЙ УЛУЧШЕННЫЙ ТОГГЛ: No Visual Recoil (перехват камеры)
 local NoVisualRecoilToggle = RageTab:CreateToggle({
-    Name = "No Visual Recoil",
+    Name = "🟢 No Visual Recoil",
     CurrentValue = false,
     Flag = "NoVisualRecoilToggle",
     Callback = function(Value)
         noVisualRecoilEnabled = Value
+        
         if Value then
-            Rayfield:Notify({
-                Title = "No Visual Recoil",
-                Content = "Visual recoil has been removed",
-                Duration = 2,
-                Image = 4483362458,
-            })
+            -- Активируем no visual recoil
+            activateNoVisualRecoil()
         else
-            -- Восстанавливаем оригинальные значения при отключении
-            originalViewmodelOffset = Vector3.new(0, 0, 0)
-            originalCameraOffset = Vector3.new(0, 0, 0)
-            Rayfield:Notify({
-                Title = "No Visual Recoil",
-                Content = "Visual recoil restored to normal",
-                Duration = 2,
-                Image = 4483362458,
-            })
+            -- Деактивируем no visual recoil
+            deactivateNoVisualRecoil()
         end
     end,
 })
+
+local NoVisualRecoilDescription = RageTab:CreateLabel("Перехватывает отдачу ДО применения к камере")
+local NoVisualRecoilDescription2 = RageTab:CreateLabel("Сервер видит реальные значения, клиент - нет")
 
 -- Лейбл для бинда (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local AimlockKeybindLabel = RageTab:CreateLabel("Aimlock Key: Not Set")
@@ -712,7 +846,7 @@ end
 -- Функция для создания ESP объектов
 local function createESPObjects(plr)
     -- Сначала очищаем старые объекты, если они есть
-    cleanupPlayerESP(plr)
+        cleanupPlayerESP(plr)
     
     -- Текст для HP
     local hpText = Drawing.new("Text")
@@ -1135,6 +1269,9 @@ local DestroyUIButton = MiscTab:CreateButton({
         -- Останавливаем NoFall
         stopNoFall()
         
+        -- Останавливаем no visual recoil
+        deactivateNoVisualRecoil()
+        
         -- Очищаем все ESP объекты перед уничтожением
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
@@ -1162,10 +1299,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- No Visual Recoil
-    if noVisualRecoilEnabled then
-        setupNoVisualRecoil()
-    end
+    -- No Visual Recoil активирован через перехват камеры
+    -- (работает в background через cameraHookConnection)
 
     -- Aimlock и Autofire (работает ТОЛЬКО если бинд установлен и зажат)
     if aimbotEnabled and aimlockKey and keyHeld then
