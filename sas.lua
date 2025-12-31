@@ -10,6 +10,43 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
+-- NO VISUAL RECOIL (ТВОЯ ОРИГИНАЛЬНАЯ ВЕРСИЯ)
+local noVisualRecoilEnabled = false
+local lastPitch = 0
+local recoilHook = nil
+
+local function startNoVisualRecoil()
+    if recoilHook then return end
+    
+    recoilHook = RunService:BindToRenderStep(
+        "NoVisualRecoil",
+        Enum.RenderPriority.Camera.Value + 2,
+        function()
+            if not noVisualRecoilEnabled then return end
+
+            -- текущие углы камеры
+            local x, y, z = Camera.CFrame:ToOrientation()
+
+            -- если pitch резко изменился (recoil)
+            if math.abs(x - lastPitch) > 0.0005 then
+                -- возвращаем прошлый pitch, НЕ трогая yaw
+                Camera.CFrame =
+                    CFrame.new(Camera.CFrame.Position) *
+                    CFrame.fromOrientation(lastPitch, y, z)
+            end
+
+            lastPitch = x
+        end
+    )
+end
+
+local function stopNoVisualRecoil()
+    if recoilHook then
+        RunService:UnbindFromRenderStep("NoVisualRecoil")
+        recoilHook = nil
+    end
+end
+
 -- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "thw club",
@@ -46,49 +83,6 @@ local showFOV = false
 local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
-
--- NO VISUAL RECOIL (ОПТИМИЗИРОВАННАЯ ВЕРСИЯ)
-local noVisualRecoilEnabled = false
-local lastRot = Camera.CFrame - Camera.CFrame.Position
-local recoilHook = nil
-
-local function startNoVisualRecoil()
-    if recoilHook then return end
-    
-    lastRot = Camera.CFrame - Camera.CFrame.Position
-    
-    recoilHook = RunService:BindToRenderStep(
-        "NoVisualRecoil",
-        Enum.RenderPriority.Camera.Value + 1,
-        function()
-            if not noVisualRecoilEnabled then
-                lastRot = Camera.CFrame - Camera.CFrame.Position
-                return
-            end
-
-            local cam = Camera.CFrame
-            local pos = cam.Position
-            local rot = cam - pos
-
-            local delta = lastRot:Inverse() * rot
-
-            delta = delta:Lerp(CFrame.new(), 0.85)
-
-            local newRot = lastRot * delta
-            Camera.CFrame = CFrame.new(pos) * newRot
-
-            lastRot = newRot
-        end
-    )
-end
-
-local function stopNoVisualRecoil()
-    if recoilHook then
-        RunService:UnbindFromRenderStep("NoVisualRecoil")
-        recoilHook = nil
-    end
-    lastRot = Camera.CFrame - Camera.CFrame.Position
-end
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
@@ -205,6 +199,7 @@ local NoVisualRecoilToggle = RageTab:CreateToggle({
     CurrentValue = false,
     Flag = "NoVisualRecoilToggle",
     Callback = function(Value)
+        noVisualRecoilEnabled = Value
         if Value then
             startNoVisualRecoil()
         else
