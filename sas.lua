@@ -47,56 +47,18 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
--- NO VISUAL RECOIL (БЕЗ ЗАДЕРЖКИ 0.3 СЕК)
+-- NO VISUAL RECOIL С ЗАДЕРЖКОЙ 0.3 СЕК (УЛУЧШЕННАЯ ВЕРСИЯ)
 local NoVisualRecoilEnabled = false
 local lastShotTime = 0
+local RECOIL_TAIL = 0.3
 local targetCFrame = Camera.CFrame
-local recoilHook = nil
-
--- Главный хук No Visual Recoil
-local function startRecoilHook()
-    if recoilHook then return end
-    
-    recoilHook = RunService.RenderStepped:Connect(function()
-        if NoVisualRecoilEnabled and lastShotTime > 0 then
-            Camera.CFrame = targetCFrame
-        end
-    end)
-end
-
-local function stopRecoilHook()
-    if recoilHook then
-        recoilHook:Disconnect()
-        recoilHook = nil
-    end
-end
-
-local function activateNoVisualRecoil()
-    NoVisualRecoilEnabled = true
-    lastShotTime = 0
-    targetCFrame = Camera.CFrame
-    startRecoilHook()
-end
-
-local function deactivateNoVisualRecoil()
-    NoVisualRecoilEnabled = false
-    lastShotTime = 0
-    stopRecoilHook()
-end
-
--- Функция для сброса антиотдачи при потере цели
-local function resetRecoil()
-    lastShotTime = 0
-end
 
 -- Подписка на стрельбу инструмента
 local function monitorTool(tool)
     if not tool then return end
     tool.Activated:Connect(function()
-        if NoVisualRecoilEnabled then
-            lastShotTime = tick()
-            targetCFrame = Camera.CFrame
-        end
+        lastShotTime = tick()
+        targetCFrame = Camera.CFrame
     end)
 end
 
@@ -129,6 +91,31 @@ end)
 
 if localPlayer.Character then
     setupCharacter(localPlayer.Character)
+end
+
+-- Главный хук No Visual Recoil
+local recoilHook = RunService.RenderStepped:Connect(function()
+    if NoVisualRecoilEnabled then
+        if (tick() - lastShotTime <= RECOIL_TAIL) then
+            Camera.CFrame = targetCFrame
+        else
+            local char = localPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                targetCFrame = CFrame.new(Camera.CFrame.Position) * (targetCFrame - targetCFrame.Position)
+            end
+        end
+    end
+end)
+
+local function activateNoVisualRecoil()
+    NoVisualRecoilEnabled = true
+    lastShotTime = 0
+    targetCFrame = Camera.CFrame
+end
+
+local function deactivateNoVisualRecoil()
+    NoVisualRecoilEnabled = false
+    lastShotTime = 0
 end
 
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
@@ -237,7 +224,6 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
-            lastShotTime = 0
         end
     end,
 })
@@ -619,7 +605,6 @@ UIS.InputEnded:Connect(function(input)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
-            lastShotTime = 0
         end
     end
 end)
@@ -1096,7 +1081,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        deactivateNoVisualRecoil()
+        if recoilHook then recoilHook:Disconnect() end
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
@@ -1133,33 +1118,35 @@ RunService.RenderStepped:Connect(function()
             if validTarget then
                 Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
                 
-                if autofireEnabled then
+                if autofireEnabled and targetHead ~= nil then
                     currentTool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
-                    if currentTool then 
-                        currentTool:Activate() 
+                    if currentTool then
+                        currentTool:Activate()
+                    end
+                else
+                    if currentTool then
+                        currentTool:Deactivate()
+                        currentTool = nil
                     end
                 end
             else
                 currentTarget = nil
                 targetLocked = false
-                lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ
-                if currentTool then 
-                    currentTool:Deactivate() 
-                    currentTool = nil 
+                if currentTool then
+                    currentTool:Deactivate()
+                    currentTool = nil
                 end
             end
         else
-            lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ ПРИ ПОТЕРЕ ЦЕЛИ
-            if currentTool then 
-                currentTool:Deactivate() 
-                currentTool = nil 
+            if currentTool then
+                currentTool:Deactivate()
+                currentTool = nil
             end
         end
     else
-        lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ КОГДА НЕ ДЕРЖИМ БИНД
-        if currentTool then 
-            currentTool:Deactivate() 
-            currentTool = nil 
+        if currentTool then
+            currentTool:Deactivate()
+            currentTool = nil
         end
     end
 
