@@ -375,8 +375,10 @@ local ClearFriendsButton = RageTab:CreateButton({
 --==================== Weapon Prediction ====================
 local weaponBulletSpeeds = {
     ["Beretta"] = 1624,
+    ["Magnum"] = 2550,
     ["G-17"] = 1850,
     ["UZI"] = 2250,
+    ["UZI+"] = 2250,
     ["Mare"] = 2000,
     ["Deagle"] = 2200,
     ["SKS"] = 3750,
@@ -384,6 +386,12 @@ local weaponBulletSpeeds = {
     ["AKS-74U"] = 3000,
     ["FNP-45"] = 1500,
     ["TEC-9"] = 2100,
+    ["MAC-10+"] = 2250,
+    ["MAC-10"] = 2250,
+    ["MP7"] = 2600,
+    ["Tommy+"] = 2225,
+    ["Tommy"] = 2225,
+    
 }
 
 local function getCurrentWeaponSpeed()
