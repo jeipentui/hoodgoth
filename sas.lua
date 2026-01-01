@@ -10,102 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
--- =============================
--- NO VISUAL RECOIL (КОМБИНИРОВАННАЯ ВЕРСИЯ ДЛЯ CRIMINALITY)
--- =============================
-local noVisualRecoilEnabled = false
-local lastPitch = 0
-local recoilHook = nil
-local antiShakeHook = nil
-
-local function disableRecoilModules()
-    for _,v in pairs(getgc(true)) do
-        if typeof(v) == "table" then
-            -- отключаем CameraShake
-            if rawget(v, "Shake") and typeof(v.Shake) == "function" then
-                v.Shake = function() end
-            end
-            if rawget(v, "AddShake") then
-                v.AddShake = function() end
-            end
-            if rawget(v, "StartShake") then
-                v.StartShake = function() end
-            end
-            
-            -- отключаем spring recoil
-            if rawget(v, "Update")
-             and rawget(v, "Velocity")
-             and rawget(v, "Position") then
-                
-                v.Update = function()
-                    v.Position = Vector3.zero
-                    v.Velocity = Vector3.zero
-                    return CFrame.new()
-                end
-            end
-        end
-    end
-end
-
-local function startNoVisualRecoil()
-    if recoilHook then return end
-    
-    -- 1. Убиваем системные модули отдачи
-    disableRecoilModules()
-    
-    -- 2. Блокируем CameraShake эффекты
-    if antiShakeHook then
-        RunService:UnbindFromRenderStep("CrimAntiShake")
-    end
-    
-    antiShakeHook = RunService:BindToRenderStep("CrimAntiShake", Enum.RenderPriority.Camera.Value + 1, function()
-        -- жёстко сбрасываем эффекты shake
-        for _,eff in pairs(Camera:GetChildren()) do
-            if eff:IsA("CameraShake") then
-                eff:Destroy()
-            end
-        end
-    end)
-    
-    -- 3. Плавная антиотдача камеры
-    lastPitch = select(1, Camera.CFrame:ToOrientation())
-    
-    recoilHook = RunService:BindToRenderStep(
-        "NoVisualRecoil",
-        Enum.RenderPriority.Camera.Value + 2,
-        function()
-            if not noVisualRecoilEnabled then return end
-
-            -- текущие углы камеры
-            local x, y, z = Camera.CFrame:ToOrientation()
-
-            -- если pitch резко изменился (recoil)
-            if math.abs(x - lastPitch) > 0.0005 then
-                -- возвращаем прошлый pitch, НЕ трогая yaw
-                Camera.CFrame =
-                    CFrame.new(Camera.CFrame.Position) *
-                    CFrame.fromOrientation(lastPitch, y, z)
-            end
-
-            lastPitch = x
-        end
-    )
-    
-    print("[NoVisualRecoil] успешно применён для Criminality")
-end
-
-local function stopNoVisualRecoil()
-    if recoilHook then
-        RunService:UnbindFromRenderStep("NoVisualRecoil")
-        recoilHook = nil
-    end
-    
-    if antiShakeHook then
-        RunService:UnbindFromRenderStep("CrimAntiShake")
-        antiShakeHook = nil
-    end
-end
-
 -- Create Window
 local Window = Rayfield:CreateWindow({
     Name = "thw club",
@@ -143,6 +47,74 @@ local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 
+-- NO VISUAL RECOIL (БЕЗ ЗАДЕРЖКИ 0.3 СЕК)
+local NoVisualRecoilEnabled = false
+local lastShotTime = 0
+local targetCFrame = Camera.CFrame
+local originalCFrame = Camera.CFrame -- Сохраняем оригинальное положение
+
+-- Подписка на стрельбу инструмента
+local function monitorTool(tool)
+    if not tool then return end
+    tool.Activated:Connect(function()
+        lastShotTime = tick()
+        targetCFrame = Camera.CFrame
+        originalCFrame = Camera.CFrame
+    end)
+end
+
+-- Следим за текущим инструментом персонажа
+local function setupCharacter(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        monitorTool(tool)
+    end
+    
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            monitorTool(child)
+        end
+    end)
+    
+    char.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") then
+            lastShotTime = 0
+        end
+    end)
+end
+
+-- Подписка на смену персонажа
+localPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    setupCharacter(char)
+end)
+
+if localPlayer.Character then
+    setupCharacter(localPlayer.Character)
+end
+
+-- Главный хук No Visual Recoil
+local recoilHook = RunService.RenderStepped:Connect(function()
+    if NoVisualRecoilEnabled then
+        if lastShotTime > 0 then
+            Camera.CFrame = targetCFrame
+        end
+    end
+end)
+
+local function activateNoVisualRecoil()
+    NoVisualRecoilEnabled = true
+    lastShotTime = 0
+    targetCFrame = Camera.CFrame
+    originalCFrame = Camera.CFrame
+end
+
+local function deactivateNoVisualRecoil()
+    NoVisualRecoilEnabled = false
+    lastShotTime = 0
+end
+
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
 local aimlockKeyName = "Not Set"
@@ -151,6 +123,8 @@ local isRecordingKeybind = false
 -- Добавляем переменные для стабильного aimlock
 local currentTarget = nil -- Текущая цель
 local targetLocked = false -- Флаг блокировки цели
+local aimLockActive = false -- Флаг активного аимлока
+local lastValidCFrame = Camera.CFrame -- Последняя валидная CFrame до аимлока
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
@@ -249,6 +223,7 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
+            aimLockActive = false
         end
     end,
 })
@@ -258,11 +233,10 @@ local NoVisualRecoilToggle = RageTab:CreateToggle({
     CurrentValue = false,
     Flag = "NoVisualRecoilToggle",
     Callback = function(Value)
-        noVisualRecoilEnabled = Value
         if Value then
-            startNoVisualRecoil()
+            activateNoVisualRecoil()
         else
-            stopNoVisualRecoil()
+            deactivateNoVisualRecoil()
         end
     end,
 })
@@ -514,6 +488,7 @@ local function getTarget()
         if not plr then
             currentTarget = nil
             targetLocked = false
+            aimLockActive = false
             return nil
         end
         
@@ -527,6 +502,7 @@ local function getTarget()
         
         currentTarget = nil
         targetLocked = false
+        aimLockActive = false
         return nil
     end
     
@@ -535,6 +511,9 @@ local function getTarget()
         if newTarget then
             currentTarget = newTarget
             targetLocked = true
+            aimLockActive = true
+            -- Сохраняем текущую позицию камеры перед началом аимлока
+            lastValidCFrame = Camera.CFrame
         end
     end
     
@@ -621,6 +600,9 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
+            aimLockActive = false
+            -- Сохраняем позицию камеры при нажатии бинда
+            lastValidCFrame = Camera.CFrame
         end
     end
 end)
@@ -631,6 +613,7 @@ UIS.InputEnded:Connect(function(input)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
+            aimLockActive = false
         end
     end
 end)
@@ -1107,7 +1090,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        stopNoVisualRecoil()
+        if recoilHook then recoilHook:Disconnect() end
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
@@ -1153,18 +1136,37 @@ RunService.RenderStepped:Connect(function()
             else
                 currentTarget = nil
                 targetLocked = false
+                aimLockActive = false
+                -- Возвращаем камеру в исходное положение
+                if lastValidCFrame then
+                    Camera.CFrame = lastValidCFrame
+                end
                 if currentTool then 
                     currentTool:Deactivate() 
                     currentTool = nil 
                 end
             end
         else
+            if aimLockActive then
+                aimLockActive = false
+                -- Возвращаем камеру в исходное положение
+                if lastValidCFrame then
+                    Camera.CFrame = lastValidCFrame
+                end
+            end
             if currentTool then 
                 currentTool:Deactivate() 
                 currentTool = nil 
             end
         end
     else
+        if aimLockActive then
+            aimLockActive = false
+            -- Возвращаем камеру в исходное положение
+            if lastValidCFrame then
+                Camera.CFrame = lastValidCFrame
+            end
+        end
         if currentTool then 
             currentTool:Deactivate() 
             currentTool = nil 
