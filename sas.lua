@@ -53,10 +53,6 @@ local lastShotTime = 0
 local RECOIL_TAIL = 0.3
 local targetCFrame = Camera.CFrame
 
--- 🔧 КОНКРЕТНЫЙ ФИКС переменные
-local savedCamCF = nil
-local autofireActive = false
-
 -- Подписка на стрельбу инструмента
 local function monitorTool(tool)
     if not tool then return end
@@ -1122,79 +1118,30 @@ RunService.RenderStepped:Connect(function()
             if validTarget then
                 Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
                 
-                -- 🔧 КОНКРЕТНЫЙ ФИКС автопстрела
-                if autofireEnabled and targetHead ~= nil then
-                    if not autofireActive then
-                        savedCamCF = Camera.CFrame -- сохраняем камеру ДО recoil
-                        autofireActive = true
-                    end
-
+                if autofireEnabled then
                     currentTool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
-                    if currentTool then
-                        currentTool:Activate()
-                    end
-                else
-                    if autofireActive then
-                        if savedCamCF then
-                            -- возвращаем ТОЛЬКО ориентацию, не позицию
-                            Camera.CFrame =
-                                CFrame.new(Camera.CFrame.Position) *
-                                (savedCamCF - savedCamCF.Position)
-                        end
-                        autofireActive = false
-                        savedCamCF = nil
-                    end
-
-                    if currentTool then
-                        currentTool:Deactivate()
-                        currentTool = nil
+                    if currentTool then 
+                        currentTool:Activate() 
                     end
                 end
             else
                 currentTarget = nil
                 targetLocked = false
-                if autofireActive then
-                    if savedCamCF then
-                        Camera.CFrame =
-                            CFrame.new(Camera.CFrame.Position) *
-                            (savedCamCF - savedCamCF.Position)
-                    end
-                    autofireActive = false
-                    savedCamCF = nil
-                end
-                if currentTool then
-                    currentTool:Deactivate()
-                    currentTool = nil
+                if currentTool then 
+                    currentTool:Deactivate() 
+                    currentTool = nil 
                 end
             end
         else
-            if autofireActive then
-                if savedCamCF then
-                    Camera.CFrame =
-                        CFrame.new(Camera.CFrame.Position) *
-                        (savedCamCF - savedCamCF.Position)
-                end
-                autofireActive = false
-                savedCamCF = nil
-            end
-            if currentTool then
-                currentTool:Deactivate()
-                currentTool = nil
+            if currentTool then 
+                currentTool:Deactivate() 
+                currentTool = nil 
             end
         end
     else
-        if autofireActive then
-            if savedCamCF then
-                Camera.CFrame =
-                    CFrame.new(Camera.CFrame.Position) *
-                    (savedCamCF - savedCamCF.Position)
-            end
-            autofireActive = false
-            savedCamCF = nil
-        end
-        if currentTool then
-            currentTool:Deactivate()
-            currentTool = nil
+        if currentTool then 
+            currentTool:Deactivate() 
+            currentTool = nil 
         end
     end
 
