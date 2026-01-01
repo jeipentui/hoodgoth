@@ -10,65 +10,66 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
 
--- ==============================
--- NO VISUAL RECOIL (СОВМЕЩЕННАЯ ВЕРСИЯ)
--- ==============================
+-- =============================
+-- NO VISUAL RECOIL (КОМБИНИРОВАННАЯ ВЕРСИЯ ДЛЯ CRIMINALITY)
+-- =============================
 local noVisualRecoilEnabled = false
 local lastPitch = 0
 local recoilHook = nil
-local fullRecoilEnabled = false
+local antiShakeHook = nil
+
+local function disableRecoilModules()
+    for _,v in pairs(getgc(true)) do
+        if typeof(v) == "table" then
+            -- отключаем CameraShake
+            if rawget(v, "Shake") and typeof(v.Shake) == "function" then
+                v.Shake = function() end
+            end
+            if rawget(v, "AddShake") then
+                v.AddShake = function() end
+            end
+            if rawget(v, "StartShake") then
+                v.StartShake = function() end
+            end
+            
+            -- отключаем spring recoil
+            if rawget(v, "Update")
+             and rawget(v, "Velocity")
+             and rawget(v, "Position") then
+                
+                v.Update = function()
+                    v.Position = Vector3.zero
+                    v.Velocity = Vector3.zero
+                    return CFrame.new()
+                end
+            end
+        end
+    end
+end
 
 local function startNoVisualRecoil()
     if recoilHook then return end
     
-    -- Сначала убиваем системную отдачу
-    if fullRecoilEnabled then
-        -- 1. УБИВАЕМ CameraShake / Spring / Recoil modules
-        for _,v in pairs(getgc(true)) do
-            if typeof(v) == "table" then
-                -- CameraShaker / Shake modules
-                if rawget(v, "Shake") and typeof(v.Shake) == "function" then
-                    v.Shake = function() end
-                end
-                if rawget(v, "AddShake") then
-                    v.AddShake = function() end
-                end
-                if rawget(v, "StartShake") then
-                    v.StartShake = function() end
-                end
-
-                -- Spring recoil (самый частый)
-                if rawget(v, "Update") and rawget(v, "Velocity") and rawget(v, "Position") then
-                    v.Update = function()
-                        v.Position = Vector3.zero
-                        v.Velocity = Vector3.zero
-                        return CFrame.new()
-                    end
-                end
-            end
-        end
-
-        -- 2. УБИРАЕМ VIEWMODEL SWAY (если трясло руки)
-        for _,v in pairs(workspace:GetDescendants()) do
-            if v:IsA("Motor6D") then
-                v.Transform = CFrame.new()
-            end
-        end
-
-        -- 3. ЗАЩИТА: если новые модули подгрузятся позже
-        task.spawn(function()
-            while noVisualRecoilEnabled and fullRecoilEnabled do
-                task.wait(1)
-                for _,v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("Motor6D") then
-                        v.Transform = CFrame.new()
-                    end
-                end
-            end
-        end)
+    -- 1. Убиваем системные модули отдачи
+    disableRecoilModules()
+    
+    -- 2. Блокируем CameraShake эффекты
+    if antiShakeHook then
+        RunService:UnbindFromRenderStep("CrimAntiShake")
     end
     
-    -- Потом запускаем плавное устранение остатков
+    antiShakeHook = RunService:BindToRenderStep("CrimAntiShake", Enum.RenderPriority.Camera.Value + 1, function()
+        -- жёстко сбрасываем эффекты shake
+        for _,eff in pairs(Camera:GetChildren()) do
+            if eff:IsA("CameraShake") then
+                eff:Destroy()
+            end
+        end
+    end)
+    
+    -- 3. Плавная антиотдача камеры
+    lastPitch = select(1, Camera.CFrame:ToOrientation())
+    
     recoilHook = RunService:BindToRenderStep(
         "NoVisualRecoil",
         Enum.RenderPriority.Camera.Value + 2,
@@ -89,12 +90,19 @@ local function startNoVisualRecoil()
             lastPitch = x
         end
     )
+    
+    print("[NoVisualRecoil] успешно применён для Criminality")
 end
 
 local function stopNoVisualRecoil()
     if recoilHook then
         RunService:UnbindFromRenderStep("NoVisualRecoil")
         recoilHook = nil
+    end
+    
+    if antiShakeHook then
+        RunService:UnbindFromRenderStep("CrimAntiShake")
+        antiShakeHook = nil
     end
 end
 
@@ -255,20 +263,6 @@ local NoVisualRecoilToggle = RageTab:CreateToggle({
             startNoVisualRecoil()
         else
             stopNoVisualRecoil()
-        end
-    end,
-})
-
-local FullRecoilToggle = RageTab:CreateToggle({
-    Name = "AGGRESSIVE Anti-Recoil",
-    CurrentValue = false,
-    Flag = "FullRecoilToggle",
-    Callback = function(Value)
-        fullRecoilEnabled = Value
-        -- Если антиотдача уже включена, перезапускаем её с новыми настройками
-        if noVisualRecoilEnabled then
-            stopNoVisualRecoil()
-            startNoVisualRecoil()
         end
     end,
 })
