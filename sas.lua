@@ -51,7 +51,6 @@ local FriendList = {}
 local NoVisualRecoilEnabled = false
 local lastShotTime = 0
 local targetCFrame = Camera.CFrame
-local originalCFrame = Camera.CFrame -- Сохраняем оригинальное положение
 
 -- Подписка на стрельбу инструмента
 local function monitorTool(tool)
@@ -59,7 +58,6 @@ local function monitorTool(tool)
     tool.Activated:Connect(function()
         lastShotTime = tick()
         targetCFrame = Camera.CFrame
-        originalCFrame = Camera.CFrame
     end)
 end
 
@@ -107,7 +105,6 @@ local function activateNoVisualRecoil()
     NoVisualRecoilEnabled = true
     lastShotTime = 0
     targetCFrame = Camera.CFrame
-    originalCFrame = Camera.CFrame
 end
 
 local function deactivateNoVisualRecoil()
@@ -123,8 +120,8 @@ local isRecordingKeybind = false
 -- Добавляем переменные для стабильного aimlock
 local currentTarget = nil -- Текущая цель
 local targetLocked = false -- Флаг блокировки цели
-local aimLockActive = false -- Флаг активного аимлока
-local lastValidCFrame = Camera.CFrame -- Последняя валидная CFrame до аимлока
+local shouldReturnCamera = false -- Флаг для возврата камеры
+local lastValidCameraPosition = Camera.CFrame.Position -- Последняя валидная позиция камеры
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
@@ -223,7 +220,6 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
-            aimLockActive = false
         end
     end,
 })
@@ -488,13 +484,15 @@ local function getTarget()
         if not plr then
             currentTarget = nil
             targetLocked = false
-            aimLockActive = false
+            shouldReturnCamera = true
             return nil
         end
         
         if InFOV(currentTarget.Position) then
             if isValidTarget(plr, currentTarget) then
                 if WallCheck(currentTarget, localPlayer.Character) then
+                    -- Сохраняем текущую позицию камеры пока цель в FOV
+                    lastValidCameraPosition = Camera.CFrame.Position
                     return currentTarget
                 end
             end
@@ -502,7 +500,7 @@ local function getTarget()
         
         currentTarget = nil
         targetLocked = false
-        aimLockActive = false
+        shouldReturnCamera = true
         return nil
     end
     
@@ -511,9 +509,8 @@ local function getTarget()
         if newTarget then
             currentTarget = newTarget
             targetLocked = true
-            aimLockActive = true
-            -- Сохраняем текущую позицию камеры перед началом аимлока
-            lastValidCFrame = Camera.CFrame
+            -- Сохраняем позицию камеры при начале аимлока
+            lastValidCameraPosition = Camera.CFrame.Position
         end
     end
     
@@ -600,9 +597,8 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
-            aimLockActive = false
             -- Сохраняем позицию камеры при нажатии бинда
-            lastValidCFrame = Camera.CFrame
+            lastValidCameraPosition = Camera.CFrame.Position
         end
     end
 end)
@@ -613,7 +609,7 @@ UIS.InputEnded:Connect(function(input)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
-            aimLockActive = false
+            shouldReturnCamera = true
         end
     end
 end)
@@ -1136,23 +1132,16 @@ RunService.RenderStepped:Connect(function()
             else
                 currentTarget = nil
                 targetLocked = false
-                aimLockActive = false
-                -- Возвращаем камеру в исходное положение
-                if lastValidCFrame then
-                    Camera.CFrame = lastValidCFrame
-                end
                 if currentTool then 
                     currentTool:Deactivate() 
                     currentTool = nil 
                 end
             end
         else
-            if aimLockActive then
-                aimLockActive = false
-                -- Возвращаем камеру в исходное положение
-                if lastValidCFrame then
-                    Camera.CFrame = lastValidCFrame
-                end
+            if shouldReturnCamera then
+                -- Возвращаем камеру только на один тик
+                Camera.CFrame = CFrame.new(lastValidCameraPosition) * (Camera.CFrame - Camera.CFrame.Position)
+                shouldReturnCamera = false
             end
             if currentTool then 
                 currentTool:Deactivate() 
@@ -1160,12 +1149,10 @@ RunService.RenderStepped:Connect(function()
             end
         end
     else
-        if aimLockActive then
-            aimLockActive = false
-            -- Возвращаем камеру в исходное положение
-            if lastValidCFrame then
-                Camera.CFrame = lastValidCFrame
-            end
+        if keyHeld == false and shouldReturnCamera then
+            -- Возвращаем камеру только на один тик при отпускании бинда
+            Camera.CFrame = CFrame.new(lastValidCameraPosition) * (Camera.CFrame - Camera.CFrame.Position)
+            shouldReturnCamera = false
         end
         if currentTool then 
             currentTool:Deactivate() 
