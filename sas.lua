@@ -51,13 +51,52 @@ local FriendList = {}
 local NoVisualRecoilEnabled = false
 local lastShotTime = 0
 local targetCFrame = Camera.CFrame
+local recoilHook = nil
+
+-- Главный хук No Visual Recoil
+local function startRecoilHook()
+    if recoilHook then return end
+    
+    recoilHook = RunService.RenderStepped:Connect(function()
+        if NoVisualRecoilEnabled and lastShotTime > 0 then
+            Camera.CFrame = targetCFrame
+        end
+    end)
+end
+
+local function stopRecoilHook()
+    if recoilHook then
+        recoilHook:Disconnect()
+        recoilHook = nil
+    end
+end
+
+local function activateNoVisualRecoil()
+    NoVisualRecoilEnabled = true
+    lastShotTime = 0
+    targetCFrame = Camera.CFrame
+    startRecoilHook()
+end
+
+local function deactivateNoVisualRecoil()
+    NoVisualRecoilEnabled = false
+    lastShotTime = 0
+    stopRecoilHook()
+end
+
+-- Функция для сброса антиотдачи при потере цели
+local function resetRecoil()
+    lastShotTime = 0
+end
 
 -- Подписка на стрельбу инструмента
 local function monitorTool(tool)
     if not tool then return end
     tool.Activated:Connect(function()
-        lastShotTime = tick()
-        targetCFrame = Camera.CFrame
+        if NoVisualRecoilEnabled then
+            lastShotTime = tick()
+            targetCFrame = Camera.CFrame
+        end
     end)
 end
 
@@ -92,26 +131,6 @@ if localPlayer.Character then
     setupCharacter(localPlayer.Character)
 end
 
--- Главный хук No Visual Recoil
-local recoilHook = RunService.RenderStepped:Connect(function()
-    if NoVisualRecoilEnabled then
-        if lastShotTime > 0 then
-            Camera.CFrame = targetCFrame
-        end
-    end
-end)
-
-local function activateNoVisualRecoil()
-    NoVisualRecoilEnabled = true
-    lastShotTime = 0
-    targetCFrame = Camera.CFrame
-end
-
-local function deactivateNoVisualRecoil()
-    NoVisualRecoilEnabled = false
-    lastShotTime = 0
-end
-
 -- Настройки биндов (НЕ СОХРАНЯЕТСЯ В КОНФИГЕ)
 local aimlockKey = nil
 local aimlockKeyName = "Not Set"
@@ -120,8 +139,6 @@ local isRecordingKeybind = false
 -- Добавляем переменные для стабильного aimlock
 local currentTarget = nil -- Текущая цель
 local targetLocked = false -- Флаг блокировки цели
-local shouldReturnCamera = false -- Флаг для возврата камеры
-local lastValidCameraPosition = Camera.CFrame.Position -- Последняя валидная позиция камеры
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
@@ -220,6 +237,7 @@ local AimlockToggle = RageTab:CreateToggle({
         if not Value then
             currentTarget = nil
             targetLocked = false
+            lastShotTime = 0
         end
     end,
 })
@@ -484,15 +502,12 @@ local function getTarget()
         if not plr then
             currentTarget = nil
             targetLocked = false
-            shouldReturnCamera = true
             return nil
         end
         
         if InFOV(currentTarget.Position) then
             if isValidTarget(plr, currentTarget) then
                 if WallCheck(currentTarget, localPlayer.Character) then
-                    -- Сохраняем текущую позицию камеры пока цель в FOV
-                    lastValidCameraPosition = Camera.CFrame.Position
                     return currentTarget
                 end
             end
@@ -500,7 +515,6 @@ local function getTarget()
         
         currentTarget = nil
         targetLocked = false
-        shouldReturnCamera = true
         return nil
     end
     
@@ -509,8 +523,6 @@ local function getTarget()
         if newTarget then
             currentTarget = newTarget
             targetLocked = true
-            -- Сохраняем позицию камеры при начале аимлока
-            lastValidCameraPosition = Camera.CFrame.Position
         end
     end
     
@@ -597,8 +609,6 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
-            -- Сохраняем позицию камеры при нажатии бинда
-            lastValidCameraPosition = Camera.CFrame.Position
         end
     end
 end)
@@ -609,7 +619,7 @@ UIS.InputEnded:Connect(function(input)
         if aimbotEnabled then
             currentTarget = nil
             targetLocked = false
-            shouldReturnCamera = true
+            lastShotTime = 0
         end
     end
 end)
@@ -1086,7 +1096,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
-        if recoilHook then recoilHook:Disconnect() end
+        deactivateNoVisualRecoil()
         
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
@@ -1132,28 +1142,21 @@ RunService.RenderStepped:Connect(function()
             else
                 currentTarget = nil
                 targetLocked = false
+                lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ
                 if currentTool then 
                     currentTool:Deactivate() 
                     currentTool = nil 
                 end
             end
         else
-            if shouldReturnCamera then
-                -- Возвращаем камеру только на один тик
-                Camera.CFrame = CFrame.new(lastValidCameraPosition) * (Camera.CFrame - Camera.CFrame.Position)
-                shouldReturnCamera = false
-            end
+            lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ ПРИ ПОТЕРЕ ЦЕЛИ
             if currentTool then 
                 currentTool:Deactivate() 
                 currentTool = nil 
             end
         end
     else
-        if keyHeld == false and shouldReturnCamera then
-            -- Возвращаем камеру только на один тик при отпускании бинда
-            Camera.CFrame = CFrame.new(lastValidCameraPosition) * (Camera.CFrame - Camera.CFrame.Position)
-            shouldReturnCamera = false
-        end
+        lastShotTime = 0  -- СБРАСЫВАЕМ АНТИОТДАЧУ КОГДА НЕ ДЕРЖИМ БИНД
         if currentTool then 
             currentTool:Deactivate() 
             currentTool = nil 
