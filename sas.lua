@@ -1,6 +1,4 @@
 
-
-```lua
 -- Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
