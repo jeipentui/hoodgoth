@@ -129,7 +129,7 @@ fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
 
---==================== ОПТИМИЗАЦИЯ: КЭШ ЗА КАДР ====================
+--==================== FRAME CACHE ====================
 local frameCache = {
     mousePos = Vector2.new(),
     cameraPos = Vector3.new(),
@@ -144,33 +144,29 @@ local function updateFrameCache()
     frameCache.time = tick()
 end
 
---==================== ОПТИМИЗАЦИЯ: КЭШ WALLCHECK ====================
+--==================== WALLCHECK CACHE ====================
 local wallCheckCache = {}
-local WALLCHECK_CACHE_TIME = 0.08 -- 80мс кэш рейкаста
+local WALLCHECK_CACHE_TIME = 0.08
 
-local function clearWallCheckCache(plr)
-    wallCheckCache[plr] = nil
-end
-
---==================== FOV CHECK ====================
 local FOV_RADIUS = 100
 
 local function InFOV(worldPos)
     local screenPos, onScreen = Camera:WorldToViewportPoint(worldPos)
     if not onScreen then return false end
-
     local dist = (Vector2.new(screenPos.X, screenPos.Y) - frameCache.mousePos).Magnitude
     return dist <= FOV_RADIUS
 end
 
---==================== WALLCHECK (RAW) ====================
+local function InFOVCustom(worldPos, customFOV)
+    local screenPos, onScreen = Camera:WorldToViewportPoint(worldPos)
+    if not onScreen then return false end
+    local dist = (Vector2.new(screenPos.X, screenPos.Y) - frameCache.mousePos).Magnitude
+    return dist <= customFOV
+end
+
 local function WallCheckRaw(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
-
-    if not InFOV(targetHead.Position) then
-        return false
-    end
 
     local origin = frameCache.cameraPos
     local direction = (targetHead.Position - origin).Unit
@@ -215,11 +211,9 @@ local function WallCheckRaw(targetHead, localChar)
     return false
 end
 
---==================== WALLCHECK С КЭШЕМ ====================
 local function WallCheck(targetHead, localChar, plr)
     if not wallCheckEnabled then return true end
 
-    -- Проверяем кэш
     if plr then
         local cached = wallCheckCache[plr]
         if cached and (frameCache.time - cached.time) < WALLCHECK_CACHE_TIME then
@@ -227,10 +221,8 @@ local function WallCheck(targetHead, localChar, plr)
         end
     end
 
-    -- Делаем рейкаст
     local result = WallCheckRaw(targetHead, localChar)
 
-    -- Сохраняем в кэш
     if plr then
         wallCheckCache[plr] = {result = result, time = frameCache.time}
     end
@@ -238,8 +230,287 @@ local function WallCheck(targetHead, localChar, plr)
     return result
 end
 
+--==================== Weapon Prediction ====================
+local weaponBulletSpeeds = {
+    ["Beretta"] = 1624,
+    ["Magnum"] = 2550,
+    ["G-17"] = 1850,
+    ["UZI"] = 2250,
+    ["UZI+"] = 2250,
+    ["Mare"] = 2000,
+    ["Deagle"] = 2200,
+    ["SKS"] = 3750,
+    ["M1911"] = 2230,
+    ["AKS-74U"] = 3000,
+    ["FNP-45"] = 1500,
+    ["TEC-9"] = 2100,
+    ["MAC-10+"] = 2250,
+    ["MAC-10"] = 2250,
+    ["MP7"] = 2600,
+    ["Tommy+"] = 2225,
+    ["Tommy"] = 2225,
+}
+
+local function getCurrentWeaponSpeed()
+    local char = localPlayer.Character
+    if char then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then return weaponBulletSpeeds[tool.Name] or 1624 end
+    end
+    return 1624
+end
+
+local function isFriend(plr)
+    for _, name in pairs(FriendList) do
+        if plr.Name == name then return true end
+    end
+    return false
+end
+
+--==================== Downed Check ====================
+local function isTargetDowned(targetCharacter)
+    local targetName = targetCharacter.Name
+    local charStat = CharStats:FindFirstChild(targetName)
+    if not charStat then return false end
+    local downedValue = charStat:FindFirstChild("Downed")
+    if downedValue and downedValue:IsA("BoolValue") then
+        return downedValue.Value
+    end
+    return false
+end
+
+--==================== Visibility & Prediction ====================
+local function hasSpawnShield(plr)
+    return plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function getPredictedPosition(target)
+    local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
+    if not hrp then return target.Position end
+
+    local dist = (hrp.Position - frameCache.cameraPos).Magnitude
+    local t = dist / getCurrentWeaponSpeed()
+
+    return target.Position + hrp.Velocity * t
+end
+
+local function isValidTarget(plr, targetHead)
+    if not plr or not plr.Character then return false end
+    if isFriend(plr) then return false end
+    if not targetHead then return false end
+
+    local char = plr.Character
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return false end
+    if hasSpawnShield(plr) then return false end
+    if isTargetDowned(char) then return false end
+
+    return true
+end
+
+--==================== TARGET FINDING ====================
+local function getNearestToCursor()
+    local localChar = localPlayer.Character
+    if not localChar then return nil end
+
+    local mousePos = frameCache.mousePos
+    local candidates = {}
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer then
+            local char = plr.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if dist <= FOV_RADIUS then
+                            if isValidTarget(plr, head) then
+                                candidates[#candidates + 1] = {plr = plr, head = head, dist = dist}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if #candidates == 0 then return nil end
+
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+
+    for _, c in ipairs(candidates) do
+        if WallCheck(c.head, localChar, c.plr) then
+            return c.head
+        end
+    end
+
+    return nil
+end
+
+local function getTarget()
+    if currentTarget and targetLocked then
+        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
+
+        if not plr then
+            currentTarget = nil
+            targetLocked = false
+            return nil
+        end
+
+        if isValidTarget(plr, currentTarget) then
+            if WallCheck(currentTarget, localPlayer.Character, plr) then
+                return currentTarget
+            end
+        end
+
+        currentTarget = nil
+        targetLocked = false
+        return nil
+    end
+
+    if not currentTarget then
+        local newTarget = getNearestToCursor()
+        if newTarget then
+            currentTarget = newTarget
+            targetLocked = true
+        end
+    end
+
+    return currentTarget
+end
+
+--==================== SILENT AIM ====================
+local silentAimEnabled = false
+local silentAimFOV = 100
+local silentAimShowFOV = false
+local silentAimWallCheck = true
+
+local silentFovCircle = Drawing.new("Circle")
+silentFovCircle.Visible = false
+silentFovCircle.Color = Color3.new(1, 0, 0)
+silentFovCircle.Thickness = 2
+silentFovCircle.NumSides = 100
+
+local silentAimTarget = nil
+local lastSilentAimUpdate = 0
+local SILENT_AIM_UPDATE_INTERVAL = 0.05
+
+local function updateSilentAimTarget()
+    if not silentAimEnabled then
+        silentAimTarget = nil
+        return
+    end
+
+    local now = frameCache.time
+    if now - lastSilentAimUpdate < SILENT_AIM_UPDATE_INTERVAL then
+        -- Проверяем что текущая цель ещё валидна
+        if silentAimTarget then
+            local plr = Players:GetPlayerFromCharacter(silentAimTarget.Parent)
+            if not plr or not isValidTarget(plr, silentAimTarget) then
+                silentAimTarget = nil
+            end
+        end
+        return
+    end
+    lastSilentAimUpdate = now
+
+    local localChar = localPlayer.Character
+    if not localChar then
+        silentAimTarget = nil
+        return
+    end
+
+    local mousePos = frameCache.mousePos
+    local candidates = {}
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer then
+            local char = plr.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if dist <= silentAimFOV then
+                            if isValidTarget(plr, head) then
+                                candidates[#candidates + 1] = {
+                                    plr = plr,
+                                    head = head,
+                                    dist = dist
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if #candidates == 0 then
+        silentAimTarget = nil
+        return
+    end
+
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+
+    for _, c in ipairs(candidates) do
+        if silentAimWallCheck then
+            if WallCheck(c.head, localChar, c.plr) then
+                silentAimTarget = c.head
+                return
+            end
+        else
+            silentAimTarget = c.head
+            return
+        end
+    end
+
+    silentAimTarget = nil
+end
+
+-- ХУК Mouse.Hit
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+
+if setreadonly then
+    setreadonly(mt, false)
+elseif make_writeable then
+    make_writeable(mt)
+end
+
+mt.__index = newcclosure(function(self, key)
+    if silentAimEnabled and silentAimTarget then
+        if tostring(self) == "Mouse" then
+            if key == "Hit" then
+                local predictedPos = getPredictedPosition(silentAimTarget)
+                return CFrame.new(predictedPos)
+            end
+            if key == "Target" then
+                return silentAimTarget
+            end
+            if key == "X" then
+                local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
+                return pos.X
+            end
+            if key == "Y" then
+                local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
+                return pos.Y
+            end
+        end
+    end
+    return oldIndex(self, key)
+end)
+
+if setreadonly then
+    setreadonly(mt, true)
+end
+
 --==================== UI Elements ====================
 
+-- Rage Tab
 local AimlockToggle = RageTab:CreateToggle({
     Name = "Aimlock",
     CurrentValue = false,
@@ -251,6 +522,62 @@ local AimlockToggle = RageTab:CreateToggle({
             targetLocked = false
         end
     end,
+})
+
+local SilentAimToggle = RageTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAimToggle",
+    Callback = function(Value)
+        silentAimEnabled = Value
+        if not Value then
+            silentAimTarget = nil
+        end
+    end,
+})
+
+local SilentAimWallcheckToggle = RageTab:CreateToggle({
+    Name = "Silent Aim Wallcheck",
+    CurrentValue = true,
+    Flag = "SilentAimWallcheck",
+    Callback = function(Value)
+        silentAimWallCheck = Value
+    end,
+})
+
+local SilentAimFOVSlider = RageTab:CreateSlider({
+    Name = "Silent Aim FOV",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "px",
+    CurrentValue = 100,
+    Flag = "SilentAimFOV",
+    Callback = function(Value)
+        silentAimFOV = Value
+    end,
+})
+
+local SilentAimFOVCircleToggle = RageTab:CreateButton({
+    Name = "Toggle Silent Aim FOV Circle",
+    Callback = function()
+        silentAimShowFOV = not silentAimShowFOV
+        silentFovCircle.Visible = silentAimShowFOV
+        Rayfield:Notify({
+            Title = "Silent FOV Circle",
+            Content = silentAimShowFOV and "Enabled" or "Disabled",
+            Duration = 1,
+            Image = 4483362458,
+        })
+    end,
+})
+
+local SilentFOVColorPicker = RageTab:CreateColorPicker({
+    Name = "Silent FOV Color",
+    Color = Color3.new(1, 0, 0),
+    Flag = "SilentFOVColor",
+    Callback = function(Value)
+        silentFovCircle.Color = Value
+    end
 })
 
 local NoVisualRecoilToggle = RageTab:CreateToggle({
@@ -331,7 +658,7 @@ local WallcheckToggle = RageTab:CreateToggle({
 })
 
 local FOVSlider = RageTab:CreateSlider({
-    Name = "FOV Aim",
+    Name = "Aimlock FOV",
     Range = {50, 500},
     Increment = 10,
     Suffix = "px",
@@ -344,12 +671,12 @@ local FOVSlider = RageTab:CreateSlider({
 })
 
 local FOVCircleToggle = RageTab:CreateButton({
-    Name = "Toggle FOV Circle",
+    Name = "Toggle Aimlock FOV Circle",
     Callback = function()
         showFOV = not showFOV
         fovCircle.Visible = showFOV
         Rayfield:Notify({
-            Title = "FOV Circle",
+            Title = "Aimlock FOV Circle",
             Content = showFOV and "Enabled" or "Disabled",
             Duration = 1,
             Image = 4483362458,
@@ -358,7 +685,7 @@ local FOVCircleToggle = RageTab:CreateButton({
 })
 
 local FOVColorPicker = RageTab:CreateColorPicker({
-    Name = "FOV Circle Color",
+    Name = "Aimlock FOV Color",
     Color = Color3.new(1,1,1),
     Flag = "FOVColor",
     Callback = function(Value)
@@ -394,161 +721,6 @@ local ClearFriendsButton = RageTab:CreateButton({
         })
     end,
 })
-
---==================== Weapon Prediction ====================
-local weaponBulletSpeeds = {
-    ["Beretta"] = 1624,
-    ["Magnum"] = 2550,
-    ["G-17"] = 1850,
-    ["UZI"] = 2250,
-    ["UZI+"] = 2250,
-    ["Mare"] = 2000,
-    ["Deagle"] = 2200,
-    ["SKS"] = 3750,
-    ["M1911"] = 2230,
-    ["AKS-74U"] = 3000,
-    ["FNP-45"] = 1500,
-    ["TEC-9"] = 2100,
-    ["MAC-10+"] = 2250,
-    ["MAC-10"] = 2250,
-    ["MP7"] = 2600,
-    ["Tommy+"] = 2225,
-    ["Tommy"] = 2225,
-}
-
-local function getCurrentWeaponSpeed()
-    local char = localPlayer.Character
-    if char then
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then return weaponBulletSpeeds[tool.Name] or 1624 end
-    end
-    return 1624
-end
-
-local function isFriend(plr)
-    for _, name in pairs(FriendList) do
-        if plr.Name == name then return true end
-    end
-    return false
-end
-
---==================== Downed Check ====================
-local function isTargetDowned(targetCharacter)
-    local targetName = targetCharacter.Name
-    local charStat = CharStats:FindFirstChild(targetName)
-    if not charStat then return false end
-    local downedValue = charStat:FindFirstChild("Downed")
-    if downedValue and downedValue:IsA("BoolValue") then
-        return downedValue.Value
-    end
-    return false
-end
-
---==================== Visibility & Prediction ====================
-local function hasSpawnShield(plr)
-    return plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
-end
-
-local function getPredictedPosition(target)
-    local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
-    if not hrp then return target.Position end
-
-    local dist = (hrp.Position - frameCache.cameraPos).Magnitude
-    local t = dist / getCurrentWeaponSpeed()
-
-    return target.Position + hrp.Velocity * t
-end
-
-local function isValidTarget(plr, targetHead)
-    if not plr or not plr.Character then return false end
-    if isFriend(plr) then return false end
-    if not targetHead then return false end
-
-    local char = plr.Character
-    local humanoid = char:FindFirstChild("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return false end
-    if hasSpawnShield(plr) then return false end
-    if isTargetDowned(char) then return false end
-
-    return true
-end
-
---==================== ОПТИМИЗИРОВАННЫЙ ПОИСК ЦЕЛИ ====================
-local function getNearestToCursor()
-    local localChar = localPlayer.Character
-    if not localChar then return nil end
-
-    local mousePos = frameCache.mousePos
-    local candidates = {}
-
-    -- ШАГ 1: Собираем кандидатов с расстоянием до курсора (ДЁШЕВО, без рейкастов)
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= localPlayer then
-            local char = plr.Character
-            if char then
-                local head = char:FindFirstChild("Head")
-                if head then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                        if dist <= FOV_RADIUS then
-                            if isValidTarget(plr, head) then
-                                candidates[#candidates + 1] = {plr = plr, head = head, dist = dist}
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- Нет кандидатов — выходим БЕЗ рейкастов
-    if #candidates == 0 then return nil end
-
-    -- ШАГ 2: Сортируем по расстоянию (ближайший первый)
-    table.sort(candidates, function(a, b) return a.dist < b.dist end)
-
-    -- ШАГ 3: WallCheck ТОЛЬКО ближайших (с кэшем!) — останавливаемся на первом видимом
-    for _, c in ipairs(candidates) do
-        if WallCheck(c.head, localChar, c.plr) then
-            return c.head -- нашли ближайшего видимого — СТОП
-        end
-    end
-
-    return nil
-end
-
-local function getTarget()
-    if currentTarget and targetLocked then
-        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
-
-        if not plr then
-            currentTarget = nil
-            targetLocked = false
-            return nil
-        end
-
-        if isValidTarget(plr, currentTarget) then
-            if WallCheck(currentTarget, localPlayer.Character, plr) then
-                return currentTarget
-            end
-        end
-
-        currentTarget = nil
-        targetLocked = false
-        return nil
-    end
-
-    if not currentTarget then
-        local newTarget = getNearestToCursor()
-        if newTarget then
-            currentTarget = newTarget
-            targetLocked = true
-        end
-    end
-
-    return currentTarget
-end
 
 --==================== LEGIT NO FALL ====================
 
@@ -764,11 +936,9 @@ local function updatePlayersInRangeCache()
 
             if hrp and humanoid and humanoid.Health > 0 then
                 local dist = (cameraPos - hrp.Position).Magnitude
-                local isInRange = dist <= ESP_MaxDistance
+                playersInRange[plr] = dist <= ESP_MaxDistance
 
-                playersInRange[plr] = isInRange
-
-                if not isInRange then
+                if not playersInRange[plr] then
                     hidePlayerESP(plr)
                 end
             else
@@ -950,7 +1120,6 @@ end
 
 local function initPlayer(plr)
     if plr == localPlayer then return end
-
     plr.CharacterAdded:Connect(function(char)
         cleanupPlayerESP(plr)
     end)
@@ -1078,19 +1247,38 @@ local DestroyUIButton = MiscTab:CreateButton({
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
         end
+
         fovCircle:Remove()
+        silentFovCircle:Remove()
+
+        -- Восстанавливаем хук
+        if setreadonly then setreadonly(mt, false) end
+        mt.__index = oldIndex
+        if setreadonly then setreadonly(mt, true) end
+
         Rayfield:Destroy()
     end,
 })
 
---==================== ГЛАВНЫЙ RENDER LOOP ====================
+--==================== MAIN RENDER LOOP ====================
 local currentTool
 
 RunService.RenderStepped:Connect(function()
-    -- Обновляем кэш значений за кадр (1 раз)
     updateFrameCache()
 
-    -- FOV Circle
+    -- Silent Aim - обновляем цель
+    updateSilentAimTarget()
+
+    -- Silent Aim FOV Circle
+    if silentAimEnabled and silentAimShowFOV then
+        silentFovCircle.Position = frameCache.mousePos
+        silentFovCircle.Radius = silentAimFOV
+        silentFovCircle.Visible = true
+    else
+        silentFovCircle.Visible = false
+    end
+
+    -- Aimlock FOV Circle
     if not aimbotEnabled or not showFOV then
         fovCircle.Visible = false
     else
@@ -1142,7 +1330,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP (обновление дистанции раз в 0.25сек, viewport каждый кадр)
+    -- ESP
     updatePlayersInRangeCache()
     cacheViewportPoints()
 
