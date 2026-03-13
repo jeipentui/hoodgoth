@@ -1,3 +1,7 @@
+
+
+```lua
+-- Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Services
@@ -8,7 +12,6 @@ local Camera = workspace.CurrentCamera
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
-local Mouse = localPlayer:GetMouse()
 
 -- Create Window
 local Window = Rayfield:CreateWindow({
@@ -54,17 +57,14 @@ local lastShotTime = 0
 local RECOIL_TAIL = 0.3
 local targetCFrame = Camera.CFrame
 
--- SILENT AIM VARIABLES
+-- SILENT AIM (FLASH AIM) VARIABLES
 local silentAimEnabled = false
 local silentAimFOV = 100
 local silentAimShowFOV = false
 local silentAimWallCheck = true
-local silentAimHooked = false
 local silentAimTarget = nil
 local lastSilentAimUpdate = 0
 local SILENT_AIM_UPDATE_INTERVAL = 0.05
-local oldIndex = nil
-local oldNamecall = nil
 local silentAimKey = nil
 local silentAimKeyName = "Not Set"
 local silentAimKeyHeld = false
@@ -587,7 +587,7 @@ local AimlockToggle = RageTab:CreateToggle({
 })
 
 local SilentAimToggle = RageTab:CreateToggle({
-    Name = "Silent Aim",
+    Name = "Silent Aim (Flash)",
     CurrentValue = false,
     Flag = "SilentAimToggle",
     Callback = function(Value)
@@ -1331,6 +1331,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
+        silentAimEnabled = false
         if recoilHook then recoilHook:Disconnect() end
 
         for plr, _ in pairs(ESP_HPText) do
@@ -1339,92 +1340,9 @@ local DestroyUIButton = MiscTab:CreateButton({
         fovCircle:Remove()
         silentFovCircle:Remove()
 
-        pcall(function()
-            if silentAimHooked then
-                local mt = getrawmetatable(game)
-                if setreadonly then setreadonly(mt, false) end
-                if oldIndex then mt.__index = oldIndex end
-                if oldNamecall then mt.__namecall = oldNamecall end
-                if setreadonly then setreadonly(mt, true) end
-            end
-        end)
-
         Rayfield:Destroy()
     end,
 })
-
---==================== SILENT AIM HOOK ====================
-local hookSuccess, hookError = pcall(function()
-    local mt = getrawmetatable(game)
-    oldIndex = mt.__index
-    oldNamecall = mt.__namecall
-
-    if setreadonly then
-        setreadonly(mt, false)
-    elseif make_writeable then
-        make_writeable(mt)
-    end
-
-    mt.__index = newcclosure(function(self, key)
-        if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
-            if self == Mouse then
-                if key == "Hit" then
-                    return CFrame.new(getPredictedPosition(silentAimTarget))
-                end
-                if key == "Target" then
-                    return silentAimTarget
-                end
-                if key == "X" then
-                    local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
-                    return pos.X
-                end
-                if key == "Y" then
-                    local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
-                    return pos.Y
-                end
-                if key == "UnitRay" then
-                    local pos = getPredictedPosition(silentAimTarget)
-                    return Ray.new(frameCache.cameraPos, (pos - frameCache.cameraPos).Unit)
-                end
-            end
-        end
-        return oldIndex(self, key)
-    end)
-
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
-            if self == Mouse then
-                if method == "GetHit" or method == "get_Hit" then
-                    return CFrame.new(getPredictedPosition(silentAimTarget))
-                end
-            end
-        end
-        return oldNamecall(self, ...)
-    end)
-
-    if setreadonly then
-        setreadonly(mt, true)
-    end
-
-    silentAimHooked = true
-end)
-
-if hookSuccess then
-    Rayfield:Notify({
-        Title = "Silent Aim",
-        Content = "Hook installed successfully",
-        Duration = 3,
-        Image = 4483362458,
-    })
-else
-    Rayfield:Notify({
-        Title = "Silent Aim Error",
-        Content = "Hook failed: " .. tostring(hookError),
-        Duration = 5,
-        Image = 4483362458,
-    })
-end
 
 --==================== ГЛАВНЫЙ RENDER LOOP ====================
 local currentTool
@@ -1435,11 +1353,15 @@ RunService.RenderStepped:Connect(function()
     -- Silent Aim цель
     updateSilentAimTarget()
 
-    -- Silent Aim Autofire
+    -- Silent Aim Flash (камера к цели -> выстрел -> камера обратно за 1 кадр)
     if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
         local tool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
         if tool then
+            local savedCFrame = Camera.CFrame
+            local predictedPos = getPredictedPosition(silentAimTarget)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
             tool:Activate()
+            Camera.CFrame = savedCFrame
         end
     end
 
@@ -1518,3 +1440,4 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:LoadConfiguration()
+```
