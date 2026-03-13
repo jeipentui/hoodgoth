@@ -15,6 +15,7 @@ local Window = Rayfield:CreateWindow({
     Name = "thw club",
     LoadingTitle = "Loading Interface...",
     LoadingSubtitle = "by thw",
+    Theme = "Bloom",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "thw-club",
@@ -63,6 +64,10 @@ local silentAimTarget = nil
 local lastSilentAimUpdate = 0
 local SILENT_AIM_UPDATE_INTERVAL = 0.05
 local oldIndex = nil
+local silentAimKey = nil
+local silentAimKeyName = "Not Set"
+local silentAimKeyHeld = false
+local isRecordingSilentKeybind = false
 
 local silentFovCircle = Drawing.new("Circle")
 silentFovCircle.Visible = false
@@ -252,7 +257,7 @@ local function WallCheck(targetHead, localChar, plr)
     return result
 end
 
---==================== WALLCHECK ДЛЯ SILENT AIM (без InFOV, свой FOV) ====================
+--==================== WALLCHECK ДЛЯ SILENT AIM ====================
 local function WallCheckSilentRaw(targetHead, localChar)
     if not targetHead or not localChar then return false end
 
@@ -377,7 +382,7 @@ local function isValidTarget(plr, targetHead)
     return true
 end
 
---==================== ОПТИМИЗИРОВАННЫЙ ПОИСК ЦЕЛИ ====================
+--==================== ПОИСК ЦЕЛИ ====================
 local function getNearestToCursor()
     local localChar = localPlayer.Character
     if not localChar then return nil end
@@ -452,7 +457,7 @@ end
 
 --==================== SILENT AIM TARGET ====================
 local function updateSilentAimTarget()
-    if not silentAimEnabled then
+    if not silentAimEnabled or not silentAimKeyHeld then
         silentAimTarget = nil
         return
     end
@@ -608,6 +613,52 @@ local SilentAimFOVSlider = RageTab:CreateSlider({
     Flag = "SilentAimFOV",
     Callback = function(Value)
         silentAimFOV = Value
+    end,
+})
+
+local SilentAimKeybindLabel = RageTab:CreateLabel("Silent Aim Key: Not Set")
+
+local SetSilentAimKeyButton = RageTab:CreateButton({
+    Name = "Set Silent Aim Key",
+    Callback = function()
+        isRecordingSilentKeybind = true
+        SilentAimKeybindLabel:Set("Press any keyboard key...")
+
+        local connection
+        connection = UIS.InputBegan:Connect(function(input, gameProcessed)
+            if isRecordingSilentKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
+                isRecordingSilentKeybind = false
+                connection:Disconnect()
+
+                silentAimKey = input.KeyCode
+                silentAimKeyName = input.KeyCode.Name
+                SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+                Rayfield:Notify({
+                    Title = "Keybind Set",
+                    Content = "Silent Aim key set to: " .. silentAimKeyName,
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        end)
+
+        task.delay(5, function()
+            if isRecordingSilentKeybind then
+                isRecordingSilentKeybind = false
+                if connection then
+                    connection:Disconnect()
+                end
+                SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+                Rayfield:Notify({
+                    Title = "Keybind Recording Cancelled",
+                    Content = "Keybind recording timed out",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        end)
     end,
 })
 
@@ -796,6 +847,24 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         return
     end
 
+    if isRecordingSilentKeybind then
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+        isRecordingSilentKeybind = false
+        silentAimKey = input.KeyCode
+        silentAimKeyName = input.KeyCode.Name
+        SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+        Rayfield:Notify({
+            Title = "Keybind Set",
+            Content = "Silent Aim key set to: " .. silentAimKeyName,
+            Duration = 2,
+            Image = 4483362458,
+        })
+
+        return
+    end
+
     if gameProcessed then return end
 
     if aimlockKey and input.KeyCode == aimlockKey then
@@ -804,6 +873,10 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             currentTarget = nil
             targetLocked = false
         end
+    end
+
+    if silentAimKey and input.KeyCode == silentAimKey then
+        silentAimKeyHeld = true
     end
 end)
 
@@ -814,6 +887,10 @@ UIS.InputEnded:Connect(function(input)
             currentTarget = nil
             targetLocked = false
         end
+    end
+
+    if silentAimKey and input.KeyCode == silentAimKey then
+        silentAimKeyHeld = false
     end
 end)
 
@@ -1286,7 +1363,7 @@ local hookSuccess, hookError = pcall(function()
     end
 
     mt.__index = newcclosure(function(self, key)
-        if silentAimEnabled and silentAimTarget then
+        if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
             if tostring(self) == "Mouse" then
                 if key == "Hit" then
                     return CFrame.new(getPredictedPosition(silentAimTarget))
@@ -1338,6 +1415,14 @@ RunService.RenderStepped:Connect(function()
 
     -- Silent Aim цель
     updateSilentAimTarget()
+
+    -- Silent Aim Autofire
+    if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
+        local tool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            tool:Activate()
+        end
+    end
 
     -- Silent Aim FOV Circle
     if silentAimEnabled and silentAimShowFOV then
