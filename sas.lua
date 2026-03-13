@@ -1,3 +1,6 @@
+
+
+```lua
 -- Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -9,6 +12,7 @@ local Camera = workspace.CurrentCamera
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 local localPlayer = Players.LocalPlayer
+local Mouse = localPlayer:GetMouse()
 
 -- Create Window
 local Window = Rayfield:CreateWindow({
@@ -64,6 +68,7 @@ local silentAimTarget = nil
 local lastSilentAimUpdate = 0
 local SILENT_AIM_UPDATE_INTERVAL = 0.05
 local oldIndex = nil
+local oldNamecall = nil
 local silentAimKey = nil
 local silentAimKeyName = "Not Set"
 local silentAimKeyHeld = false
@@ -1339,10 +1344,11 @@ local DestroyUIButton = MiscTab:CreateButton({
         silentFovCircle:Remove()
 
         pcall(function()
-            if silentAimHooked and oldIndex then
+            if silentAimHooked then
                 local mt = getrawmetatable(game)
                 if setreadonly then setreadonly(mt, false) end
-                mt.__index = oldIndex
+                if oldIndex then mt.__index = oldIndex end
+                if oldNamecall then mt.__namecall = oldNamecall end
                 if setreadonly then setreadonly(mt, true) end
             end
         end)
@@ -1351,10 +1357,11 @@ local DestroyUIButton = MiscTab:CreateButton({
     end,
 })
 
---==================== SILENT AIM HOOK (pcall, в самом конце) ====================
+--==================== SILENT AIM HOOK ====================
 local hookSuccess, hookError = pcall(function()
     local mt = getrawmetatable(game)
     oldIndex = mt.__index
+    oldNamecall = mt.__namecall
 
     if setreadonly then
         setreadonly(mt, false)
@@ -1364,7 +1371,7 @@ local hookSuccess, hookError = pcall(function()
 
     mt.__index = newcclosure(function(self, key)
         if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
-            if tostring(self) == "Mouse" then
+            if self == Mouse then
                 if key == "Hit" then
                     return CFrame.new(getPredictedPosition(silentAimTarget))
                 end
@@ -1379,9 +1386,25 @@ local hookSuccess, hookError = pcall(function()
                     local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
                     return pos.Y
                 end
+                if key == "UnitRay" then
+                    local pos = getPredictedPosition(silentAimTarget)
+                    return Ray.new(frameCache.cameraPos, (pos - frameCache.cameraPos).Unit)
+                end
             end
         end
         return oldIndex(self, key)
+    end)
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
+            if self == Mouse then
+                if method == "GetHit" or method == "get_Hit" then
+                    return CFrame.new(getPredictedPosition(silentAimTarget))
+                end
+            end
+        end
+        return oldNamecall(self, ...)
     end)
 
     if setreadonly then
@@ -1499,3 +1522,4 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:LoadConfiguration()
+```
