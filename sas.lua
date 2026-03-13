@@ -359,9 +359,11 @@ local function getTarget()
             return nil
         end
 
-        if isValidTarget(plr, currentTarget) then
-            if WallCheck(currentTarget, localPlayer.Character, plr) then
-                return currentTarget
+        if InFOV(currentTarget.Position) then
+            if isValidTarget(plr, currentTarget) then
+                if WallCheck(currentTarget, localPlayer.Character, plr) then
+                    return currentTarget
+                end
             end
         end
 
@@ -386,6 +388,7 @@ local silentAimEnabled = false
 local silentAimFOV = 100
 local silentAimShowFOV = false
 local silentAimWallCheck = true
+local silentAimHooked = false
 
 local silentFovCircle = Drawing.new("Circle")
 silentFovCircle.Visible = false
@@ -405,7 +408,6 @@ local function updateSilentAimTarget()
 
     local now = frameCache.time
     if now - lastSilentAimUpdate < SILENT_AIM_UPDATE_INTERVAL then
-        -- Проверяем что текущая цель ещё валидна
         if silentAimTarget then
             local plr = Players:GetPlayerFromCharacter(silentAimTarget.Parent)
             if not plr or not isValidTarget(plr, silentAimTarget) then
@@ -471,42 +473,92 @@ local function updateSilentAimTarget()
     silentAimTarget = nil
 end
 
--- ХУК Mouse.Hit
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
+--==================== LEGIT NO FALL ====================
 
-if setreadonly then
-    setreadonly(mt, false)
-elseif make_writeable then
-    make_writeable(mt)
+local NoFallEnabled = false
+local NoFallConnection
+
+local FALL_SPEED_THRESHOLD = -55
+local SAFE_FALL_SPEED = -15
+
+local function startNoFall()
+    if NoFallEnabled then return end
+    NoFallEnabled = true
+
+    NoFallConnection = RunService.Heartbeat:Connect(function()
+        if not NoFallEnabled then return end
+
+        local char = localPlayer.Character
+        if not char then return end
+
+        local humanoid = char:FindFirstChild("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not hrp then return end
+
+        if humanoid.SeatPart or humanoid:GetState() == Enum.HumanoidStateType.Climbing then
+            return
+        end
+
+        local velY = hrp.Velocity.Y
+
+        if velY < FALL_SPEED_THRESHOLD then
+            hrp.Velocity = Vector3.new(
+                hrp.Velocity.X,
+                SAFE_FALL_SPEED,
+                hrp.Velocity.Z
+            )
+        end
+    end)
 end
 
-mt.__index = newcclosure(function(self, key)
-    if silentAimEnabled and silentAimTarget then
-        if tostring(self) == "Mouse" then
-            if key == "Hit" then
-                local predictedPos = getPredictedPosition(silentAimTarget)
-                return CFrame.new(predictedPos)
-            end
-            if key == "Target" then
-                return silentAimTarget
-            end
-            if key == "X" then
-                local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
-                return pos.X
-            end
-            if key == "Y" then
-                local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
-                return pos.Y
-            end
+local function stopNoFall()
+    NoFallEnabled = false
+    if NoFallConnection then
+        NoFallConnection:Disconnect()
+        NoFallConnection = nil
+    end
+end
+
+--==================== Input ====================
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if isRecordingKeybind then
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+        isRecordingKeybind = false
+        aimlockKey = input.KeyCode
+        aimlockKeyName = input.KeyCode.Name
+        AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
+
+        Rayfield:Notify({
+            Title = "Keybind Set",
+            Content = "Aimlock key set to: " .. aimlockKeyName,
+            Duration = 2,
+            Image = 4483362458,
+        })
+
+        return
+    end
+
+    if gameProcessed then return end
+
+    if aimlockKey and input.KeyCode == aimlockKey then
+        keyHeld = true
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
         end
     end
-    return oldIndex(self, key)
 end)
 
-if setreadonly then
-    setreadonly(mt, true)
-end
+UIS.InputEnded:Connect(function(input)
+    if aimlockKey and input.KeyCode == aimlockKey then
+        keyHeld = false
+        if aimbotEnabled then
+            currentTarget = nil
+            targetLocked = false
+        end
+    end
+end)
 
 --==================== UI Elements ====================
 
@@ -721,93 +773,6 @@ local ClearFriendsButton = RageTab:CreateButton({
         })
     end,
 })
-
---==================== LEGIT NO FALL ====================
-
-local NoFallEnabled = false
-local NoFallConnection
-
-local FALL_SPEED_THRESHOLD = -55
-local SAFE_FALL_SPEED = -15
-
-local function startNoFall()
-    if NoFallEnabled then return end
-    NoFallEnabled = true
-
-    NoFallConnection = RunService.Heartbeat:Connect(function()
-        if not NoFallEnabled then return end
-
-        local char = localPlayer.Character
-        if not char then return end
-
-        local humanoid = char:FindFirstChild("Humanoid")
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not hrp then return end
-
-        if humanoid.SeatPart or humanoid:GetState() == Enum.HumanoidStateType.Climbing then
-            return
-        end
-
-        local velY = hrp.Velocity.Y
-
-        if velY < FALL_SPEED_THRESHOLD then
-            hrp.Velocity = Vector3.new(
-                hrp.Velocity.X,
-                SAFE_FALL_SPEED,
-                hrp.Velocity.Z
-            )
-        end
-    end)
-end
-
-local function stopNoFall()
-    NoFallEnabled = false
-    if NoFallConnection then
-        NoFallConnection:Disconnect()
-        NoFallConnection = nil
-    end
-end
-
---==================== Input ====================
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if isRecordingKeybind then
-        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-
-        isRecordingKeybind = false
-        aimlockKey = input.KeyCode
-        aimlockKeyName = input.KeyCode.Name
-        AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-
-        Rayfield:Notify({
-            Title = "Keybind Set",
-            Content = "Aimlock key set to: " .. aimlockKeyName,
-            Duration = 2,
-            Image = 4483362458,
-        })
-
-        return
-    end
-
-    if gameProcessed then return end
-
-    if aimlockKey and input.KeyCode == aimlockKey then
-        keyHeld = true
-        if aimbotEnabled then
-            currentTarget = nil
-            targetLocked = false
-        end
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if aimlockKey and input.KeyCode == aimlockKey then
-        keyHeld = false
-        if aimbotEnabled then
-            currentTarget = nil
-            targetLocked = false
-        end
-    end
-end)
 
 --==================== ESP System ====================
 local Box_ESP_Enabled = false
@@ -1252,13 +1217,78 @@ local DestroyUIButton = MiscTab:CreateButton({
         silentFovCircle:Remove()
 
         -- Восстанавливаем хук
-        if setreadonly then setreadonly(mt, false) end
-        mt.__index = oldIndex
-        if setreadonly then setreadonly(mt, true) end
+        pcall(function()
+            local mt = getrawmetatable(game)
+            if setreadonly then setreadonly(mt, false) end
+            if silentAimHooked and oldIndex then
+                mt.__index = oldIndex
+            end
+            if setreadonly then setreadonly(mt, true) end
+        end)
 
         Rayfield:Destroy()
     end,
 })
+
+--==================== SILENT AIM HOOK (В КОНЦЕ, В PCALL) ====================
+local oldIndex = nil
+
+local hookSuccess, hookError = pcall(function()
+    local mt = getrawmetatable(game)
+    oldIndex = mt.__index
+
+    if setreadonly then
+        setreadonly(mt, false)
+    elseif make_writeable then
+        make_writeable(mt)
+    end
+
+    mt.__index = newcclosure(function(self, key)
+        if silentAimEnabled and silentAimTarget then
+            if tostring(self) == "Mouse" then
+                if key == "Hit" then
+                    local predictedPos = getPredictedPosition(silentAimTarget)
+                    return CFrame.new(predictedPos)
+                end
+                if key == "Target" then
+                    return silentAimTarget
+                end
+                if key == "X" then
+                    local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
+                    return pos.X
+                end
+                if key == "Y" then
+                    local pos = Camera:WorldToViewportPoint(silentAimTarget.Position)
+                    return pos.Y
+                end
+            end
+        end
+        return oldIndex(self, key)
+    end)
+
+    if setreadonly then
+        setreadonly(mt, true)
+    end
+
+    silentAimHooked = true
+end)
+
+if hookSuccess then
+    Rayfield:Notify({
+        Title = "Silent Aim",
+        Content = "Hook installed successfully",
+        Duration = 3,
+        Image = 4483362458,
+    })
+else
+    Rayfield:Notify({
+        Title = "Silent Aim Error",
+        Content = "Hook failed: " .. tostring(hookError),
+        Duration = 5,
+        Image = 4483362458,
+    })
+    warn("[Silent Aim] Hook failed: " .. tostring(hookError))
+end
 
 --==================== MAIN RENDER LOOP ====================
 local currentTool
@@ -1266,7 +1296,7 @@ local currentTool
 RunService.RenderStepped:Connect(function()
     updateFrameCache()
 
-    -- Silent Aim - обновляем цель
+    -- Silent Aim target
     updateSilentAimTarget()
 
     -- Silent Aim FOV Circle
