@@ -1,6 +1,3 @@
-
-
-```lua
 -- Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -1522,4 +1519,3 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:LoadConfiguration()
-```
