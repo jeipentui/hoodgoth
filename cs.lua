@@ -34,10 +34,10 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Create Tabs
-local RageTab = Window:CreateTab("Ragebot")
-local ESPTab = Window:CreateTab("ESP")
-local AntiAimTab = Window:CreateTab("Anti-Aim")
-local MiscTab = Window:CreateTab("Misc")
+local RageTab = Window:CreateTab("Ragebot", 4483362458)
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+local AntiAimTab = Window:CreateTab("Anti-Aim", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
 
 --==================== Ragebot Variables ====================
 local aimbotEnabled = false
@@ -631,7 +631,6 @@ local function stopAntiAim()
     setAutoRotate(true)
 end
 
--- Респавн фикс для AntiAim
 localPlayer.CharacterAdded:Connect(function(char)
     if AntiAimEnabled then
         task.wait(0.5)
@@ -643,7 +642,6 @@ localPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --==================== LEGIT NO FALL ====================
-
 local NoFallEnabled = false
 local NoFallConnection
 
@@ -1003,7 +1001,7 @@ local AntiAimSpeedSlider = AntiAimTab:CreateSlider({
 
 AntiAimTab:CreateLabel("━━━━━━ Info ━━━━━━")
 AntiAimTab:CreateLabel("Spin - fast rotation")
-AntiAimTab:CreateLabel("Jitter - snap 180° left/right")
+AntiAimTab:CreateLabel("Jitter - snap 180 left/right")
 AntiAimTab:CreateLabel("Random - random angle each tick")
 AntiAimTab:CreateLabel("Backward - always face away")
 AntiAimTab:CreateLabel("Sideways - thin hitbox")
