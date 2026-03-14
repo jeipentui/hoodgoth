@@ -15,6 +15,7 @@ local Window = Rayfield:CreateWindow({
     Name = "thw club",
     LoadingTitle = "Loading Interface...",
     LoadingSubtitle = "by thw",
+    Theme = "Bloom",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "thw-club",
@@ -53,6 +54,25 @@ local lastShotTime = 0
 local RECOIL_TAIL = 0.3
 local targetCFrame = Camera.CFrame
 
+-- SILENT AIM (FLASH AIM) VARIABLES
+local silentAimEnabled = false
+local silentAimFOV = 100
+local silentAimShowFOV = false
+local silentAimWallCheck = true
+local silentAimTarget = nil
+local lastSilentAimUpdate = 0
+local SILENT_AIM_UPDATE_INTERVAL = 0.05
+local silentAimKey = nil
+local silentAimKeyName = "Not Set"
+local silentAimKeyHeld = false
+local isRecordingSilentKeybind = false
+
+local silentFovCircle = Drawing.new("Circle")
+silentFovCircle.Visible = false
+silentFovCircle.Color = Color3.new(1, 0, 0)
+silentFovCircle.Thickness = 2
+silentFovCircle.NumSides = 100
+
 local function monitorTool(tool)
     if not tool then return end
     tool.Activated:Connect(function()
@@ -62,11 +82,7 @@ local function monitorTool(tool)
 end
 
 local function setupCharacter(char)
-    if not char then return end
-
-    local humanoid = char:WaitForChild("Humanoid", 5)
-    if not humanoid then return end
-
+    local humanoid = char:WaitForChild("Humanoid")
     local tool = char:FindFirstChildOfClass("Tool")
     if tool then
         monitorTool(tool)
@@ -133,73 +149,424 @@ fovCircle.NumSides = 100
 local lastMousePos = Vector2.new()
 local lastFOV = fov
 
---==================== WALLCHECK ====================
+--==================== FRAME CACHE ====================
+local frameCache = {
+    mousePos = Vector2.new(),
+    cameraPos = Vector3.new(),
+    cameraCFrame = CFrame.new(),
+    time = 0,
+}
 
+local function updateFrameCache()
+    frameCache.mousePos = UIS:GetMouseLocation()
+    frameCache.cameraCFrame = Camera.CFrame
+    frameCache.cameraPos = Camera.CFrame.Position
+    frameCache.time = tick()
+end
+
+--==================== WALLCHECK CACHE ====================
+local wallCheckCache = {}
+local WALLCHECK_CACHE_TIME = 0.08
+
+local function clearWallCheckCache(plr)
+    wallCheckCache[plr] = nil
+end
+
+--==================== FOV CHECK ====================
 local FOV_RADIUS = 100
 
 local function InFOV(worldPos)
     local screenPos, onScreen = Camera:WorldToViewportPoint(worldPos)
     if not onScreen then return false end
 
-    local mousePos = UIS:GetMouseLocation()
-    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-
+    local dist = (Vector2.new(screenPos.X, screenPos.Y) - frameCache.mousePos).Magnitude
     return dist <= FOV_RADIUS
 end
 
-local function WallCheck(targetHead, localChar)
+--==================== WALLCHECK (RAW) ====================
+local function WallCheckRaw(targetHead, localChar)
     if not wallCheckEnabled then return true end
     if not targetHead or not localChar then return false end
 
-    local ok, result = pcall(function()
-        if not InFOV(targetHead.Position) then
+    if not InFOV(targetHead.Position) then
+        return false
+    end
+
+    local origin = frameCache.cameraPos
+    local direction = (targetHead.Position - origin).Unit
+    local distanceToTarget = (targetHead.Position - origin).Magnitude
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+
+    local result1 = workspace:Raycast(origin, direction * distanceToTarget, rayParams)
+
+    if not result1 then
+        return true
+    end
+
+    local hit1 = result1.Instance
+
+    if hit1:IsDescendantOf(targetHead.Parent) then
+        return true
+    end
+
+    if hit1.Name == "DFrame" or hit1.ClassName == "DFrame" then
+        local newOrigin = result1.Position + (direction * 0.5)
+        local remainingDistance = distanceToTarget - (newOrigin - origin).Magnitude
+
+        if remainingDistance > 0 then
+            local result2 = workspace:Raycast(newOrigin, direction * remainingDistance, rayParams)
+
+            if not result2 then
+                return true
+            end
+
+            if result2.Instance:IsDescendantOf(targetHead.Parent) then
+                return true
+            end
+
             return false
         end
+    end
 
-        local origin = Camera.CFrame.Position
-        local direction = (targetHead.Position - origin).Unit
-        local distanceToTarget = (targetHead.Position - origin).Magnitude
+    return false
+end
 
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.IgnoreWater = true
+--==================== WALLCHECK С КЭШЕМ ====================
+local function WallCheck(targetHead, localChar, plr)
+    if not wallCheckEnabled then return true end
 
-        local result1 = workspace:Raycast(origin, direction * distanceToTarget, rayParams)
+    if plr then
+        local cached = wallCheckCache[plr]
+        if cached and (frameCache.time - cached.time) < WALLCHECK_CACHE_TIME then
+            return cached.result
+        end
+    end
 
-        if not result1 then
-            return true
+    local result = WallCheckRaw(targetHead, localChar)
+
+    if plr then
+        wallCheckCache[plr] = {result = result, time = frameCache.time}
+    end
+
+    return result
+end
+
+--==================== WALLCHECK ДЛЯ SILENT AIM ====================
+local function WallCheckSilentRaw(targetHead, localChar)
+    if not targetHead or not localChar then return false end
+
+    local origin = frameCache.cameraPos
+    local direction = (targetHead.Position - origin).Unit
+    local distanceToTarget = (targetHead.Position - origin).Magnitude
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+
+    local result1 = workspace:Raycast(origin, direction * distanceToTarget, rayParams)
+
+    if not result1 then
+        return true
+    end
+
+    local hit1 = result1.Instance
+
+    if hit1:IsDescendantOf(targetHead.Parent) then
+        return true
+    end
+
+    if hit1.Name == "DFrame" or hit1.ClassName == "DFrame" then
+        local newOrigin = result1.Position + (direction * 0.5)
+        local remainingDistance = distanceToTarget - (newOrigin - origin).Magnitude
+
+        if remainingDistance > 0 then
+            local result2 = workspace:Raycast(newOrigin, direction * remainingDistance, rayParams)
+
+            if not result2 then
+                return true
+            end
+
+            if result2.Instance:IsDescendantOf(targetHead.Parent) then
+                return true
+            end
+
+            return false
+        end
+    end
+
+    return false
+end
+
+--==================== Weapon Prediction ====================
+local weaponBulletSpeeds = {
+    ["Beretta"] = 1624,
+    ["Magnum"] = 2550,
+    ["G-17"] = 1850,
+    ["UZI"] = 2250,
+    ["UZI+"] = 2250,
+    ["Mare"] = 2000,
+    ["Deagle"] = 2200,
+    ["SKS"] = 3750,
+    ["M1911"] = 2230,
+    ["AKS-74U"] = 3000,
+    ["FNP-45"] = 1500,
+    ["TEC-9"] = 2100,
+    ["MAC-10+"] = 2250,
+    ["MAC-10"] = 2250,
+    ["MP7"] = 2600,
+    ["Tommy+"] = 2225,
+    ["Tommy"] = 2225,
+}
+
+local function getCurrentWeaponSpeed()
+    local char = localPlayer.Character
+    if char then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then return weaponBulletSpeeds[tool.Name] or 1624 end
+    end
+    return 1624
+end
+
+local function isFriend(plr)
+    for _, name in pairs(FriendList) do
+        if plr.Name == name then return true end
+    end
+    return false
+end
+
+--==================== Downed Check ====================
+local function isTargetDowned(targetCharacter)
+    if not CharStats then return false end
+    local targetName = targetCharacter.Name
+    local charStat = CharStats:FindFirstChild(targetName)
+    if not charStat then return false end
+    local downedValue = charStat:FindFirstChild("Downed")
+    if downedValue and downedValue:IsA("BoolValue") then
+        return downedValue.Value
+    end
+    return false
+end
+
+--==================== Visibility & Prediction ====================
+local function hasSpawnShield(plr)
+    return plr.Character and plr.Character:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function getPredictedPosition(target)
+    local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
+    if not hrp then return target.Position end
+
+    local dist = (hrp.Position - frameCache.cameraPos).Magnitude
+    local t = dist / getCurrentWeaponSpeed()
+
+    return target.Position + hrp.Velocity * t
+end
+
+local function isValidTarget(plr, targetHead)
+    if not plr or not plr.Character then return false end
+    if isFriend(plr) then return false end
+    if not targetHead then return false end
+
+    local char = plr.Character
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return false end
+    if hasSpawnShield(plr) then return false end
+    if isTargetDowned(char) then return false end
+
+    return true
+end
+
+--==================== ПОИСК ЦЕЛИ ====================
+local function getNearestToCursor()
+    local localChar = localPlayer.Character
+    if not localChar then return nil end
+
+    local mousePos = frameCache.mousePos
+    local candidates = {}
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer then
+            local char = plr.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if dist <= FOV_RADIUS then
+                            if isValidTarget(plr, head) then
+                                candidates[#candidates + 1] = {plr = plr, head = head, dist = dist}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if #candidates == 0 then return nil end
+
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+
+    for _, c in ipairs(candidates) do
+        if WallCheck(c.head, localChar, c.plr) then
+            return c.head
+        end
+    end
+
+    return nil
+end
+
+local function getTarget()
+    if currentTarget and targetLocked then
+        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
+
+        if not plr then
+            currentTarget = nil
+            targetLocked = false
+            return nil
         end
 
-        local hit1 = result1.Instance
-
-        if hit1:IsDescendantOf(targetHead.Parent) then
-            return true
-        end
-
-        if hit1.Name == "DFrame" or hit1.ClassName == "DFrame" then
-            local newOrigin = result1.Position + (direction * 0.5)
-            local remainingDistance = distanceToTarget - (newOrigin - origin).Magnitude
-
-            if remainingDistance > 0 then
-                local result2 = workspace:Raycast(newOrigin, direction * remainingDistance, rayParams)
-
-                if not result2 then
-                    return true
-                end
-
-                if result2.Instance:IsDescendantOf(targetHead.Parent) then
-                    return true
-                end
-
-                return false
+        if isValidTarget(plr, currentTarget) then
+            if WallCheck(currentTarget, localPlayer.Character, plr) then
+                return currentTarget
             end
         end
 
-        return false
-    end)
+        currentTarget = nil
+        targetLocked = false
+        return nil
+    end
 
-    if ok then return result else return false end
+    if not currentTarget then
+        local newTarget = getNearestToCursor()
+        if newTarget then
+            currentTarget = newTarget
+            targetLocked = true
+        end
+    end
+
+    return currentTarget
+end
+
+--==================== SILENT AIM TARGET ====================
+local function updateSilentAimTarget()
+    if not silentAimEnabled or not silentAimKeyHeld then
+        silentAimTarget = nil
+        return
+    end
+
+    local now = frameCache.time
+    if now - lastSilentAimUpdate < SILENT_AIM_UPDATE_INTERVAL then
+        if silentAimTarget then
+            local plr = Players:GetPlayerFromCharacter(silentAimTarget.Parent)
+            if not plr or not isValidTarget(plr, silentAimTarget) then
+                silentAimTarget = nil
+            end
+        end
+        return
+    end
+    lastSilentAimUpdate = now
+
+    local localChar = localPlayer.Character
+    if not localChar then
+        silentAimTarget = nil
+        return
+    end
+
+    local mousePos = frameCache.mousePos
+    local candidates = {}
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= localPlayer then
+            local char = plr.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if dist <= silentAimFOV then
+                            if isValidTarget(plr, head) then
+                                candidates[#candidates + 1] = {plr = plr, head = head, dist = dist}
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if #candidates == 0 then
+        silentAimTarget = nil
+        return
+    end
+
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+
+    for _, c in ipairs(candidates) do
+        if silentAimWallCheck then
+            if WallCheckSilentRaw(c.head, localChar) then
+                silentAimTarget = c.head
+                return
+            end
+        else
+            silentAimTarget = c.head
+            return
+        end
+    end
+    silentAimTarget = nil
+end
+
+--==================== LEGIT NO FALL ====================
+
+local NoFallEnabled = false
+local NoFallConnection
+
+local FALL_SPEED_THRESHOLD = -55
+local SAFE_FALL_SPEED = -15
+
+local function startNoFall()
+    if NoFallEnabled then return end
+    NoFallEnabled = true
+
+    NoFallConnection = RunService.Heartbeat:Connect(function()
+        if not NoFallEnabled then return end
+
+        local char = localPlayer.Character
+        if not char then return end
+
+        local humanoid = char:FindFirstChild("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not hrp then return end
+
+        if humanoid.SeatPart or humanoid:GetState() == Enum.HumanoidStateType.Climbing then
+            return
+        end
+
+        local velY = hrp.Velocity.Y
+
+        if velY < FALL_SPEED_THRESHOLD then
+            hrp.Velocity = Vector3.new(
+                hrp.Velocity.X,
+                SAFE_FALL_SPEED,
+                hrp.Velocity.Z
+            )
+        end
+    end)
+end
+
+local function stopNoFall()
+    NoFallEnabled = false
+    if NoFallConnection then
+        NoFallConnection:Disconnect()
+        NoFallConnection = nil
+    end
 end
 
 --==================== UI Elements ====================
@@ -215,6 +582,106 @@ local AimlockToggle = RageTab:CreateToggle({
             targetLocked = false
         end
     end,
+})
+
+local SilentAimToggle = RageTab:CreateToggle({
+    Name = "Silent Aim (Flash)",
+    CurrentValue = false,
+    Flag = "SilentAimToggle",
+    Callback = function(Value)
+        silentAimEnabled = Value
+        if not Value then silentAimTarget = nil end
+    end,
+})
+
+local SilentAimWallcheckToggle = RageTab:CreateToggle({
+    Name = "Silent Aim Wallcheck",
+    CurrentValue = true,
+    Flag = "SilentAimWallcheck",
+    Callback = function(Value)
+        silentAimWallCheck = Value
+    end,
+})
+
+local SilentAimFOVSlider = RageTab:CreateSlider({
+    Name = "Silent Aim FOV",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "px",
+    CurrentValue = 100,
+    Flag = "SilentAimFOV",
+    Callback = function(Value)
+        silentAimFOV = Value
+    end,
+})
+
+local SilentAimKeybindLabel = RageTab:CreateLabel("Silent Aim Key: Not Set")
+
+local SetSilentAimKeyButton = RageTab:CreateButton({
+    Name = "Set Silent Aim Key",
+    Callback = function()
+        isRecordingSilentKeybind = true
+        SilentAimKeybindLabel:Set("Press any keyboard key...")
+
+        local connection
+        connection = UIS.InputBegan:Connect(function(input, gameProcessed)
+            if isRecordingSilentKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
+                isRecordingSilentKeybind = false
+                connection:Disconnect()
+
+                silentAimKey = input.KeyCode
+                silentAimKeyName = input.KeyCode.Name
+                SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+                Rayfield:Notify({
+                    Title = "Keybind Set",
+                    Content = "Silent Aim key set to: " .. silentAimKeyName,
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        end)
+
+        task.delay(5, function()
+            if isRecordingSilentKeybind then
+                isRecordingSilentKeybind = false
+                if connection then
+                    connection:Disconnect()
+                end
+                SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+                Rayfield:Notify({
+                    Title = "Keybind Recording Cancelled",
+                    Content = "Keybind recording timed out",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        end)
+    end,
+})
+
+local SilentFOVCircleToggle = RageTab:CreateButton({
+    Name = "Toggle Silent FOV Circle",
+    Callback = function()
+        silentAimShowFOV = not silentAimShowFOV
+        silentFovCircle.Visible = silentAimShowFOV
+        Rayfield:Notify({
+            Title = "Silent FOV Circle",
+            Content = silentAimShowFOV and "Enabled" or "Disabled",
+            Duration = 1,
+            Image = 4483362458,
+        })
+    end,
+})
+
+local SilentFOVColorPicker = RageTab:CreateColorPicker({
+    Name = "Silent FOV Color",
+    Color = Color3.new(1, 0, 0),
+    Flag = "SilentFOVColor",
+    Callback = function(Value)
+        silentFovCircle.Color = Value
+    end
 })
 
 local NoVisualRecoilToggle = RageTab:CreateToggle({
@@ -359,276 +826,37 @@ local ClearFriendsButton = RageTab:CreateButton({
     end,
 })
 
---==================== Weapon Prediction ====================
-local weaponBulletSpeeds = {
-    -- Criminality
-    ["Beretta"] = 1624,
-    ["Magnum"] = 2550,
-    ["G-17"] = 1850,
-    ["UZI"] = 2250,
-    ["UZI+"] = 2250,
-    ["Mare"] = 2000,
-    ["Deagle"] = 2200,
-    ["SKS"] = 3750,
-    ["M1911"] = 2230,
-    ["AKS-74U"] = 3000,
-    ["FNP-45"] = 1500,
-    ["TEC-9"] = 2100,
-    ["MAC-10+"] = 2250,
-    ["MAC-10"] = 2250,
-    ["MP7"] = 2600,
-    ["Tommy+"] = 2225,
-    ["Tommy"] = 2225,
-
-    -- Blox Strike (Rifles)
-    ["AK-47"] = 3200,
-    ["M4A4"] = 3100,
-    ["M4A1-S"] = 3100,
-    ["AUG"] = 3150,
-    ["SG 553"] = 3200,
-    ["FAMAS"] = 3050,
-    ["Galil AR"] = 3000,
-    ["Galil"] = 3000,
-
-    -- Blox Strike (Snipers)
-    ["AWP"] = 5000,
-    ["SSG 08"] = 4500,
-    ["Scout"] = 4500,
-    ["SCAR-20"] = 4000,
-    ["G3SG1"] = 4000,
-
-    -- Blox Strike (SMGs)
-    ["MP5"] = 2600,
-    ["UMP-45"] = 2400,
-    ["UMP"] = 2400,
-    ["P90"] = 2800,
-    ["PP-Bizon"] = 2500,
-    ["Bizon"] = 2500,
-    ["MP9"] = 2600,
-
-    -- Blox Strike (Pistols)
-    ["Glock-18"] = 2000,
-    ["Glock"] = 2000,
-    ["USP-S"] = 2100,
-    ["USP"] = 2100,
-    ["P250"] = 2100,
-    ["Five-SeveN"] = 2200,
-    ["CZ75-Auto"] = 2100,
-    ["CZ75"] = 2100,
-    ["Desert Eagle"] = 2500,
-    ["R8 Revolver"] = 2800,
-    ["Dual Berettas"] = 2000,
-    ["Tec-9"] = 2100,
-
-    -- Blox Strike (Shotguns)
-    ["Nova"] = 1800,
-    ["XM1014"] = 1800,
-    ["MAG-7"] = 1800,
-    ["Sawed-Off"] = 1600,
-
-    -- Blox Strike (Heavy)
-    ["M249"] = 3100,
-    ["Negev"] = 3000,
-}
-
-local function getCurrentWeaponSpeed()
-    local char = localPlayer.Character
-    if char then
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then return weaponBulletSpeeds[tool.Name] or 2000 end
-    end
-    return 2000
-end
-
-local function isFriend(plr)
-    for _, name in pairs(FriendList) do
-        if plr.Name == name then return true end
-    end
-    return false
-end
-
-local function isSameTeam(plr)
-    if not localPlayer.Team or not plr.Team then return false end
-    return localPlayer.Team == plr.Team
-end
-
---==================== Downed Check ====================
-local function isTargetDowned(targetCharacter)
-    local cs = ReplicatedStorage:FindFirstChild("CharStats")
-    if not cs then return false end
-
-    local charStat = cs:FindFirstChild(targetCharacter.Name)
-    if not charStat then return false end
-
-    local downedValue = charStat:FindFirstChild("Downed")
-    if downedValue and downedValue:IsA("BoolValue") then
-        return downedValue.Value
-    end
-    return false
-end
-
---==================== Visibility & Prediction ====================
-local function hasSpawnShield(plr)
-    local char = plr and plr.Character
-    if not char then return false end
-    return char:FindFirstChildOfClass("ForceField") ~= nil
-end
-
-local function getPredictedPosition(target)
-    local hrp = target.Parent:FindFirstChild("HumanoidRootPart")
-    if not hrp then return target.Position end
-
-    local dir = hrp.Position - Camera.CFrame.Position
-    local dist = dir.Magnitude
-    local t = dist / getCurrentWeaponSpeed()
-
-    return target.Position + hrp.Velocity * t
-end
-
-local function isValidTarget(plr, targetHead)
-    if not plr or not plr.Character then return false end
-    if isFriend(plr) then return false end
-    if isSameTeam(plr) then return false end
-    if not targetHead then return false end
-
-    local char = plr.Character
-    local humanoid = char:FindFirstChild("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return false end
-    if hasSpawnShield(plr) then return false end
-    if isTargetDowned(char) then return false end
-
-    return true
-end
-
-local function getNearestToCursor()
-    local nearest = nil
-    local minDist = FOV_RADIUS
-    local localChar = localPlayer.Character
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= localPlayer then
-            local char = plr.Character
-            if char then
-                local head = char:FindFirstChild("Head")
-                if head then
-                    if InFOV(head.Position) then
-                        if isValidTarget(plr, head) then
-                            if WallCheck(head, localChar) then
-                                local mousePos = UIS:GetMouseLocation()
-                                local pos, _ = Camera:WorldToScreenPoint(head.Position)
-                                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-
-                                if dist < minDist then
-                                    minDist = dist
-                                    nearest = head
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return nearest
-end
-
-local function getTarget()
-    if currentTarget and targetLocked then
-        local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
-
-        if not plr then
-            currentTarget = nil
-            targetLocked = false
-            return nil
-        end
-
-        if InFOV(currentTarget.Position) then
-            if isValidTarget(plr, currentTarget) then
-                if WallCheck(currentTarget, localPlayer.Character) then
-                    return currentTarget
-                end
-            end
-        end
-
-        currentTarget = nil
-        targetLocked = false
-        return nil
-    end
-
-    if not currentTarget then
-        local newTarget = getNearestToCursor()
-        if newTarget then
-            currentTarget = newTarget
-            targetLocked = true
-        end
-    end
-
-    return currentTarget
-end
-
---==================== LEGIT NO FALL ====================
-
-local NoFallEnabled = false
-local NoFallConnection
-
-local FALL_SPEED_THRESHOLD = -55
-local SAFE_FALL_SPEED = -15
-
-local function startNoFall()
-    if NoFallEnabled then return end
-    NoFallEnabled = true
-
-    NoFallConnection = RunService.Heartbeat:Connect(function()
-        if not NoFallEnabled then return end
-
-        local char = localPlayer.Character
-        if not char then return end
-
-        local humanoid = char:FindFirstChild("Humanoid")
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not hrp then return end
-
-        if humanoid.SeatPart or humanoid:GetState() == Enum.HumanoidStateType.Climbing then
-            return
-        end
-
-        local velY = hrp.Velocity.Y
-
-        if velY < FALL_SPEED_THRESHOLD then
-            hrp.Velocity = Vector3.new(
-                hrp.Velocity.X,
-                SAFE_FALL_SPEED,
-                hrp.Velocity.Z
-            )
-        end
-    end)
-end
-
-local function stopNoFall()
-    NoFallEnabled = false
-
-    if NoFallConnection then
-        NoFallConnection:Disconnect()
-        NoFallConnection = nil
-    end
-end
-
 --==================== Input ====================
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if isRecordingKeybind then
         if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
 
         isRecordingKeybind = false
-
         aimlockKey = input.KeyCode
         aimlockKeyName = input.KeyCode.Name
-
         AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
 
         Rayfield:Notify({
             Title = "Keybind Set",
             Content = "Aimlock key set to: " .. aimlockKeyName,
+            Duration = 2,
+            Image = 4483362458,
+        })
+
+        return
+    end
+
+    if isRecordingSilentKeybind then
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+        isRecordingSilentKeybind = false
+        silentAimKey = input.KeyCode
+        silentAimKeyName = input.KeyCode.Name
+        SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
+
+        Rayfield:Notify({
+            Title = "Keybind Set",
+            Content = "Silent Aim key set to: " .. silentAimKeyName,
             Duration = 2,
             Image = 4483362458,
         })
@@ -645,6 +873,10 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             targetLocked = false
         end
     end
+
+    if silentAimKey and input.KeyCode == silentAimKey then
+        silentAimKeyHeld = true
+    end
 end)
 
 UIS.InputEnded:Connect(function(input)
@@ -654,6 +886,10 @@ UIS.InputEnded:Connect(function(input)
             currentTarget = nil
             targetLocked = false
         end
+    end
+
+    if silentAimKey and input.KeyCode == silentAimKey then
+        silentAimKeyHeld = false
     end
 end)
 
@@ -670,13 +906,12 @@ local ESP_HPText = {}
 local ESP_NameText = {}
 local ESP_WeaponText = {}
 local ESP_Boxes = {}
-local partCache = {}
 local characterCache = {}
 local viewportCache = {}
 
 local playersInRange = {}
 local lastDistanceCheck = 0
-local DISTANCE_CHECK_INTERVAL = 0.2
+local DISTANCE_CHECK_INTERVAL = 0.25
 
 local function cleanupPlayerESP(plr)
     if ESP_HPText[plr] then
@@ -709,22 +944,16 @@ local function cleanupPlayerESP(plr)
         ESP_Boxes[plr] = nil
     end
 
-    partCache[plr] = nil
     characterCache[plr] = nil
     viewportCache[plr] = nil
     playersInRange[plr] = nil
+    wallCheckCache[plr] = nil
 end
 
 local function hidePlayerESP(plr)
-    if ESP_HPText[plr] then
-        ESP_HPText[plr].Visible = false
-    end
-    if ESP_NameText[plr] then
-        ESP_NameText[plr].Visible = false
-    end
-    if ESP_WeaponText[plr] then
-        ESP_WeaponText[plr].Visible = false
-    end
+    if ESP_HPText[plr] then ESP_HPText[plr].Visible = false end
+    if ESP_NameText[plr] then ESP_NameText[plr].Visible = false end
+    if ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible = false end
     if ESP_Boxes[plr] then
         ESP_Boxes[plr].box.Visible = false
         ESP_Boxes[plr].boxoutline.Visible = false
@@ -769,21 +998,11 @@ local function createESPObjects(plr)
     boxoutline.Color = Settings.ESP_Color
 
     ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
-
-    partCache[plr] = {}
     characterCache[plr] = plr.Character
-
-    if plr.Character then
-        for _, part in ipairs(plr.Character:GetChildren()) do
-            if part:IsA("BasePart") then
-                partCache[plr][part] = true
-            end
-        end
-    end
 end
 
 local function updatePlayersInRangeCache()
-    local currentTime = tick()
+    local currentTime = frameCache.time
 
     if currentTime - lastDistanceCheck < DISTANCE_CHECK_INTERVAL then
         return
@@ -791,7 +1010,7 @@ local function updatePlayersInRangeCache()
 
     lastDistanceCheck = currentTime
 
-    local cameraPos = Camera.CFrame.Position
+    local cameraPos = frameCache.cameraPos
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= localPlayer and plr.Character then
@@ -805,7 +1024,7 @@ local function updatePlayersInRangeCache()
 
                 playersInRange[plr] = isInRange
 
-                if not isInRange and ESP_HPText[plr] then
+                if not isInRange then
                     hidePlayerESP(plr)
                 end
             else
@@ -819,13 +1038,11 @@ end
 
 local function get3DBoxCorners(hrp)
     local cf = hrp.CFrame
-    local size = Vector3.new(4, 6, 1.5)
-
     return {
-        cf * Vector3.new(-size.X/2, size.Y/2, 0),
-        cf * Vector3.new( size.X/2, size.Y/2, 0),
-        cf * Vector3.new(-size.X/2,-size.Y/2, 0),
-        cf * Vector3.new( size.X/2,-size.Y/2, 0),
+        cf * Vector3.new(-2, 3, 0),
+        cf * Vector3.new(2, 3, 0),
+        cf * Vector3.new(-2, -3, 0),
+        cf * Vector3.new(2, -3, 0),
     }
 end
 
@@ -840,13 +1057,11 @@ local function cacheViewportPoints()
                 local humanoid = char:FindFirstChild("Humanoid")
 
                 if hrp and humanoid and humanoid.Health > 0 then
-                    viewportCache[plr] = {
+                    local data = {
                         head = nil,
                         boxCorners = {},
                         anyVisible = false
                     }
-
-                    local data = viewportCache[plr]
 
                     local head = char:FindFirstChild("Head")
                     if head then
@@ -855,15 +1070,15 @@ local function cacheViewportPoints()
                         if headVisible then data.anyVisible = true end
                     end
 
-                    if Box_ESP_Enabled then
+                    if Box_ESP_Enabled and data.anyVisible then
                         local corners = get3DBoxCorners(hrp)
-
                         for i, corner in ipairs(corners) do
                             local pos, visible = Camera:WorldToViewportPoint(corner)
                             data.boxCorners[i] = {pos = Vector2.new(pos.X, pos.Y), visible = visible, z = pos.Z}
-                            if visible then data.anyVisible = true end
                         end
                     end
+
+                    viewportCache[plr] = data
                 end
             end
         end
@@ -872,25 +1087,19 @@ end
 
 local function updatePlayerESP(plr)
     if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then
-        if ESP_HPText[plr] or ESP_NameText[plr] or ESP_WeaponText[plr] or ESP_Boxes[plr] then
-            hidePlayerESP(plr)
-        end
+        hidePlayerESP(plr)
         return
     end
 
     local char = plr.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        if ESP_HPText[plr] then
-            cleanupPlayerESP(plr)
-        end
+    if not char then
+        cleanupPlayerESP(plr)
         return
     end
 
     local humanoid = char:FindFirstChild("Humanoid")
     if not humanoid or humanoid.Health <= 0 then
-        if ESP_HPText[plr] then
-            cleanupPlayerESP(plr)
-        end
+        cleanupPlayerESP(plr)
         return
     end
 
@@ -900,13 +1109,6 @@ local function updatePlayerESP(plr)
 
     if characterCache[plr] ~= char then
         characterCache[plr] = char
-        partCache[plr] = {}
-
-        for _, part in ipairs(char:GetChildren()) do
-            if part:IsA("BasePart") then
-                partCache[plr][part] = true
-            end
-        end
     end
 
     local data = viewportCache[plr]
@@ -926,7 +1128,7 @@ local function updatePlayerESP(plr)
 
         if ESP_HPEnabled and hpText then
             local hp = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
-            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp/humanoid.MaxHealth)/3,1,1) or color
+            local hpColor = ESP_HPDynamicEnabled and Color3.fromHSV((hp / humanoid.MaxHealth) / 3, 1, 1) or color
             hpText.Position = Vector2.new(headPos.X + 20, headPos.Y)
             hpText.Text = math.floor(hp) .. " HP"
             hpText.Color = hpColor
@@ -969,23 +1171,22 @@ local function updatePlayerESP(plr)
             for _, corner in ipairs(boxCorners) do
                 if corner.visible and corner.z > 0 then
                     anyVisible = true
-                    minX = math.min(minX, corner.pos.X)
-                    minY = math.min(minY, corner.pos.Y)
-                    maxX = math.max(maxX, corner.pos.X)
-                    maxY = math.max(maxY, corner.pos.Y)
+                    if corner.pos.X < minX then minX = corner.pos.X end
+                    if corner.pos.Y < minY then minY = corner.pos.Y end
+                    if corner.pos.X > maxX then maxX = corner.pos.X end
+                    if corner.pos.Y > maxY then maxY = corner.pos.Y end
                 end
             end
 
             if anyVisible then
                 local w, h = maxX - minX, maxY - minY
-                local pos = Vector2.new(minX, minY)
 
-                boxes.box.Position = pos
+                boxes.box.Position = Vector2.new(minX, minY)
                 boxes.box.Size = Vector2.new(w, h)
                 boxes.box.Color = color
                 boxes.box.Visible = true
 
-                boxes.boxoutline.Position = Vector2.new(pos.X - 1, pos.Y - 1)
+                boxes.boxoutline.Position = Vector2.new(minX - 1, minY - 1)
                 boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
                 boxes.boxoutline.Color = color
                 boxes.boxoutline.Visible = true
@@ -1128,24 +1329,54 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
+        silentAimEnabled = false
         if recoilHook then recoilHook:Disconnect() end
 
         for plr, _ in pairs(ESP_HPText) do
             cleanupPlayerESP(plr)
         end
         fovCircle:Remove()
+        silentFovCircle:Remove()
+
         Rayfield:Destroy()
     end,
 })
 
---==================== Render Loop ====================
+--==================== ГЛАВНЫЙ RENDER LOOP ====================
 local currentTool
 
 RunService.RenderStepped:Connect(function()
+    updateFrameCache()
+
+    -- Silent Aim цель
+    updateSilentAimTarget()
+
+    -- Silent Aim Flash
+    if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
+        local tool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            local savedCFrame = Camera.CFrame
+            local predictedPos = getPredictedPosition(silentAimTarget)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
+            tool:Activate()
+            Camera.CFrame = savedCFrame
+        end
+    end
+
+    -- Silent Aim FOV Circle
+    if silentAimEnabled and silentAimShowFOV then
+        silentFovCircle.Position = frameCache.mousePos
+        silentFovCircle.Radius = silentAimFOV
+        silentFovCircle.Visible = true
+    else
+        silentFovCircle.Visible = false
+    end
+
+    -- FOV Circle
     if not aimbotEnabled or not showFOV then
         fovCircle.Visible = false
     else
-        local mousePos = UIS:GetMouseLocation()
+        local mousePos = frameCache.mousePos
         if mousePos ~= lastMousePos or fov ~= lastFOV then
             fovCircle.Position = mousePos
             fovCircle.Radius = fov
@@ -1155,6 +1386,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Aimbot
     if aimbotEnabled and aimlockKey and keyHeld then
         local targetHead = getTarget()
 
@@ -1192,14 +1424,14 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- ESP
     updatePlayersInRangeCache()
-
     cacheViewportPoints()
 
     for plr, isInRange in pairs(playersInRange) do
         if isInRange then
             updatePlayerESP(plr)
-        elseif ESP_HPText[plr] then
+        else
             hidePlayerESP(plr)
         end
     end
