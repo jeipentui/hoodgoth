@@ -36,6 +36,7 @@ local Window = Rayfield:CreateWindow({
 -- Create Tabs
 local RageTab = Window:CreateTab("Ragebot")
 local ESPTab = Window:CreateTab("ESP")
+local AntiAimTab = Window:CreateTab("Anti-Aim")
 local MiscTab = Window:CreateTab("Misc")
 
 --==================== Ragebot Variables ====================
@@ -523,6 +524,124 @@ local function updateSilentAimTarget()
     silentAimTarget = nil
 end
 
+--==================== ANTI-AIM С DESYNC ====================
+local AntiAimEnabled = false
+local AntiAimMode = "Spin"
+local AntiAimSpeed = 20
+local AntiAimConnection = nil
+local DesyncEnabled = true
+
+local function setAutoRotate(value)
+    local char = localPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.AutoRotate = value
+        end
+    end
+end
+
+local function startAntiAim()
+    if AntiAimConnection then AntiAimConnection:Disconnect() end
+
+    local spinAngle = 0
+    local jitterFlip = false
+
+    setAutoRotate(false)
+
+    AntiAimConnection = RunService.RenderStepped:Connect(function(dt)
+        if not AntiAimEnabled then return end
+
+        local char = localPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChild("Humanoid")
+        if not hrp or not humanoid then return end
+        if humanoid.Health <= 0 then return end
+        if humanoid.SeatPart then return end
+
+        humanoid.AutoRotate = false
+
+        local savedCamCFrame = Camera.CFrame
+
+        local lookDir = savedCamCFrame.LookVector
+        local realAngle = math.atan2(-lookDir.X, -lookDir.Z)
+
+        if AntiAimMode == "Spin" then
+            spinAngle = spinAngle + (AntiAimSpeed * dt * 60)
+            if spinAngle >= 360 then spinAngle = spinAngle - 360 end
+
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(0, math.rad(spinAngle), 0)
+
+        elseif AntiAimMode == "Jitter" then
+            jitterFlip = not jitterFlip
+            local offset = jitterFlip and 180 or -180
+
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(0, realAngle + math.rad(offset), 0)
+
+        elseif AntiAimMode == "Random" then
+            local randomAngle = math.random(0, 360)
+
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(0, math.rad(randomAngle), 0)
+
+        elseif AntiAimMode == "Backward" then
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(0, realAngle + math.rad(180), 0)
+
+        elseif AntiAimMode == "Sideways" then
+            jitterFlip = not jitterFlip
+            local sideAngle = jitterFlip and 90 or -90
+
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(0, realAngle + math.rad(sideAngle), 0)
+
+        elseif AntiAimMode == "Fake Down" then
+            spinAngle = spinAngle + (AntiAimSpeed * dt * 60)
+            if spinAngle >= 360 then spinAngle = spinAngle - 360 end
+
+            hrp.CFrame = CFrame.new(hrp.Position + Vector3.new(0, -0.5, 0))
+                * CFrame.Angles(math.rad(15), math.rad(spinAngle), 0)
+
+        elseif AntiAimMode == "Crazy" then
+            spinAngle = spinAngle + (AntiAimSpeed * dt * 60)
+            if spinAngle >= 360 then spinAngle = spinAngle - 360 end
+
+            local randomTilt = math.random(-25, 25)
+
+            hrp.CFrame = CFrame.new(hrp.Position)
+                * CFrame.Angles(math.rad(randomTilt), math.rad(spinAngle), math.rad(randomTilt))
+        end
+
+        if DesyncEnabled then
+            Camera.CFrame = savedCamCFrame
+        end
+    end)
+end
+
+local function stopAntiAim()
+    AntiAimEnabled = false
+    if AntiAimConnection then
+        AntiAimConnection:Disconnect()
+        AntiAimConnection = nil
+    end
+    setAutoRotate(true)
+end
+
+-- Респавн фикс для AntiAim
+localPlayer.CharacterAdded:Connect(function(char)
+    if AntiAimEnabled then
+        task.wait(0.5)
+        local humanoid = char:WaitForChild("Humanoid")
+        if humanoid then
+            humanoid.AutoRotate = false
+        end
+    end
+end)
+
 --==================== LEGIT NO FALL ====================
 
 local NoFallEnabled = false
@@ -569,7 +688,7 @@ local function stopNoFall()
     end
 end
 
---==================== UI Elements ====================
+--==================== UI: RAGEBOT TAB ====================
 
 local AimlockToggle = RageTab:CreateToggle({
     Name = "Aimlock",
@@ -645,17 +764,8 @@ local SetSilentAimKeyButton = RageTab:CreateButton({
         task.delay(5, function()
             if isRecordingSilentKeybind then
                 isRecordingSilentKeybind = false
-                if connection then
-                    connection:Disconnect()
-                end
+                if connection then connection:Disconnect() end
                 SilentAimKeybindLabel:Set("Silent Aim Key: " .. silentAimKeyName)
-
-                Rayfield:Notify({
-                    Title = "Keybind Recording Cancelled",
-                    Content = "Keybind recording timed out",
-                    Duration = 2,
-                    Image = 4483362458,
-                })
             end
         end)
     end,
@@ -727,17 +837,8 @@ local SetAimlockKeyButton = RageTab:CreateButton({
         task.delay(5, function()
             if isRecordingKeybind then
                 isRecordingKeybind = false
-                if connection then
-                    connection:Disconnect()
-                end
+                if connection then connection:Disconnect() end
                 AimlockKeybindLabel:Set("Aimlock Key: " .. aimlockKeyName)
-
-                Rayfield:Notify({
-                    Title = "Keybind Recording Cancelled",
-                    Content = "Keybind recording timed out",
-                    Duration = 2,
-                    Image = 4483362458,
-                })
             end
         end)
     end,
@@ -825,6 +926,92 @@ local ClearFriendsButton = RageTab:CreateButton({
         })
     end,
 })
+
+--==================== UI: ANTI-AIM TAB ====================
+
+local AntiAimToggle = AntiAimTab:CreateToggle({
+    Name = "Anti-Aim",
+    CurrentValue = false,
+    Flag = "AntiAimToggle",
+    Callback = function(Value)
+        AntiAimEnabled = Value
+        if Value then
+            startAntiAim()
+            Rayfield:Notify({
+                Title = "Anti-Aim",
+                Content = "Anti-Aim enabled: " .. AntiAimMode,
+                Duration = 2,
+                Image = 4483362458,
+            })
+        else
+            stopAntiAim()
+            Rayfield:Notify({
+                Title = "Anti-Aim",
+                Content = "Anti-Aim disabled",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+local DesyncToggle = AntiAimTab:CreateToggle({
+    Name = "Desync (Anim Fix)",
+    CurrentValue = true,
+    Flag = "DesyncToggle",
+    Callback = function(Value)
+        DesyncEnabled = Value
+        Rayfield:Notify({
+            Title = "Desync",
+            Content = Value and "Camera independent from model" or "Camera follows model",
+            Duration = 2,
+            Image = 4483362458,
+        })
+    end,
+})
+
+local AntiAimModeDropdown = AntiAimTab:CreateDropdown({
+    Name = "Anti-Aim Mode",
+    Options = {"Spin", "Jitter", "Random", "Backward", "Sideways", "Fake Down", "Crazy"},
+    CurrentOption = {"Spin"},
+    MultipleOptions = false,
+    Flag = "AntiAimMode",
+    Callback = function(Value)
+        AntiAimMode = Value[1] or Value
+        if AntiAimEnabled then
+            Rayfield:Notify({
+                Title = "Anti-Aim Mode",
+                Content = "Mode: " .. AntiAimMode,
+                Duration = 1,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+local AntiAimSpeedSlider = AntiAimTab:CreateSlider({
+    Name = "Anti-Aim Speed",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = "speed",
+    CurrentValue = 20,
+    Flag = "AntiAimSpeed",
+    Callback = function(Value)
+        AntiAimSpeed = Value
+    end,
+})
+
+AntiAimTab:CreateLabel("━━━━━━ Info ━━━━━━")
+AntiAimTab:CreateLabel("Spin - fast rotation")
+AntiAimTab:CreateLabel("Jitter - snap 180° left/right")
+AntiAimTab:CreateLabel("Random - random angle each tick")
+AntiAimTab:CreateLabel("Backward - always face away")
+AntiAimTab:CreateLabel("Sideways - thin hitbox")
+AntiAimTab:CreateLabel("Fake Down - spin + head tilt")
+AntiAimTab:CreateLabel("Crazy - spin + random tilt")
+AntiAimTab:CreateLabel("━━━━━━━━━━━━━━━━━")
+AntiAimTab:CreateLabel("Desync ON = you aim freely")
+AntiAimTab:CreateLabel("Enemies see spinning model")
 
 --==================== Input ====================
 UIS.InputBegan:Connect(function(input, gameProcessed)
@@ -1228,7 +1415,8 @@ Players.PlayerRemoving:Connect(function(plr)
     cleanupPlayerESP(plr)
 end)
 
--- ESP Tab
+--==================== UI: ESP TAB ====================
+
 local HPToggle = ESPTab:CreateToggle({
     Name = "Health ESP",
     CurrentValue = false,
@@ -1295,7 +1483,8 @@ local ESPDistanceSlider = ESPTab:CreateSlider({
     end,
 })
 
--- Misc Tab
+--==================== UI: MISC TAB ====================
+
 local NoFallToggle = MiscTab:CreateToggle({
     Name = "NoFall Protection",
     CurrentValue = false,
@@ -1329,6 +1518,7 @@ local DestroyUIButton = MiscTab:CreateButton({
     Name = "Destroy UI",
     Callback = function()
         stopNoFall()
+        stopAntiAim()
         silentAimEnabled = false
         if recoilHook then recoilHook:Disconnect() end
 
@@ -1348,10 +1538,8 @@ local currentTool
 RunService.RenderStepped:Connect(function()
     updateFrameCache()
 
-    -- Silent Aim цель
     updateSilentAimTarget()
 
-    -- Silent Aim Flash
     if silentAimEnabled and silentAimKeyHeld and silentAimTarget then
         local tool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
         if tool then
@@ -1363,7 +1551,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Silent Aim FOV Circle
     if silentAimEnabled and silentAimShowFOV then
         silentFovCircle.Position = frameCache.mousePos
         silentFovCircle.Radius = silentAimFOV
@@ -1372,7 +1559,6 @@ RunService.RenderStepped:Connect(function()
         silentFovCircle.Visible = false
     end
 
-    -- FOV Circle
     if not aimbotEnabled or not showFOV then
         fovCircle.Visible = false
     else
@@ -1386,7 +1572,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot
     if aimbotEnabled and aimlockKey and keyHeld then
         local targetHead = getTarget()
 
@@ -1424,7 +1609,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP
     updatePlayersInRangeCache()
     cacheViewportPoints()
 
