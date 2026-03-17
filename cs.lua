@@ -432,6 +432,9 @@ local AA_UseLeftRight = false
 local AA_Left = -90
 local AA_Right = 90
 
+-- PITCH
+local AA_Pitch = 0
+
 -- JITTER
 local AA_JitterMode = "Off"
 local AA_JitterAmount = 0
@@ -456,6 +459,71 @@ local function setAutoRotate(value)
     if char then
         local humanoid = char:FindFirstChild("Humanoid")
         if humanoid then humanoid.AutoRotate = value end
+    end
+end
+
+local function getNeck(char)
+    if not char then return nil end
+    local head = char:FindFirstChild("Head")
+    if head then
+        local neck = head:FindFirstChild("Neck")
+        if neck then return neck end
+    end
+    local torso = char:FindFirstChild("Torso")
+    if torso then
+        local neck = torso:FindFirstChild("Neck")
+        if neck then return neck end
+    end
+    local upperTorso = char:FindFirstChild("UpperTorso")
+    if upperTorso then
+        local neck = upperTorso:FindFirstChild("Neck")
+        if neck then return neck end
+    end
+    return nil
+end
+
+local function saveNeckC0(neck)
+    if not neck then return end
+    if not neck:GetAttribute("OriginalC0X") then
+        local _, _, _, r00, r01, r02, r10, r11, r12, r20, r21, r22 = neck.C0:GetComponents()
+        neck:SetAttribute("OriginalC0X", neck.C0.X)
+        neck:SetAttribute("OriginalC0Y", neck.C0.Y)
+        neck:SetAttribute("OriginalC0Z", neck.C0.Z)
+        neck:SetAttribute("OrigR00", r00)
+        neck:SetAttribute("OrigR01", r01)
+        neck:SetAttribute("OrigR02", r02)
+        neck:SetAttribute("OrigR10", r10)
+        neck:SetAttribute("OrigR11", r11)
+        neck:SetAttribute("OrigR12", r12)
+        neck:SetAttribute("OrigR20", r20)
+        neck:SetAttribute("OrigR21", r21)
+        neck:SetAttribute("OrigR22", r22)
+    end
+end
+
+local function getOriginalC0(neck)
+    if not neck then return nil end
+    local origX = neck:GetAttribute("OriginalC0X")
+    if not origX then return nil end
+    local origY = neck:GetAttribute("OriginalC0Y")
+    local origZ = neck:GetAttribute("OriginalC0Z")
+    local r00 = neck:GetAttribute("OrigR00")
+    local r01 = neck:GetAttribute("OrigR01")
+    local r02 = neck:GetAttribute("OrigR02")
+    local r10 = neck:GetAttribute("OrigR10")
+    local r11 = neck:GetAttribute("OrigR11")
+    local r12 = neck:GetAttribute("OrigR12")
+    local r20 = neck:GetAttribute("OrigR20")
+    local r21 = neck:GetAttribute("OrigR21")
+    local r22 = neck:GetAttribute("OrigR22")
+    return CFrame.new(origX, origY, origZ, r00, r01, r02, r10, r11, r12, r20, r21, r22)
+end
+
+local function restoreNeck(neck)
+    if not neck then return end
+    local originalC0 = getOriginalC0(neck)
+    if originalC0 then
+        neck.C0 = originalC0
     end
 end
 
@@ -549,6 +617,21 @@ local function startAntiAim()
         hrp.CFrame = CFrame.new(hrp.Position)
             * CFrame.Angles(0, finalAngle + bodyRad, 0)
 
+        -- ═══════════ PITCH (НАКЛОН ГОЛОВЫ) ═══════════
+        local neck = getNeck(char)
+        if neck then
+            if AA_Pitch ~= 0 then
+                saveNeckC0(neck)
+                local originalC0 = getOriginalC0(neck)
+                if originalC0 then
+                    local pitchRad = math.rad(AA_Pitch)
+                    neck.C0 = originalC0 * CFrame.Angles(pitchRad, 0, 0)
+                end
+            else
+                restoreNeck(neck)
+            end
+        end
+
         -- ═══════════ DESYNC ═══════════
         if DesyncEnabled then
             Camera.CFrame = savedCamCFrame
@@ -563,6 +646,13 @@ local function stopAntiAim()
         AntiAimConnection = nil
     end
     setAutoRotate(true)
+
+    -- Восстанавливаем шею при выключении
+    local char = localPlayer.Character
+    if char then
+        local neck = getNeck(char)
+        restoreNeck(neck)
+    end
 end
 
 localPlayer.CharacterAdded:Connect(function(char)
@@ -784,6 +874,18 @@ local DesyncToggle = AntiAimTab:CreateToggle({
     Callback = function(Value) DesyncEnabled = Value end,
 })
 
+AntiAimTab:CreateLabel("━━━━━━ Pitch ━━━━━━")
+
+local AA_PitchSlider = AntiAimTab:CreateSlider({
+    Name = "Pitch (Head Up/Down)",
+    Range = {-90, 90},
+    Increment = 1,
+    Suffix = "°",
+    CurrentValue = 0,
+    Flag = "AAPitch",
+    Callback = function(Value) AA_Pitch = Value end,
+})
+
 AntiAimTab:CreateLabel("━━━━━━ Yaw ━━━━━━")
 
 local AA_UseLeftRightToggle = AntiAimTab:CreateToggle({
@@ -797,7 +899,7 @@ local AA_YawSlider = AntiAimTab:CreateSlider({
     Name = "Yaw",
     Range = {-180, 180},
     Increment = 1,
-    Suffix = "",
+    Suffix = "°",
     CurrentValue = 0,
     Flag = "AAYaw",
     Callback = function(Value) AA_Yaw = Value end,
@@ -807,7 +909,7 @@ local AA_LeftSlider = AntiAimTab:CreateSlider({
     Name = "Yaw Left",
     Range = {-180, 180},
     Increment = 1,
-    Suffix = "",
+    Suffix = "°",
     CurrentValue = -90,
     Flag = "AALeft",
     Callback = function(Value) AA_Left = Value end,
@@ -817,7 +919,7 @@ local AA_RightSlider = AntiAimTab:CreateSlider({
     Name = "Yaw Right",
     Range = {-180, 180},
     Increment = 1,
-    Suffix = "",
+    Suffix = "°",
     CurrentValue = 90,
     Flag = "AARight",
     Callback = function(Value) AA_Right = Value end,
@@ -842,7 +944,7 @@ local AA_JitterSlider = AntiAimTab:CreateSlider({
     Name = "Jitter Amount",
     Range = {0, 180},
     Increment = 1,
-    Suffix = "",
+    Suffix = "°",
     CurrentValue = 0,
     Flag = "AAJitterAmount",
     Callback = function(Value) AA_JitterAmount = Value end,
@@ -863,7 +965,7 @@ local AA_BodySlider = AntiAimTab:CreateSlider({
     Name = "Body Amount",
     Range = {-180, 180},
     Increment = 1,
-    Suffix = "",
+    Suffix = "°",
     CurrentValue = 60,
     Flag = "AABodyAmount",
     Callback = function(Value) AA_BodyAmount = Value end,
@@ -882,6 +984,7 @@ local AA_SpeedSlider = AntiAimTab:CreateSlider({
 })
 
 AntiAimTab:CreateLabel("━━━━━━ Info ━━━━━━")
+AntiAimTab:CreateLabel("Pitch - head tilt up/down (-90 to 90)")
 AntiAimTab:CreateLabel("Yaw - base rotation angle")
 AntiAimTab:CreateLabel("Left/Right - alternating sides")
 AntiAimTab:CreateLabel("Center - jitter around center")
