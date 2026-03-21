@@ -318,6 +318,15 @@ local function cacheViewportPoints()
 		end
 	end
 end
+local function isESPActive()
+	if not espVisualEnabled then return false end
+	if espVisualMode=="Always on" then return true
+	elseif espVisualMode=="On hotkey" then return espVisualKeyHeld
+	elseif espVisualMode=="Toggle" then return true
+	elseif espVisualMode=="Off hotkey" then return not espVisualKeyHeld end
+	return false
+end
+
 local function updatePlayerESP(plr)
 	if not isESPActive() then hidePlayerESP(plr);return end
 	if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then hidePlayerESP(plr);return end
@@ -577,8 +586,10 @@ end
 local function buildPlayerESPPage(parent)
 	local leftX=6
 	local rightX=290
+	local totalH=contentHeight-15
 
-	local playerGroup=createGroup(parent,leftX,5,250,270,"Player ESP")
+	local playerGroup=createGroup(parent,leftX,5,250,totalH,"Player ESP")
+	local otherGroup=createGroup(parent,rightX,5,250,totalH,"Other")
 
 	local y=12
 	createCheckboxWithBind(playerGroup,y,"Activation type",false,"[-]",
@@ -628,6 +639,8 @@ local function buildPlayerESPPage(parent)
 	createCheckbox(playerGroup,y,"Weapon text",false,function(v) ESP_WeaponEnabled=v end);y=y+22
 	createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
 	createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
+
+	createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 -- ==================== DEFAULT PAGE ====================
