@@ -580,62 +580,155 @@ end
 
 -- ==================== PAGE 4 (Player ESP - NEW) ====================
 local function buildPlayerESPPage(parent)
-	local totalH=contentHeight-15
-	local playerGroup=createGroup(parent,6,5,274,totalH,"Player ESP")
+	local leftX = 6
+	local rightX = 290
 
-	local y=12
-	-- Activation type with bind
-	createCheckboxWithBindSimple(playerGroup,y,"Activation type",false,"[-]",
-		function(val) espVisualEnabled=val
-			if not val then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
+	local playerGroup = createGroup(parent, leftX, 5, 250, 270, "Player ESP")
+	local otherGroup = createGroup(parent, rightX, 5, 250, 250, "Other ESP")
+	local coloredGroup = createGroup(parent, leftX, 295, 250, 220, "Colored models")
+	local effectsGroup = createGroup(parent, rightX, 280, 250, 250, "Effects")
+
+	-- Player ESP
+	local y = 12
+	createCheckboxWithBindSimple(playerGroup, y, "Activation type", false, "[-]",
+		function(val)
+			espVisualEnabled = val
+			if not val then
+				for plr, _ in pairs(ESP_HPText) do
+					hidePlayerESP(plr)
+				end
+			end
 		end,
 		function(bindLabel)
 			if isRecordingESPKeybind then return end
-			isRecordingESPKeybind=true;bindLabel.Text="[-]";bindLabel.TextColor3=C.bindRecording
+			isRecordingESPKeybind = true
+			bindLabel.Text = "[-]"
+			bindLabel.TextColor3 = C.bindRecording
+
 			local conn
-			conn=UIS.InputBegan:Connect(function(input)
+			conn = UIS.InputBegan:Connect(function(input)
 				if not isRecordingESPKeybind then return end
-				if input.UserInputType~=Enum.UserInputType.Keyboard then return end
-				if input.KeyCode==Enum.KeyCode.Escape then isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=nil;espVisualKeyName="Not Set";bindLabel.Text="[-]";bindLabel.TextColor3=C.bindText;return end
-				if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift or input.KeyCode==Enum.KeyCode.LeftControl or input.KeyCode==Enum.KeyCode.RightControl or input.KeyCode==Enum.KeyCode.LeftAlt or input.KeyCode==Enum.KeyCode.RightAlt then return end
-				isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=input.KeyCode;espVisualKeyName=input.KeyCode.Name;bindLabel.Text="["..espVisualKeyName.."]";bindLabel.TextColor3=C.bindText
+				if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+				if input.KeyCode == Enum.KeyCode.Escape then
+					isRecordingESPKeybind = false
+					conn:Disconnect()
+					espVisualKey = nil
+					espVisualKeyName = "Not Set"
+					bindLabel.Text = "[-]"
+					bindLabel.TextColor3 = C.bindText
+					return
+				end
+
+				if input.KeyCode == Enum.KeyCode.LeftShift
+					or input.KeyCode == Enum.KeyCode.RightShift
+					or input.KeyCode == Enum.KeyCode.LeftControl
+					or input.KeyCode == Enum.KeyCode.RightControl
+					or input.KeyCode == Enum.KeyCode.LeftAlt
+					or input.KeyCode == Enum.KeyCode.RightAlt then
+					return
+				end
+
+				isRecordingESPKeybind = false
+				conn:Disconnect()
+				espVisualKey = input.KeyCode
+				espVisualKeyName = input.KeyCode.Name
+				bindLabel.Text = "[" .. espVisualKeyName .. "]"
+				bindLabel.TextColor3 = C.bindText
 			end)
-			task.delay(5,function() if isRecordingESPKeybind then isRecordingESPKeybind=false;if conn then conn:Disconnect() end;bindLabel.Text=espVisualKey and("["..espVisualKeyName.."]") or "[-]";bindLabel.TextColor3=C.bindText end end)
+
+			task.delay(5, function()
+				if isRecordingESPKeybind then
+					isRecordingESPKeybind = false
+					if conn then conn:Disconnect() end
+					bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"
+					bindLabel.TextColor3 = C.bindText
+				end
+			end)
 		end
 	)
-	y=y+22
+	y = y + 22
 
-	-- Player ESP items
-	createCheckbox(playerGroup,y,"Teammates",false,function(v) end);y=y+22
-	createCheckbox(playerGroup,y,"Dormant",false,function(v) end);y=y+22
-	createCheckboxWithColor(playerGroup,y,"Bounding box",false,Color3.fromRGB(50,100,255),function(v) Box_ESP_Enabled=v end,function(c) end);y=y+22
-	createCheckbox(playerGroup,y,"Health bar",false,function(v) ESP_HPEnabled=v end);y=y+22
-	createCheckboxWithColor(playerGroup,y,"Name",false,Color3.fromRGB(50,100,255),function(v) ESP_NameEnabled=v end,function(c) end);y=y+22
-	createCheckbox(playerGroup,y,"Flags",false,function(v) end);y=y+22
-	createCheckbox(playerGroup,y,"Weapon text",false,function(v) ESP_WeaponEnabled=v end);y=y+22
-	createCheckbox(playerGroup,y,"Weapon icon",false,function(v) end);y=y+22
-	createCheckboxWithColor(playerGroup,y,"Ammo",false,Color3.fromRGB(50,100,255),function(v) end,function(c) end);y=y+22
-	createCheckbox(playerGroup,y,"Distance",false,function(v) end);y=y+22
-	createCheckboxWithColor(playerGroup,y,"Glow",false,Color3.fromRGB(255,50,100),function(v) end,function(c) end);y=y+22
-	createCheckbox(playerGroup,y,"Hit marker",false,function(v) end);y=y+22
-	createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
-	createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
+	createCheckbox(playerGroup, y, "Bounding box", false, function(v)
+		Box_ESP_Enabled = v
+	end)
+	y = y + 22
 
-	-- Other ESP group on right
-	local otherGroup=createGroup(parent,290,5,274,totalH,"Other ESP")
-	local oy=12
-	createCheckbox(otherGroup,oy,"Radar",false,function(v) end);oy=oy+22
-	createCheckboxWithColor(otherGroup,oy,"Dropped weapons",false,Color3.fromRGB(50,100,255),function(v) end,function(c) end);oy=oy+28
-	createCheckboxWithColor(otherGroup,oy,"Grenades",false,Color3.fromRGB(255,50,50),function(v) end,function(c) end);oy=oy+22
-	createCheckbox(otherGroup,oy,"Inaccuracy overlay",false,function(v) end);oy=oy+22
-	createCheckbox(otherGroup,oy,"Recoil overlay",false,function(v) end);oy=oy+22
-	createCheckbox(otherGroup,oy,"Crosshair",false,function(v) end);oy=oy+22
-	createCheckboxWithColor(otherGroup,oy,"Bomb",false,Color3.fromRGB(50,255,50),function(v) end,function(c) end);oy=oy+22
-	createCheckboxWithColor(otherGroup,oy,"Grenade trajectory",false,Color3.fromRGB(50,255,50),function(v) end,function(c) end);oy=oy+22
-	createCheckboxWithColor(otherGroup,oy,"Grenade proximity warning",false,Color3.fromRGB(255,50,50),function(v) end,function(c) end);oy=oy+22
-	createCheckbox(otherGroup,oy,"Spectators",false,function(v) end);oy=oy+22
-	createCheckbox(otherGroup,oy,"Penetration reticle",false,function(v) end);oy=oy+28
-	createCheckbox(otherGroup,oy,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
+	createCheckbox(playerGroup, y, "Health bar", false, function(v)
+		ESP_HPEnabled = v
+	end)
+	y = y + 22
+
+	createCheckbox(playerGroup, y, "Name", false, function(v)
+		ESP_NameEnabled = v
+	end)
+	y = y + 22
+
+	createCheckbox(playerGroup, y, "Weapon text", false, function(v)
+		ESP_WeaponEnabled = v
+	end)
+	y = y + 22
+
+	createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v)
+		ESP_HPDynamicEnabled = v
+	end)
+	y = y + 28
+
+	createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v)
+		ESP_MaxDistance = v
+	end)
+
+	-- Other ESP
+	local oy = 12
+	createCheckbox(otherGroup, oy, "Radar", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Grenades", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Inaccuracy overlay", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Recoil overlay", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Crosshair", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Bomb", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Grenade trajectory", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Grenade proximity warning", false, function(v) end)
+	oy = oy + 22
+	createCheckbox(otherGroup, oy, "Spectators", false, function(v) end)
+
+	-- Colored models
+	local cy = 12
+	createCheckbox(coloredGroup, cy, "Player", false, function(v) end)
+	cy = cy + 22
+	createCheckbox(coloredGroup, cy, "Player behind wall", false, function(v) end)
+	cy = cy + 22
+	createCheckbox(coloredGroup, cy, "Teammate", false, function(v) end)
+	cy = cy + 22
+	createCheckbox(coloredGroup, cy, "Teammate behind wall", false, function(v) end)
+	cy = cy + 22
+	createCheckbox(coloredGroup, cy, "Local player", false, function(v) end)
+	cy = cy + 22
+	createCheckbox(coloredGroup, cy, "Local player fake", false, function(v) end)
+
+	-- Effects
+	local ey = 12
+	createCheckbox(effectsGroup, ey, "Remove flashbang effects", false, function(v) end)
+	ey = ey + 22
+	createCheckbox(effectsGroup, ey, "Remove smoke grenades", false, function(v) end)
+	ey = ey + 22
+	createCheckbox(effectsGroup, ey, "Remove fog", false, function(v) end)
+	ey = ey + 22
+	createCheckbox(effectsGroup, ey, "Remove skybox", false, function(v) end)
+	ey = ey + 22
+	createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
+		if v then
+			startNoFall()
+		else
+			stopNoFall()
+		end
+	end)
 end
 
 -- ==================== DEFAULT PAGE ====================
