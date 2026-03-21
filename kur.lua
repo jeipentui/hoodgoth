@@ -45,25 +45,25 @@ local C = {
 	dotA        = Color3.fromRGB(12, 12, 12),
 	dotB        = Color3.fromRGB(20, 20, 20),
 	topMini     = Color3.fromRGB(40, 40, 40),
-	checkOn     = Color3.fromRGB(55, 170, 255),
+	checkOn     = Color3.fromRGB(0, 200, 0),
 	checkOff    = Color3.fromRGB(35, 35, 35),
 	sliderBg    = Color3.fromRGB(8, 8, 8),
-	sliderFill  = Color3.fromRGB(55, 170, 255),
+	sliderFill  = Color3.fromRGB(0, 200, 0),
+	sliderFill2 = Color3.fromRGB(0, 255, 50),
 	bindBg      = Color3.fromRGB(35, 35, 35),
 	bindText    = Color3.fromRGB(180, 180, 180),
 	contextBg   = Color3.fromRGB(20, 20, 20),
 	contextBorder = Color3.fromRGB(50, 50, 50),
 	contextHover = Color3.fromRGB(35, 35, 35),
-	contextDot  = Color3.fromRGB(55, 170, 255),
+	contextDot  = Color3.fromRGB(0, 200, 0),
 }
 
---==================== ФУНКЦИОНАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
+-- ==================== FUNCTIONAL VARIABLES ====================
 local aimbotEnabled = false
 local autofireEnabled = false
 local keyHeld = false
 local fov = 100
 local showFOV = false
-local fovColor = Color3.new(1,1,1)
 local wallCheckEnabled = true
 local FriendList = {}
 local NoVisualRecoilEnabled = false
@@ -71,16 +71,13 @@ local lastShotTime = 0
 local RECOIL_TAIL = 0.3
 local targetCFrame = Camera.CFrame
 local silentAimEnabled = false
-local silentAimFOV = 100
-local silentAimShowFOV = false
-local silentAimWallCheck = true
 local silentAimTarget = nil
 local lastSilentAimUpdate = 0
 local SILENT_AIM_UPDATE_INTERVAL = 0.05
 local aimlockKey = nil
 local aimlockKeyName = "Not Set"
 local aimlockKeyHeld = false
-local aimlockMode = "On hotkey" -- "Always on", "On hotkey", "Toggle", "Off hotkey"
+local aimlockMode = "On hotkey"
 local isRecordingKeybind = false
 local currentTarget = nil
 local targetLocked = false
@@ -95,19 +92,13 @@ local ESP_NameEnabled = false
 local ESP_HPDynamicEnabled = false
 local ESP_WeaponEnabled = false
 local ESP_MaxDistance = 1500
-local Settings = {ESP_Color=Color3.fromRGB(255,0,0), Friend_Color=Color3.fromRGB(0,255,0)}
+local Settings = {ESP_Color = Color3.fromRGB(255, 0, 0), Friend_Color = Color3.fromRGB(0, 255, 0)}
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
-fovCircle.Color = fovColor
+fovCircle.Color = Color3.new(1, 1, 1)
 fovCircle.Thickness = 2
 fovCircle.NumSides = 100
-
-local silentFovCircle = Drawing.new("Circle")
-silentFovCircle.Visible = false
-silentFovCircle.Color = Color3.new(1, 0, 0)
-silentFovCircle.Thickness = 2
-silentFovCircle.NumSides = 100
 
 local lastMousePos = Vector2.new()
 local lastFOV = fov
@@ -131,7 +122,7 @@ local frameCache = {
 	time = 0,
 }
 
---==================== ВСЕ ФУНКЦИИ ЛОГИКИ ====================
+-- ==================== ALL LOGIC FUNCTIONS ====================
 local function updateFrameCache()
 	frameCache.mousePos = UIS:GetMouseLocation()
 	frameCache.cameraCFrame = Camera.CFrame
@@ -148,7 +139,7 @@ local function monitorTool(tool)
 end
 
 local function setupCharacter(char)
-	local humanoid = char:WaitForChild("Humanoid")
+	char:WaitForChild("Humanoid")
 	local tool = char:FindFirstChildOfClass("Tool")
 	if tool then monitorTool(tool) end
 	char.ChildAdded:Connect(function(child)
@@ -239,32 +230,6 @@ local function WallCheck(targetHead, localChar, plr)
 		wallCheckCache[plr] = {result = result, time = frameCache.time}
 	end
 	return result
-end
-
-local function WallCheckSilentRaw(targetHead, localChar)
-	if not targetHead or not localChar then return false end
-	local origin = frameCache.cameraPos
-	local direction = (targetHead.Position - origin).Unit
-	local distanceToTarget = (targetHead.Position - origin).Magnitude
-	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {localChar, targetHead.Parent}
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.IgnoreWater = true
-	local result1 = workspace:Raycast(origin, direction * distanceToTarget, rayParams)
-	if not result1 then return true end
-	local hit1 = result1.Instance
-	if hit1:IsDescendantOf(targetHead.Parent) then return true end
-	if hit1.Name == "DFrame" or hit1.ClassName == "DFrame" then
-		local newOrigin = result1.Position + (direction * 0.5)
-		local remainingDistance = distanceToTarget - (newOrigin - origin).Magnitude
-		if remainingDistance > 0 then
-			local result2 = workspace:Raycast(newOrigin, direction * remainingDistance, rayParams)
-			if not result2 then return true end
-			if result2.Instance:IsDescendantOf(targetHead.Parent) then return true end
-			return false
-		end
-	end
-	return false
 end
 
 local weaponBulletSpeeds = {
@@ -427,12 +392,7 @@ local function updateSilentAimTarget()
 	if #candidates == 0 then silentAimTarget = nil return end
 	table.sort(candidates, function(a, b) return a.dist < b.dist end)
 	for _, c in ipairs(candidates) do
-		if silentAimWallCheck then
-			if WallCheckSilentRaw(c.head, localChar) then
-				silentAimTarget = c.head
-				return
-			end
-		else
+		if WallCheck(c.head, localChar, c.plr) then
 			silentAimTarget = c.head
 			return
 		end
@@ -462,7 +422,6 @@ local function stopNoFall()
 	if NoFallConnection then NoFallConnection:Disconnect() NoFallConnection = nil end
 end
 
--- Функция проверки активности аимбота по режиму
 local function isAimbotActive()
 	if not aimbotEnabled then return false end
 	if aimlockMode == "Always on" then
@@ -477,7 +436,7 @@ local function isAimbotActive()
 	return false
 end
 
---==================== ESP ФУНКЦИИ ====================
+-- ==================== ESP FUNCTIONS ====================
 local function cleanupPlayerESP(plr)
 	if ESP_HPText[plr] then ESP_HPText[plr].Visible = false; ESP_HPText[plr]:Remove(); ESP_HPText[plr] = nil end
 	if ESP_NameText[plr] then ESP_NameText[plr].Visible = false; ESP_NameText[plr]:Remove(); ESP_NameText[plr] = nil end
@@ -503,7 +462,7 @@ local function createESPObjects(plr)
 	local nameText = Drawing.new("Text"); nameText.Visible = false; nameText.Color = Settings.ESP_Color; nameText.Size = 9; nameText.Center = true; nameText.Outline = true; ESP_NameText[plr] = nameText
 	local weaponText = Drawing.new("Text"); weaponText.Visible = false; weaponText.Color = Settings.ESP_Color; weaponText.Size = 12; weaponText.Center = true; weaponText.Outline = true; ESP_WeaponText[plr] = weaponText
 	local box = Drawing.new("Square"); box.Visible = false; box.Thickness = 1; box.Color = Settings.ESP_Color
-	local boxoutline = Drawing.new("Square"); boxoutline.Visible = false; boxoutline.Thickness = 1; boxoutline.Color = Color3.new(0,0,0)
+	local boxoutline = Drawing.new("Square"); boxoutline.Visible = false; boxoutline.Thickness = 1; boxoutline.Color = Color3.new(0, 0, 0)
 	ESP_Boxes[plr] = {box = box, boxoutline = boxoutline}
 	characterCache[plr] = plr.Character
 end
@@ -648,14 +607,11 @@ local function initPlayer(plr)
 	if plr == lp then return end
 	plr.CharacterAdded:Connect(function() cleanupPlayerESP(plr) end)
 end
-
-for _, plr in pairs(Players:GetPlayers()) do
-	if plr ~= lp then initPlayer(plr) end
-end
+for _, plr in pairs(Players:GetPlayers()) do if plr ~= lp then initPlayer(plr) end end
 Players.PlayerAdded:Connect(function(plr) if plr ~= lp then initPlayer(plr) end end)
 Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
 
---==================== UI ПОСТРОЕНИЕ ====================
+-- ==================== UI BUILD ====================
 local function mk(class, props, parent)
 	local o = Instance.new(class)
 	for k, v in pairs(props) do o[k] = v end
@@ -694,6 +650,9 @@ local function addDotPattern(parent, colorA, colorB, tile)
 	base.Parent = parent
 	return base, img
 end
+
+-- Track slider dragging to block menu drag
+local sliderDragging = false
 
 local main = mk("Frame", {
 	Name = "Main",
@@ -737,13 +696,20 @@ mk("Frame", {
 }, body)
 
 local side = mk("Frame", {
-	Size = UDim2.fromOffset(75, 550),
+	Size = UDim2.fromOffset(75, 0),
 	Position = UDim2.fromOffset(0, 2),
 	BackgroundColor3 = C.side,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
 	ZIndex = 2
 }, body)
+
+-- Side height matches content area
+local contentHeight = 530
+local contentYStart = 20
+
+side.Size = UDim2.fromOffset(75, contentHeight)
+side.Position = UDim2.fromOffset(0, contentYStart)
 
 mk("Frame", {
 	Size = UDim2.new(0, 1, 1, 0),
@@ -754,8 +720,8 @@ mk("Frame", {
 }, side)
 
 local content = mk("Frame", {
-	Size = UDim2.fromOffset(570, 530),
-	Position = UDim2.fromOffset(82, 20),
+	Size = UDim2.fromOffset(570, contentHeight),
+	Position = UDim2.fromOffset(82, contentYStart),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
@@ -776,7 +742,8 @@ local iconHolder = mk("Frame", {
 }, side)
 
 local dragZone = mk("Frame", {
-	Size = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.new(1, 0, 0, 20),
+	Position = UDim2.fromOffset(0, 0),
 	BackgroundTransparency = 1,
 	ZIndex = 200
 }, body)
@@ -785,14 +752,12 @@ local topPadding = 20
 local bottomPadding = 30
 local iconSize = 36
 local buttonWidth = 50
-local count = #ICONS
-local availableHeight = 550 - topPadding - bottomPadding - (count * iconSize)
-local gapIcons = availableHeight / (count - 1)
+local countIcons = #ICONS
+local availableHeight = contentHeight - topPadding - bottomPadding - (countIcons * iconSize)
+local gapIcons = math.max(availableHeight / (countIcons - 1), 2)
 
 local tabButtons = {}
 local pages = {}
-
---==================== UI КОМПОНЕНТЫ (CHECKBOX, SLIDER, KEYBIND) ====================
 
 local activeContextMenu = nil
 
@@ -803,7 +768,10 @@ local function closeActiveContext()
 	end
 end
 
--- Checkbox с биндом и контекстным меню
+-- ==================== UI COMPONENTS ====================
+
+local TEXT_OFFSET = 22 -- checkbox 8px wide at x=0, text starts at 8 + 14 = 22
+
 local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bindText, onToggle, onBindClick, onContextSelect, getCurrentMode)
 	local ROW_HEIGHT = 18
 	local container = mk("Frame", {
@@ -813,7 +781,6 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		ZIndex = 5,
 	}, parent)
 
-	-- Checkbox box
 	local checkBox = mk("Frame", {
 		Size = UDim2.fromOffset(8, 8),
 		Position = UDim2.fromOffset(0, 5),
@@ -828,20 +795,20 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, checkBox)
 
-	-- Label
 	local label = mk("TextLabel", {
-		Size = UDim2.new(1, -50, 1, 0),
-		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -55, 1, 0),
+		Position = UDim2.fromOffset(TEXT_OFFSET, 0),
 		BackgroundTransparency = 1,
 		Text = labelText,
 		Font = MENU_FONT,
-		TextSize = 12,
+		TextSize = 13,
 		TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.None,
+		ClipsDescendants = false,
 		ZIndex = 6,
 	}, container)
 
-	-- Bind button
 	local bindBtn = mk("TextButton", {
 		Size = UDim2.fromOffset(30, 14),
 		Position = UDim2.new(1, -30, 0, 2),
@@ -861,7 +828,6 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, bindBtn)
 
-	-- Click area for checkbox
 	local clickArea = mk("TextButton", {
 		Size = UDim2.new(1, -35, 1, 0),
 		Position = UDim2.fromOffset(0, 0),
@@ -878,12 +844,10 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		if onToggle then onToggle(enabled) end
 	end)
 
-	-- Bind click (левая кнопка)
 	bindBtn.MouseButton1Click:Connect(function()
 		if onBindClick then onBindClick(bindBtn) end
 	end)
 
-	-- Контекстное меню (правая кнопка) 
 	bindBtn.MouseButton2Click:Connect(function()
 		closeActiveContext()
 
@@ -914,8 +878,7 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 
 			local itemBtn = mk("TextButton", {
 				Size = UDim2.new(1, -6, 0, 18),
-				Position = UDim2.fromOffset(3, 3 + (i-1) * 20),
-				BackgroundColor3 = C.contextBg,
+				Position = UDim2.fromOffset(3, 3 + (i - 1) * 20),
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Text = "",
@@ -923,7 +886,6 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 				ZIndex = 501,
 			}, ctx)
 
-			-- Точка для выбранного
 			local dot = mk("Frame", {
 				Size = UDim2.fromOffset(6, 6),
 				Position = UDim2.fromOffset(4, 6),
@@ -961,7 +923,6 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 			end)
 		end
 
-		-- Закрыть при клике вне
 		task.spawn(function()
 			task.wait(0.1)
 			local conn
@@ -993,16 +954,11 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 			enabled = val
 			checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
 		end,
-		getEnabled = function()
-			return enabled
-		end,
-		setBindText = function(txt)
-			bindBtn.Text = txt
-		end,
+		getEnabled = function() return enabled end,
+		setBindText = function(txt) bindBtn.Text = txt end,
 	}
 end
 
--- Простой Checkbox без бинда
 local function createCheckbox(parent, yPos, labelText, defaultValue, onToggle)
 	local ROW_HEIGHT = 18
 	local container = mk("Frame", {
@@ -1027,14 +983,16 @@ local function createCheckbox(parent, yPos, labelText, defaultValue, onToggle)
 	}, checkBox)
 
 	mk("TextLabel", {
-		Size = UDim2.new(1, -20, 1, 0),
-		Position = UDim2.fromOffset(14, 0),
+		Size = UDim2.new(1, -30, 1, 0),
+		Position = UDim2.fromOffset(TEXT_OFFSET, 0),
 		BackgroundTransparency = 1,
 		Text = labelText,
 		Font = MENU_FONT,
-		TextSize = 12,
+		TextSize = 13,
 		TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.None,
+		ClipsDescendants = false,
 		ZIndex = 6,
 	}, container)
 
@@ -1065,9 +1023,8 @@ local function createCheckbox(parent, yPos, labelText, defaultValue, onToggle)
 	}
 end
 
--- Slider
 local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal, suffix, onChanged)
-	local ROW_HEIGHT = 30
+	local ROW_HEIGHT = 32
 	local container = mk("Frame", {
 		Size = UDim2.new(1, -16, 0, ROW_HEIGHT),
 		Position = UDim2.fromOffset(8, yPos),
@@ -1076,24 +1033,26 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	}, parent)
 
 	mk("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 14),
+		Size = UDim2.new(0.6, 0, 0, 14),
 		Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1,
 		Text = labelText,
 		Font = MENU_FONT,
-		TextSize = 12,
+		TextSize = 13,
 		TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.None,
+		ClipsDescendants = false,
 		ZIndex = 6,
 	}, container)
 
 	local valueLabel = mk("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 14),
-		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(0.4, 0, 0, 14),
+		Position = UDim2.new(0.6, 0, 0, 0),
 		BackgroundTransparency = 1,
 		Text = tostring(defaultVal) .. (suffix or ""),
 		Font = MENU_FONT,
-		TextSize = 12,
+		TextSize = 13,
 		TextColor3 = C.textDim,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		ZIndex = 6,
@@ -1101,7 +1060,7 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 
 	local sliderTrack = mk("Frame", {
 		Size = UDim2.new(1, 0, 0, 8),
-		Position = UDim2.fromOffset(0, 16),
+		Position = UDim2.fromOffset(0, 18),
 		BackgroundColor3 = C.sliderBg,
 		BorderSizePixel = 0,
 		ZIndex = 6,
@@ -1124,7 +1083,7 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 
 	gradient(sliderFill, 0, ColorSequence.new({
 		ColorSequenceKeypoint.new(0, C.sliderFill),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 200, 255)),
+		ColorSequenceKeypoint.new(1, C.sliderFill2),
 	}))
 
 	local currentValue = defaultVal
@@ -1133,6 +1092,7 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	local function updateSlider(inputX)
 		local trackPos = sliderTrack.AbsolutePosition.X
 		local trackSize = sliderTrack.AbsoluteSize.X
+		if trackSize == 0 then return end
 		local percent = math.clamp((inputX - trackPos) / trackSize, 0, 1)
 		local value = math.floor(minVal + (maxVal - minVal) * percent)
 		currentValue = value
@@ -1152,6 +1112,7 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	sliderBtn.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
+			sliderDragging = true
 			updateSlider(input.Position.X)
 		end
 	end)
@@ -1159,12 +1120,22 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	sliderBtn.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = false
+			sliderDragging = false
 		end
 	end)
 
 	UIS.InputChanged:Connect(function(input)
 		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			updateSlider(input.Position.X)
+		end
+	end)
+
+	UIS.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if dragging then
+				dragging = false
+				sliderDragging = false
+			end
 		end
 	end)
 
@@ -1180,7 +1151,7 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	}
 end
 
---==================== GROUP BUILDER ====================
+-- ==================== GROUP BUILDER ====================
 local function createGroup(parent, x, y, w, h, titleText)
 	local g0 = mk("Frame", {
 		Size = UDim2.fromOffset(w, h),
@@ -1204,14 +1175,14 @@ local function createGroup(parent, x, y, w, h, titleText)
 		BackgroundColor3 = C.groupBg,
 		BorderSizePixel = 0,
 		ZIndex = 2,
-		ClipsDescendants = true,
+		ClipsDescendants = false,
 	}, g1)
 
 	local titleBack = mk("Frame", {
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromOffset(0, 14),
 		Position = UDim2.fromOffset(8, -7),
-		BackgroundColor3 = C.dotA,
+		BackgroundColor3 = C.groupBg,
 		BorderSizePixel = 0,
 		ZIndex = 4,
 	}, g2)
@@ -1231,21 +1202,26 @@ local function createGroup(parent, x, y, w, h, titleText)
 	return g2
 end
 
---==================== СТРАНИЦА 1 (RAGEBOT) ====================
+-- ==================== PAGE 1 (RAGEBOT) ====================
 local function buildRagebotPage(parent)
 	local pageTopPadding = 5
+	local pageBottomPadding = 10
 	local leftX = 6
 	local rightX = 290
 	local groupGap = 10
+	local totalH = contentHeight - pageTopPadding - pageBottomPadding
 
-	-- Weapon type (пустой)
-	local weaponGroup = createGroup(parent, leftX, pageTopPadding, 274, 58, "Weapon type")
+	-- Weapon type (empty)
+	local weaponGroupH = 40
+	local aimbotGroupH = totalH - weaponGroupH - groupGap
+
+	createGroup(parent, leftX, pageTopPadding, 274, weaponGroupH, "Weapon type")
 
 	-- Aimbot group
-	local aimbotGroup = createGroup(parent, leftX, pageTopPadding + 58 + groupGap, 274, 432, "Aimbot")
+	local aimbotGroup = createGroup(parent, leftX, pageTopPadding + weaponGroupH + groupGap, 274, aimbotGroupH, "Aimbot")
 
-	-- Enabled checkbox с биндом и контекстным меню
-	local aimCheckbox = createCheckboxWithBind(
+	-- Enabled with bind
+	createCheckboxWithBind(
 		aimbotGroup, 12, "Enabled", false,
 		"[-]",
 		function(val)
@@ -1255,11 +1231,11 @@ local function buildRagebotPage(parent)
 				targetLocked = false
 			end
 		end,
-		function(bindBtn) -- при нажатии на [-]
+		function(bindBtn)
 			isRecordingKeybind = true
 			bindBtn.Text = "[?]"
 			local conn
-			conn = UIS.InputBegan:Connect(function(input, gp)
+			conn = UIS.InputBegan:Connect(function(input)
 				if isRecordingKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
 					isRecordingKeybind = false
 					conn:Disconnect()
@@ -1276,107 +1252,113 @@ local function buildRagebotPage(parent)
 				end
 			end)
 		end,
-		function(mode) -- контекстное меню выбор
+		function(mode)
 			aimlockMode = mode
 		end,
-		function() -- получить текущий режим
+		function()
 			return aimlockMode
 		end
 	)
 
-	-- Silent Aim checkbox
+	-- Silent aim
 	createCheckbox(aimbotGroup, 34, "Silent aim", false, function(val)
 		silentAimEnabled = val
 		if not val then silentAimTarget = nil end
 	end)
 
-	-- FOV Slider
-	createSlider(aimbotGroup, 58, "FOV", 50, 500, 100, "px", function(val)
+	-- Other group (right, same height as both left groups combined)
+	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, totalH, "Other")
+
+	local y = 12
+	-- Wallcheck
+	createCheckbox(otherGroup, y, "Wallcheck", true, function(val)
+		wallCheckEnabled = val
+	end)
+	y = y + 22
+
+	-- Autofire
+	createCheckbox(otherGroup, y, "Autofire", false, function(val)
+		autofireEnabled = val
+	end)
+	y = y + 22
+
+	-- Remove recoil
+	createCheckbox(otherGroup, y, "Remove recoil", false, function(val)
+		if val then activateNoVisualRecoil() else deactivateNoVisualRecoil() end
+	end)
+	y = y + 28
+
+	-- FOV slider
+	createSlider(otherGroup, y, "FOV", 50, 500, 100, "px", function(val)
 		fov = val
 		FOV_RADIUS = val
 	end)
+	y = y + 38
 
-	-- Other group
-	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, 490, "Other")
-
-	-- Wallcheck
-	createCheckbox(otherGroup, 12, "Wallcheck", true, function(val)
-		wallCheckEnabled = val
-	end)
-
-	-- Autofire
-	createCheckbox(otherGroup, 34, "Autofire", false, function(val)
-		autofireEnabled = val
-	end)
-
-	-- Silent aim (в Other секции это wallcheck для silent)
-	createCheckbox(otherGroup, 56, "Silent aim wallcheck", true, function(val)
-		silentAimWallCheck = val
-	end)
-
-	-- Remove recoil
-	createCheckbox(otherGroup, 78, "Remove recoil", false, function(val)
-		if val then
-			activateNoVisualRecoil()
-		else
-			deactivateNoVisualRecoil()
-		end
+	-- Show FOV
+	createCheckbox(otherGroup, y, "Show FOV", false, function(val)
+		showFOV = val
 	end)
 end
 
---==================== DEFAULT PAGE (для остальных табов) ====================
-local function buildDefaultPage(parent)
-	local pageTopPadding = 5
-	local pageBottomPadding = 20
-	local pageHeight = 530
-	local usableHeight = pageHeight - pageTopPadding - pageBottomPadding
-	local leftX = 6
-	local rightX = 290
-	local leftW = 274
-	local rightW = 274
-	local groupGap = 10
-
-	local leftTopH = 225
-	local leftBottomH = usableHeight - leftTopH - groupGap
-
-	local rightTopH = 155
-	local rightMidH = 155
-	local rightBottomH = usableHeight - rightTopH - rightMidH - (groupGap * 2)
-
-	createGroup(parent, leftX, pageTopPadding, leftW, leftTopH, "Player ESP")
-	createGroup(parent, leftX, pageTopPadding + leftTopH + groupGap, leftW, leftBottomH, "Self ESP")
-	createGroup(parent, rightX, pageTopPadding, rightW, rightTopH, "World")
-	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap, rightW, rightMidH, "Hud")
-	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap + rightMidH + groupGap, rightW, rightBottomH, "Other")
-end
-
---==================== СТРАНИЦА 3 (ESP) ====================
+-- ==================== PAGE 3 (ESP) ====================
 local function buildESPPage(parent)
 	local pageTopPadding = 5
+	local pageBottomPadding = 10
 	local leftX = 6
 	local rightX = 290
 	local groupGap = 10
+	local totalH = contentHeight - pageTopPadding - pageBottomPadding
 
-	local espGroup = createGroup(parent, leftX, pageTopPadding, 274, 300, "ESP Settings")
+	local espGroup = createGroup(parent, leftX, pageTopPadding, 274, totalH, "ESP Settings")
 
-	createCheckbox(espGroup, 12, "Health ESP", false, function(val) ESP_HPEnabled = val end)
-	createCheckbox(espGroup, 34, "Dynamic HP color", false, function(val) ESP_HPDynamicEnabled = val end)
-	createCheckbox(espGroup, 56, "Box ESP", false, function(val) Box_ESP_Enabled = val end)
-	createCheckbox(espGroup, 78, "Name ESP", false, function(val) ESP_NameEnabled = val end)
-	createCheckbox(espGroup, 100, "Weapon ESP", false, function(val) ESP_WeaponEnabled = val end)
+	local y = 12
+	createCheckbox(espGroup, y, "Health ESP", false, function(val) ESP_HPEnabled = val end)
+	y = y + 22
+	createCheckbox(espGroup, y, "Dynamic HP color", false, function(val) ESP_HPDynamicEnabled = val end)
+	y = y + 22
+	createCheckbox(espGroup, y, "Box ESP", false, function(val) Box_ESP_Enabled = val end)
+	y = y + 22
+	createCheckbox(espGroup, y, "Name ESP", false, function(val) ESP_NameEnabled = val end)
+	y = y + 22
+	createCheckbox(espGroup, y, "Weapon ESP", false, function(val) ESP_WeaponEnabled = val end)
+	y = y + 28
 
-	createSlider(espGroup, 128, "Max distance", 1, 1500, 1500, " studs", function(val)
+	createSlider(espGroup, y, "Max distance", 1, 1500, 1500, " studs", function(val)
 		ESP_MaxDistance = val
 	end)
 
-	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, 200, "Other")
+	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, totalH, "Other")
 
 	createCheckbox(otherGroup, 12, "NoFall protection", false, function(val)
 		if val then startNoFall() else stopNoFall() end
 	end)
 end
 
---==================== CREATE TABS ====================
+-- ==================== DEFAULT PAGE ====================
+local function buildDefaultPage(parent)
+	local pageTopPadding = 5
+	local pageBottomPadding = 10
+	local leftX = 6
+	local rightX = 290
+	local groupGap = 10
+	local totalH = contentHeight - pageTopPadding - pageBottomPadding
+
+	local leftTopH = math.floor(totalH * 0.45)
+	local leftBottomH = totalH - leftTopH - groupGap
+
+	local rightTopH = math.floor(totalH * 0.3)
+	local rightMidH = math.floor(totalH * 0.3)
+	local rightBottomH = totalH - rightTopH - rightMidH - (groupGap * 2)
+
+	createGroup(parent, leftX, pageTopPadding, 274, leftTopH, "Player ESP")
+	createGroup(parent, leftX, pageTopPadding + leftTopH + groupGap, 274, leftBottomH, "Self ESP")
+	createGroup(parent, rightX, pageTopPadding, 274, rightTopH, "World")
+	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap, 274, rightMidH, "Hud")
+	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap + rightMidH + groupGap, 274, rightBottomH, "Other")
+end
+
+-- ==================== CREATE TABS ====================
 local function createTab(index, imageId)
 	local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
 
@@ -1461,13 +1443,13 @@ gradient(topLine, 0, ColorSequence.new({
 	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(170, 255, 0)),
 }))
 
--- Dragging
+-- Dragging (blocked when slider is being dragged)
 do
 	local dragging = false
 	local dragStart, startPos
 
 	dragZone.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 and not sliderDragging then
 			dragging = true
 			dragStart = input.Position
 			startPos = main.Position
@@ -1481,7 +1463,7 @@ do
 	end)
 
 	UIS.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		if dragging and not sliderDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
 			main.Position = UDim2.new(
 				startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -1491,7 +1473,7 @@ do
 	end)
 end
 
---==================== INPUT HANDLER ====================
+-- ==================== INPUT HANDLER ====================
 UIS.InputBegan:Connect(function(input, gp)
 	if gp then return end
 
@@ -1504,7 +1486,6 @@ UIS.InputBegan:Connect(function(input, gp)
 
 	if aimlockKey and input.KeyCode == aimlockKey then
 		aimlockKeyHeld = true
-
 		if aimlockMode == "Toggle" then
 			keyHeld = not keyHeld
 		elseif aimlockMode == "On hotkey" then
@@ -1520,7 +1501,6 @@ end)
 UIS.InputEnded:Connect(function(input)
 	if aimlockKey and input.KeyCode == aimlockKey then
 		aimlockKeyHeld = false
-
 		if aimlockMode == "On hotkey" then
 			keyHeld = false
 			currentTarget = nil
@@ -1531,7 +1511,7 @@ UIS.InputEnded:Connect(function(input)
 	end
 end)
 
---==================== MAIN RENDER LOOP ====================
+-- ==================== MAIN RENDER LOOP ====================
 local currentTool
 local lastSilentShot = 0
 local SILENT_FIRE_RATE = 0.08
@@ -1539,7 +1519,6 @@ local SILENT_FIRE_RATE = 0.08
 RunService.RenderStepped:Connect(function()
 	updateFrameCache()
 
-	-- Определяем активен ли аимбот
 	local aimActive = isAimbotActive()
 
 	-- Silent Aim
@@ -1571,7 +1550,7 @@ RunService.RenderStepped:Connect(function()
 		fovCircle.Visible = false
 	end
 
-	-- Regular Aimbot (не silent)
+	-- Regular Aimbot (not silent)
 	if aimbotEnabled and not silentAimEnabled and aimActive then
 		local targetHead = getTarget()
 
