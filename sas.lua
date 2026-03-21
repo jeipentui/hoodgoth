@@ -583,13 +583,11 @@ local function buildPlayerESPPage(parent)
 	local totalH=contentHeight-15
 	local playerGroup=createGroup(parent,6,5,274,totalH,"Player ESP")
 
-	-- Activation type with bind at top
 	local y=12
+	-- Activation type with bind
 	createCheckboxWithBindSimple(playerGroup,y,"Activation type",false,"[-]",
 		function(val) espVisualEnabled=val
-			if not val then
-				for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
-			end
+			if not val then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
 		end,
 		function(bindLabel)
 			if isRecordingESPKeybind then return end
@@ -607,16 +605,37 @@ local function buildPlayerESPPage(parent)
 	)
 	y=y+22
 
-	createCheckbox(playerGroup,y,"Bounding box",false,function(v) Box_ESP_Enabled=v end);y=y+22
+	-- Player ESP items
+	createCheckbox(playerGroup,y,"Teammates",false,function(v) end);y=y+22
+	createCheckbox(playerGroup,y,"Dormant",false,function(v) end);y=y+22
+	createCheckboxWithColor(playerGroup,y,"Bounding box",false,Color3.fromRGB(50,100,255),function(v) Box_ESP_Enabled=v end,function(c) end);y=y+22
 	createCheckbox(playerGroup,y,"Health bar",false,function(v) ESP_HPEnabled=v end);y=y+22
-	createCheckbox(playerGroup,y,"Name",false,function(v) ESP_NameEnabled=v end);y=y+22
+	createCheckboxWithColor(playerGroup,y,"Name",false,Color3.fromRGB(50,100,255),function(v) ESP_NameEnabled=v end,function(c) end);y=y+22
+	createCheckbox(playerGroup,y,"Flags",false,function(v) end);y=y+22
 	createCheckbox(playerGroup,y,"Weapon text",false,function(v) ESP_WeaponEnabled=v end);y=y+22
+	createCheckbox(playerGroup,y,"Weapon icon",false,function(v) end);y=y+22
+	createCheckboxWithColor(playerGroup,y,"Ammo",false,Color3.fromRGB(50,100,255),function(v) end,function(c) end);y=y+22
+	createCheckbox(playerGroup,y,"Distance",false,function(v) end);y=y+22
+	createCheckboxWithColor(playerGroup,y,"Glow",false,Color3.fromRGB(255,50,100),function(v) end,function(c) end);y=y+22
+	createCheckbox(playerGroup,y,"Hit marker",false,function(v) end);y=y+22
 	createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
-	createSlider(playerGroup,y,"Distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
+	createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
 
 	-- Other ESP group on right
 	local otherGroup=createGroup(parent,290,5,274,totalH,"Other ESP")
-	createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
+	local oy=12
+	createCheckbox(otherGroup,oy,"Radar",false,function(v) end);oy=oy+22
+	createCheckboxWithColor(otherGroup,oy,"Dropped weapons",false,Color3.fromRGB(50,100,255),function(v) end,function(c) end);oy=oy+28
+	createCheckboxWithColor(otherGroup,oy,"Grenades",false,Color3.fromRGB(255,50,50),function(v) end,function(c) end);oy=oy+22
+	createCheckbox(otherGroup,oy,"Inaccuracy overlay",false,function(v) end);oy=oy+22
+	createCheckbox(otherGroup,oy,"Recoil overlay",false,function(v) end);oy=oy+22
+	createCheckbox(otherGroup,oy,"Crosshair",false,function(v) end);oy=oy+22
+	createCheckboxWithColor(otherGroup,oy,"Bomb",false,Color3.fromRGB(50,255,50),function(v) end,function(c) end);oy=oy+22
+	createCheckboxWithColor(otherGroup,oy,"Grenade trajectory",false,Color3.fromRGB(50,255,50),function(v) end,function(c) end);oy=oy+22
+	createCheckboxWithColor(otherGroup,oy,"Grenade proximity warning",false,Color3.fromRGB(255,50,50),function(v) end,function(c) end);oy=oy+22
+	createCheckbox(otherGroup,oy,"Spectators",false,function(v) end);oy=oy+22
+	createCheckbox(otherGroup,oy,"Penetration reticle",false,function(v) end);oy=oy+28
+	createCheckbox(otherGroup,oy,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 -- ==================== DEFAULT PAGE ====================
