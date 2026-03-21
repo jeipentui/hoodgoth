@@ -71,6 +71,8 @@ local espVisualEnabled = false
 local espVisualKey = nil
 local espVisualKeyName = "Not Set"
 local isRecordingESPKeybind = false
+local espVisualMode = "On hotkey"
+local espVisualKeyHeld = false
 
 local Box_ESP_Enabled=false
 local ESP_HPEnabled=false
@@ -259,6 +261,13 @@ local function isAimbotActive()
 	elseif aimlockMode=="Off hotkey" then return not aimlockKeyHeld end;return false
 end
 
+local function isESPActive()
+	if espVisualMode=="Always on" then return true
+	elseif espVisualMode=="On hotkey" then return espVisualKeyHeld
+	elseif espVisualMode=="Toggle" then return espVisualEnabled
+	elseif espVisualMode=="Off hotkey" then return not espVisualKeyHeld end;return false
+end
+
 local function cleanupPlayerESP(plr)
 	if ESP_HPText[plr] then ESP_HPText[plr].Visible=false;ESP_HPText[plr]:Remove();ESP_HPText[plr]=nil end
 	if ESP_NameText[plr] then ESP_NameText[plr].Visible=false;ESP_NameText[plr]:Remove();ESP_NameText[plr]=nil end
@@ -309,7 +318,7 @@ local function cacheViewportPoints()
 	end
 end
 local function updatePlayerESP(plr)
-	if not espVisualEnabled then hidePlayerESP(plr);return end
+	if not isESPActive() then hidePlayerESP(plr);return end
 	if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then hidePlayerESP(plr);return end
 	local char=plr.Character;if not char then cleanupPlayerESP(plr);return end
 	local h=char:FindFirstChild("Humanoid");if not h or h.Health<=0 then cleanupPlayerESP(plr);return end
@@ -361,7 +370,7 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=20;local bottomPadding=30;local iconSize=36;local buttonWidth=50
+local topPadding=20;local bottomPadding=20;local iconSize=36;local buttonWidth=50
 local countIcons=#ICONS
 local gapIcons=math.max((contentHeight-topPadding-bottomPadding-countIcons*iconSize)/(countIcons-1),2)
 
@@ -422,21 +431,6 @@ local function createCheckboxWithBind(parent,yPos,labelText,defaultValue,bindTex
 			openContextMenu(bindLabel,{"Always on","On hotkey","Toggle","Off hotkey"},getCurrentMode,function(mode) if onContextSelect then onContextSelect(mode) end end)
 		end)
 	end
-	return{setEnabled=function(v) enabled=v;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff end,getEnabled=function() return enabled end,setBindText=function(t) bindLabel.Text=t end}
-end
-
--- Simple bind checkbox without context menu (for ESP Activation type)
-local function createCheckboxWithBindSimple(parent,yPos,labelText,defaultValue,bindText,onToggle,onBindClick)
-	local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
-	local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=defaultValue and C.checkOn or C.checkOff,BorderSizePixel=0,ZIndex=6},container)
-	mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
-	mk("TextLabel",{Size=UDim2.new(1,-55,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
-	local bindLabel=mk("TextLabel",{Size=UDim2.fromOffset(40,14),Position=UDim2.new(1,-40,0,2),BackgroundTransparency=1,Text=bindText or "[-]",Font=MENU_FONT,TextSize=11,TextColor3=C.bindText,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=7},container)
-	local bindClickArea=mk("TextButton",{Size=UDim2.fromOffset(40,18),Position=UDim2.new(1,-40,0,0),BackgroundTransparency=1,Text="",ZIndex=9},container)
-	local clickArea=mk("TextButton",{Size=UDim2.new(1,-45,1,0),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,Text="",ZIndex=8},container)
-	local enabled=defaultValue
-	clickArea.MouseButton1Click:Connect(function() enabled=not enabled;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff;if onToggle then onToggle(enabled) end end)
-	bindClickArea.MouseButton1Click:Connect(function() if onBindClick then onBindClick(bindLabel) end end)
 	return{setEnabled=function(v) enabled=v;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff end,getEnabled=function() return enabled end,setBindText=function(t) bindLabel.Text=t end}
 end
 
@@ -563,7 +557,7 @@ local function buildRagebotPage(parent)
 	createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
--- ==================== PAGE 3 (ESP Settings - old page moved here) ====================
+-- ==================== PAGE 3 (ESP Settings) ====================
 local function buildESPSettingsPage(parent)
 	local totalH=contentHeight-15
 	local espGroup=createGroup(parent,6,5,274,totalH,"ESP Settings")
@@ -578,157 +572,61 @@ local function buildESPSettingsPage(parent)
 	createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
--- ==================== PAGE 4 (Player ESP - NEW) ====================
+-- ==================== PAGE 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
-	local leftX = 6
-	local rightX = 290
+	local leftX=6
+	local rightX=290
 
-	local playerGroup = createGroup(parent, leftX, 5, 250, 270, "Player ESP")
-	local otherGroup = createGroup(parent, rightX, 5, 250, 250, "Other ESP")
-	local coloredGroup = createGroup(parent, leftX, 295, 250, 220, "Colored models")
-	local effectsGroup = createGroup(parent, rightX, 280, 250, 250, "Effects")
+	local playerGroup=createGroup(parent,leftX,5,250,270,"Player ESP")
 
-	-- Player ESP
-	local y = 12
-	createCheckboxWithBindSimple(playerGroup, y, "Activation type", false, "[-]",
+	local y=12
+	createCheckboxWithBind(playerGroup,y,"Activation type",false,"[-]",
 		function(val)
-			espVisualEnabled = val
+			espVisualEnabled=val
 			if not val then
-				for plr, _ in pairs(ESP_HPText) do
-					hidePlayerESP(plr)
-				end
+				for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
 			end
 		end,
 		function(bindLabel)
 			if isRecordingESPKeybind then return end
-			isRecordingESPKeybind = true
-			bindLabel.Text = "[-]"
-			bindLabel.TextColor3 = C.bindRecording
-
+			isRecordingESPKeybind=true
+			bindLabel.Text="[-]"
+			bindLabel.TextColor3=C.bindRecording
 			local conn
-			conn = UIS.InputBegan:Connect(function(input)
+			conn=UIS.InputBegan:Connect(function(input)
 				if not isRecordingESPKeybind then return end
-				if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-
-				if input.KeyCode == Enum.KeyCode.Escape then
-					isRecordingESPKeybind = false
-					conn:Disconnect()
-					espVisualKey = nil
-					espVisualKeyName = "Not Set"
-					bindLabel.Text = "[-]"
-					bindLabel.TextColor3 = C.bindText
-					return
+				if input.UserInputType~=Enum.UserInputType.Keyboard then return end
+				if input.KeyCode==Enum.KeyCode.Escape then
+					isRecordingESPKeybind=false;conn:Disconnect()
+					espVisualKey=nil;espVisualKeyName="Not Set"
+					bindLabel.Text="[-]";bindLabel.TextColor3=C.bindText;return
 				end
-
-				if input.KeyCode == Enum.KeyCode.LeftShift
-					or input.KeyCode == Enum.KeyCode.RightShift
-					or input.KeyCode == Enum.KeyCode.LeftControl
-					or input.KeyCode == Enum.KeyCode.RightControl
-					or input.KeyCode == Enum.KeyCode.LeftAlt
-					or input.KeyCode == Enum.KeyCode.RightAlt then
-					return
-				end
-
-				isRecordingESPKeybind = false
-				conn:Disconnect()
-				espVisualKey = input.KeyCode
-				espVisualKeyName = input.KeyCode.Name
-				bindLabel.Text = "[" .. espVisualKeyName .. "]"
-				bindLabel.TextColor3 = C.bindText
+				if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift
+					or input.KeyCode==Enum.KeyCode.LeftControl or input.KeyCode==Enum.KeyCode.RightControl
+					or input.KeyCode==Enum.KeyCode.LeftAlt or input.KeyCode==Enum.KeyCode.RightAlt then return end
+				isRecordingESPKeybind=false;conn:Disconnect()
+				espVisualKey=input.KeyCode;espVisualKeyName=input.KeyCode.Name
+				bindLabel.Text="["..espVisualKeyName.."]";bindLabel.TextColor3=C.bindText
 			end)
-
-			task.delay(5, function()
+			task.delay(5,function()
 				if isRecordingESPKeybind then
-					isRecordingESPKeybind = false
-					if conn then conn:Disconnect() end
-					bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"
-					bindLabel.TextColor3 = C.bindText
+					isRecordingESPKeybind=false;if conn then conn:Disconnect() end
+					bindLabel.Text=espVisualKey and("["..espVisualKeyName.."]") or "[-]"
+					bindLabel.TextColor3=C.bindText
 				end
 			end)
-		end
+		end,
+		function(mode) espVisualMode=mode end,
+		function() return espVisualMode end
 	)
-	y = y + 22
+	y=y+22
 
-	createCheckbox(playerGroup, y, "Bounding box", false, function(v)
-		Box_ESP_Enabled = v
-	end)
-	y = y + 22
-
-	createCheckbox(playerGroup, y, "Health bar", false, function(v)
-		ESP_HPEnabled = v
-	end)
-	y = y + 22
-
-	createCheckbox(playerGroup, y, "Name", false, function(v)
-		ESP_NameEnabled = v
-	end)
-	y = y + 22
-
-	createCheckbox(playerGroup, y, "Weapon text", false, function(v)
-		ESP_WeaponEnabled = v
-	end)
-	y = y + 22
-
-	createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v)
-		ESP_HPDynamicEnabled = v
-	end)
-	y = y + 28
-
-	createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v)
-		ESP_MaxDistance = v
-	end)
-
-	-- Other ESP
-	local oy = 12
-	createCheckbox(otherGroup, oy, "Radar", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Grenades", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Inaccuracy overlay", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Recoil overlay", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Crosshair", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Bomb", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Grenade trajectory", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Grenade proximity warning", false, function(v) end)
-	oy = oy + 22
-	createCheckbox(otherGroup, oy, "Spectators", false, function(v) end)
-
-	-- Colored models
-	local cy = 12
-	createCheckbox(coloredGroup, cy, "Player", false, function(v) end)
-	cy = cy + 22
-	createCheckbox(coloredGroup, cy, "Player behind wall", false, function(v) end)
-	cy = cy + 22
-	createCheckbox(coloredGroup, cy, "Teammate", false, function(v) end)
-	cy = cy + 22
-	createCheckbox(coloredGroup, cy, "Teammate behind wall", false, function(v) end)
-	cy = cy + 22
-	createCheckbox(coloredGroup, cy, "Local player", false, function(v) end)
-	cy = cy + 22
-	createCheckbox(coloredGroup, cy, "Local player fake", false, function(v) end)
-
-	-- Effects
-	local ey = 12
-	createCheckbox(effectsGroup, ey, "Remove flashbang effects", false, function(v) end)
-	ey = ey + 22
-	createCheckbox(effectsGroup, ey, "Remove smoke grenades", false, function(v) end)
-	ey = ey + 22
-	createCheckbox(effectsGroup, ey, "Remove fog", false, function(v) end)
-	ey = ey + 22
-	createCheckbox(effectsGroup, ey, "Remove skybox", false, function(v) end)
-	ey = ey + 22
-	createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
-		if v then
-			startNoFall()
-		else
-			stopNoFall()
-		end
-	end)
+	createCheckbox(playerGroup,y,"Bounding box",false,function(v) Box_ESP_Enabled=v end);y=y+22
+	createCheckbox(playerGroup,y,"Health bar",false,function(v) ESP_HPEnabled=v end);y=y+22
+	createCheckbox(playerGroup,y,"Name",false,function(v) ESP_NameEnabled=v end);y=y+22
+	createCheckbox(playerGroup,y,"Weapon text",false,function(v) ESP_WeaponEnabled=v end);y=y+22
+	createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
+	createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
 end
 
 -- ==================== DEFAULT PAGE ====================
@@ -779,11 +677,14 @@ UIS.InputBegan:Connect(function(input,gp)
 	if input.KeyCode==Enum.KeyCode.K then gui.Enabled=not gui.Enabled;return end
 	if isRecordingKeybind or isRecordingESPKeybind then return end
 
-	-- ESP visual toggle key
 	if espVisualKey and input.KeyCode==espVisualKey then
-		espVisualEnabled=not espVisualEnabled
-		if not espVisualEnabled then
-			for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
+		if espVisualMode=="Toggle" then
+			espVisualEnabled=not espVisualEnabled
+			if not espVisualEnabled then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
+		elseif espVisualMode=="On hotkey" then
+			espVisualKeyHeld=true
+		elseif espVisualMode=="Off hotkey" then
+			espVisualKeyHeld=true
 		end
 	end
 
@@ -796,6 +697,13 @@ UIS.InputBegan:Connect(function(input,gp)
 end)
 
 UIS.InputEnded:Connect(function(input)
+	if espVisualKey and input.KeyCode==espVisualKey then
+		if espVisualMode=="On hotkey" then
+			espVisualKeyHeld=false
+		elseif espVisualMode=="Off hotkey" then
+			espVisualKeyHeld=false
+		end
+	end
 	if aimlockKey and input.KeyCode==aimlockKey then
 		aimlockKeyHeld=false
 		if aimlockMode=="On hotkey" then keyHeld=false;currentTarget=nil;targetLocked=false
