@@ -50,12 +50,13 @@ local C = {
 	sliderBg    = Color3.fromRGB(8, 8, 8),
 	sliderFill  = Color3.fromRGB(0, 200, 0),
 	sliderFill2 = Color3.fromRGB(0, 255, 50),
-	bindBg      = Color3.fromRGB(35, 35, 35),
 	bindText    = Color3.fromRGB(180, 180, 180),
+	bindRecording = Color3.fromRGB(255, 50, 50),
 	contextBg   = Color3.fromRGB(20, 20, 20),
 	contextBorder = Color3.fromRGB(50, 50, 50),
 	contextHover = Color3.fromRGB(35, 35, 35),
-	contextDot  = Color3.fromRGB(0, 200, 0),
+	contextSelected = Color3.fromRGB(0, 200, 0),
+	contextUnselected = Color3.fromRGB(120, 120, 120),
 }
 
 -- ==================== FUNCTIONAL VARIABLES ====================
@@ -99,9 +100,6 @@ fovCircle.Visible = false
 fovCircle.Color = Color3.new(1, 1, 1)
 fovCircle.Thickness = 2
 fovCircle.NumSides = 100
-
-local lastMousePos = Vector2.new()
-local lastFOV = fov
 
 local ESP_HPText = {}
 local ESP_NameText = {}
@@ -424,14 +422,10 @@ end
 
 local function isAimbotActive()
 	if not aimbotEnabled then return false end
-	if aimlockMode == "Always on" then
-		return true
-	elseif aimlockMode == "On hotkey" then
-		return aimlockKeyHeld
-	elseif aimlockMode == "Toggle" then
-		return keyHeld
-	elseif aimlockMode == "Off hotkey" then
-		return not aimlockKeyHeld
+	if aimlockMode == "Always on" then return true
+	elseif aimlockMode == "On hotkey" then return aimlockKeyHeld
+	elseif aimlockMode == "Toggle" then return keyHeld
+	elseif aimlockMode == "Off hotkey" then return not aimlockKeyHeld
 	end
 	return false
 end
@@ -481,12 +475,8 @@ local function updatePlayersInRangeCache()
 				local dist = (cameraPos - hrp.Position).Magnitude
 				playersInRange[plr] = dist <= ESP_MaxDistance
 				if not playersInRange[plr] then hidePlayerESP(plr) end
-			else
-				playersInRange[plr] = false
-			end
-		else
-			playersInRange[plr] = false
-		end
+			else playersInRange[plr] = false end
+		else playersInRange[plr] = false end
 	end
 end
 
@@ -592,15 +582,9 @@ local function updatePlayerESP(plr)
 				boxes.boxoutline.Size = Vector2.new(w + 2, h + 2)
 				boxes.boxoutline.Color = Color3.new(0, 0, 0)
 				boxes.boxoutline.Visible = true
-			else
-				boxes.box.Visible = false; boxes.boxoutline.Visible = false
-			end
-		else
-			boxes.box.Visible = false; boxes.boxoutline.Visible = false
-		end
-	elseif boxes then
-		boxes.box.Visible = false; boxes.boxoutline.Visible = false
-	end
+			else boxes.box.Visible = false; boxes.boxoutline.Visible = false end
+		else boxes.box.Visible = false; boxes.boxoutline.Visible = false end
+	elseif boxes then boxes.box.Visible = false; boxes.boxoutline.Visible = false end
 end
 
 local function initPlayer(plr)
@@ -639,7 +623,6 @@ local function addDotPattern(parent, colorA, colorB, tile)
 	img.ScaleType = Enum.ScaleType.Tile
 	img.TileSize = UDim2.fromOffset(tile or 6, tile or 6)
 	img.ImageColor3 = colorB or Color3.fromRGB(20, 20, 20)
-	img.ImageTransparency = 0
 	img.Parent = parent
 	local base = Instance.new("Frame")
 	base.Name = "DotBase"
@@ -651,7 +634,6 @@ local function addDotPattern(parent, colorA, colorB, tile)
 	return base, img
 end
 
--- Track slider dragging to block menu drag
 local sliderDragging = false
 
 local main = mk("Frame", {
@@ -695,21 +677,17 @@ mk("Frame", {
 	ZIndex = 50
 }, body)
 
+local contentHeight = 530
+local contentYStart = 20
+
 local side = mk("Frame", {
-	Size = UDim2.fromOffset(75, 0),
-	Position = UDim2.fromOffset(0, 2),
+	Size = UDim2.fromOffset(75, contentHeight),
+	Position = UDim2.fromOffset(0, contentYStart),
 	BackgroundColor3 = C.side,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
 	ZIndex = 2
 }, body)
-
--- Side height matches content area
-local contentHeight = 530
-local contentYStart = 20
-
-side.Size = UDim2.fromOffset(75, contentHeight)
-side.Position = UDim2.fromOffset(0, contentYStart)
 
 mk("Frame", {
 	Size = UDim2.new(0, 1, 1, 0),
@@ -758,7 +736,6 @@ local gapIcons = math.max(availableHeight / (countIcons - 1), 2)
 
 local tabButtons = {}
 local pages = {}
-
 local activeContextMenu = nil
 
 local function closeActiveContext()
@@ -769,8 +746,7 @@ local function closeActiveContext()
 end
 
 -- ==================== UI COMPONENTS ====================
-
-local TEXT_OFFSET = 22 -- checkbox 8px wide at x=0, text starts at 8 + 14 = 22
+local TEXT_OFFSET = 22
 
 local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bindText, onToggle, onBindClick, onContextSelect, getCurrentMode)
 	local ROW_HEIGHT = 18
@@ -795,7 +771,7 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, checkBox)
 
-	local label = mk("TextLabel", {
+	mk("TextLabel", {
 		Size = UDim2.new(1, -55, 1, 0),
 		Position = UDim2.fromOffset(TEXT_OFFSET, 0),
 		BackgroundTransparency = 1,
@@ -809,27 +785,30 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		ZIndex = 6,
 	}, container)
 
-	local bindBtn = mk("TextButton", {
-		Size = UDim2.fromOffset(30, 14),
-		Position = UDim2.new(1, -30, 0, 2),
-		BackgroundColor3 = C.bindBg,
-		BorderSizePixel = 0,
+	-- Bind as plain text, no background box
+	local bindLabel = mk("TextLabel", {
+		Size = UDim2.fromOffset(40, 14),
+		Position = UDim2.new(1, -40, 0, 2),
+		BackgroundTransparency = 1,
 		Text = bindText or "[-]",
 		Font = MENU_FONT,
 		TextSize = 11,
 		TextColor3 = C.bindText,
-		AutoButtonColor = false,
+		TextXAlignment = Enum.TextXAlignment.Right,
 		ZIndex = 7,
 	}, container)
 
-	mk("UIStroke", {
-		Color = Color3.fromRGB(3, 3, 3),
-		Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, bindBtn)
+	-- Invisible button over bind text for clicks
+	local bindClickArea = mk("TextButton", {
+		Size = UDim2.fromOffset(40, 18),
+		Position = UDim2.new(1, -40, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 9,
+	}, container)
 
 	local clickArea = mk("TextButton", {
-		Size = UDim2.new(1, -35, 1, 0),
+		Size = UDim2.new(1, -45, 1, 0),
 		Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1,
 		Text = "",
@@ -844,21 +823,21 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 		if onToggle then onToggle(enabled) end
 	end)
 
-	bindBtn.MouseButton1Click:Connect(function()
-		if onBindClick then onBindClick(bindBtn) end
+	bindClickArea.MouseButton1Click:Connect(function()
+		if onBindClick then onBindClick(bindLabel) end
 	end)
 
-	bindBtn.MouseButton2Click:Connect(function()
+	bindClickArea.MouseButton2Click:Connect(function()
 		closeActiveContext()
 
 		local modes = {"Always on", "On hotkey", "Toggle", "Off hotkey"}
 		local ctxHeight = #modes * 20 + 6
 		local ctxWidth = 90
 
-		local absPos = bindBtn.AbsolutePosition
+		local absPos = bindLabel.AbsolutePosition
 		local ctx = mk("Frame", {
 			Size = UDim2.fromOffset(ctxWidth, ctxHeight),
-			Position = UDim2.fromOffset(absPos.X - ctxWidth - 2, absPos.Y),
+			Position = UDim2.fromOffset(absPos.X - ctxWidth - 5, absPos.Y),
 			BackgroundColor3 = C.contextBg,
 			BorderSizePixel = 0,
 			ZIndex = 500,
@@ -886,24 +865,14 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 				ZIndex = 501,
 			}, ctx)
 
-			local dot = mk("Frame", {
-				Size = UDim2.fromOffset(6, 6),
-				Position = UDim2.fromOffset(4, 6),
-				BackgroundColor3 = isSelected and C.contextDot or Color3.fromRGB(50, 50, 50),
-				BorderSizePixel = 0,
-				ZIndex = 502,
-			}, itemBtn)
-
-			mk("UICorner", {CornerRadius = UDim.new(0, 3)}, dot)
-
 			mk("TextLabel", {
-				Size = UDim2.new(1, -16, 1, 0),
-				Position = UDim2.fromOffset(14, 0),
+				Size = UDim2.new(1, -4, 1, 0),
+				Position = UDim2.fromOffset(4, 0),
 				BackgroundTransparency = 1,
 				Text = mode,
 				Font = MENU_FONT,
 				TextSize = 11,
-				TextColor3 = isSelected and C.contextDot or C.text,
+				TextColor3 = isSelected and C.contextSelected or C.contextUnselected,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = 502,
 			}, itemBtn)
@@ -948,14 +917,13 @@ local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bin
 	return {
 		container = container,
 		checkBox = checkBox,
-		label = label,
-		bindBtn = bindBtn,
+		bindLabel = bindLabel,
 		setEnabled = function(val)
 			enabled = val
 			checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
 		end,
 		getEnabled = function() return enabled end,
-		setBindText = function(txt) bindBtn.Text = txt end,
+		setBindText = function(txt) bindLabel.Text = txt end,
 	}
 end
 
@@ -1131,11 +1099,9 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	end)
 
 	UIS.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			if dragging then
-				dragging = false
-				sliderDragging = false
-			end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
+			dragging = false
+			sliderDragging = false
 		end
 	end)
 
@@ -1211,16 +1177,13 @@ local function buildRagebotPage(parent)
 	local groupGap = 10
 	local totalH = contentHeight - pageTopPadding - pageBottomPadding
 
-	-- Weapon type (empty)
 	local weaponGroupH = 40
 	local aimbotGroupH = totalH - weaponGroupH - groupGap
 
 	createGroup(parent, leftX, pageTopPadding, 274, weaponGroupH, "Weapon type")
 
-	-- Aimbot group
 	local aimbotGroup = createGroup(parent, leftX, pageTopPadding + weaponGroupH + groupGap, 274, aimbotGroupH, "Aimbot")
 
-	-- Enabled with bind
 	createCheckboxWithBind(
 		aimbotGroup, 12, "Enabled", false,
 		"[-]",
@@ -1231,9 +1194,10 @@ local function buildRagebotPage(parent)
 				targetLocked = false
 			end
 		end,
-		function(bindBtn)
+		function(bindLabel)
 			isRecordingKeybind = true
-			bindBtn.Text = "[?]"
+			bindLabel.Text = "[-]"
+			bindLabel.TextColor3 = C.bindRecording
 			local conn
 			conn = UIS.InputBegan:Connect(function(input)
 				if isRecordingKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -1241,14 +1205,16 @@ local function buildRagebotPage(parent)
 					conn:Disconnect()
 					aimlockKey = input.KeyCode
 					aimlockKeyName = input.KeyCode.Name
-					bindBtn.Text = "[" .. aimlockKeyName .. "]"
+					bindLabel.Text = "[" .. aimlockKeyName .. "]"
+					bindLabel.TextColor3 = C.bindText
 				end
 			end)
 			task.delay(5, function()
 				if isRecordingKeybind then
 					isRecordingKeybind = false
 					if conn then conn:Disconnect() end
-					bindBtn.Text = aimlockKey and ("[" .. aimlockKeyName .. "]") or "[-]"
+					bindLabel.Text = aimlockKey and ("[" .. aimlockKeyName .. "]") or "[-]"
+					bindLabel.TextColor3 = C.bindText
 				end
 			end)
 		end,
@@ -1260,54 +1226,36 @@ local function buildRagebotPage(parent)
 		end
 	)
 
-	-- Silent aim
 	createCheckbox(aimbotGroup, 34, "Silent aim", false, function(val)
 		silentAimEnabled = val
 		if not val then silentAimTarget = nil end
 	end)
 
-	-- Other group (right, same height as both left groups combined)
 	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, totalH, "Other")
 
 	local y = 12
-	-- Wallcheck
-	createCheckbox(otherGroup, y, "Wallcheck", true, function(val)
-		wallCheckEnabled = val
-	end)
+	createCheckbox(otherGroup, y, "Wallcheck", true, function(val) wallCheckEnabled = val end)
 	y = y + 22
-
-	-- Autofire
-	createCheckbox(otherGroup, y, "Autofire", false, function(val)
-		autofireEnabled = val
-	end)
+	createCheckbox(otherGroup, y, "Autofire", false, function(val) autofireEnabled = val end)
 	y = y + 22
-
-	-- Remove recoil
 	createCheckbox(otherGroup, y, "Remove recoil", false, function(val)
 		if val then activateNoVisualRecoil() else deactivateNoVisualRecoil() end
 	end)
 	y = y + 28
-
-	-- FOV slider
 	createSlider(otherGroup, y, "FOV", 50, 500, 100, "px", function(val)
 		fov = val
 		FOV_RADIUS = val
 	end)
 	y = y + 38
-
-	-- Show FOV
-	createCheckbox(otherGroup, y, "Show FOV", false, function(val)
-		showFOV = val
-	end)
+	createCheckbox(otherGroup, y, "Show FOV", false, function(val) showFOV = val end)
 end
 
--- ==================== PAGE 3 (ESP) ====================
+-- ==================== PAGE 4 (ESP + MISC) ====================
 local function buildESPPage(parent)
 	local pageTopPadding = 5
 	local pageBottomPadding = 10
 	local leftX = 6
 	local rightX = 290
-	local groupGap = 10
 	local totalH = contentHeight - pageTopPadding - pageBottomPadding
 
 	local espGroup = createGroup(parent, leftX, pageTopPadding, 274, totalH, "ESP Settings")
@@ -1323,10 +1271,7 @@ local function buildESPPage(parent)
 	y = y + 22
 	createCheckbox(espGroup, y, "Weapon ESP", false, function(val) ESP_WeaponEnabled = val end)
 	y = y + 28
-
-	createSlider(espGroup, y, "Max distance", 1, 1500, 1500, " studs", function(val)
-		ESP_MaxDistance = val
-	end)
+	createSlider(espGroup, y, "Max distance", 1, 1500, 1500, " studs", function(val) ESP_MaxDistance = val end)
 
 	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, totalH, "Other")
 
@@ -1351,11 +1296,11 @@ local function buildDefaultPage(parent)
 	local rightMidH = math.floor(totalH * 0.3)
 	local rightBottomH = totalH - rightTopH - rightMidH - (groupGap * 2)
 
-	createGroup(parent, leftX, pageTopPadding, 274, leftTopH, "Player ESP")
-	createGroup(parent, leftX, pageTopPadding + leftTopH + groupGap, 274, leftBottomH, "Self ESP")
-	createGroup(parent, rightX, pageTopPadding, 274, rightTopH, "World")
-	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap, 274, rightMidH, "Hud")
-	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap + rightMidH + groupGap, 274, rightBottomH, "Other")
+	createGroup(parent, leftX, pageTopPadding, 274, leftTopH, "Group A")
+	createGroup(parent, leftX, pageTopPadding + leftTopH + groupGap, 274, leftBottomH, "Group B")
+	createGroup(parent, rightX, pageTopPadding, 274, rightTopH, "Group C")
+	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap, 274, rightMidH, "Group D")
+	createGroup(parent, rightX, pageTopPadding + rightTopH + groupGap + rightMidH + groupGap, 274, rightBottomH, "Group E")
 end
 
 -- ==================== CREATE TABS ====================
@@ -1395,7 +1340,7 @@ local function createTab(index, imageId)
 
 	if index == 1 then
 		buildRagebotPage(page)
-	elseif index == 3 then
+	elseif index == 4 then
 		buildESPPage(page)
 	else
 		buildDefaultPage(page)
@@ -1407,10 +1352,8 @@ local function createTab(index, imageId)
 	holder.MouseButton1Click:Connect(function()
 		closeActiveContext()
 		for i = 1, #tabButtons do
-			local tab = tabButtons[i]
-			local active = (i == index)
-			tab.icon.ImageColor3 = active and C.iconOn or Color3.new(1, 1, 1)
-			pages[i].Visible = active
+			tabButtons[i].icon.ImageColor3 = (i == index) and C.iconOn or Color3.new(1, 1, 1)
+			pages[i].Visible = (i == index)
 		end
 	end)
 end
@@ -1420,12 +1363,10 @@ for i, id in ipairs(ICONS) do
 end
 
 for i = 1, #tabButtons do
-	local active = (i == 1)
-	tabButtons[i].icon.ImageColor3 = active and C.iconOn or Color3.new(1, 1, 1)
-	pages[i].Visible = active
+	tabButtons[i].icon.ImageColor3 = (i == 1) and C.iconOn or Color3.new(1, 1, 1)
+	pages[i].Visible = (i == 1)
 end
 
--- Gradient top line
 local topLine = mk("Frame", {
 	Size = UDim2.new(1, -2, 0, 2),
 	Position = UDim2.fromOffset(1, 1),
@@ -1443,7 +1384,7 @@ gradient(topLine, 0, ColorSequence.new({
 	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(170, 255, 0)),
 }))
 
--- Dragging (blocked when slider is being dragged)
+-- Dragging
 do
 	local dragging = false
 	local dragStart, startPos
@@ -1473,17 +1414,14 @@ do
 	end)
 end
 
--- ==================== INPUT HANDLER ====================
+-- ==================== INPUT ====================
 UIS.InputBegan:Connect(function(input, gp)
 	if gp then return end
-
 	if input.KeyCode == Enum.KeyCode.K then
 		gui.Enabled = not gui.Enabled
 		return
 	end
-
 	if isRecordingKeybind then return end
-
 	if aimlockKey and input.KeyCode == aimlockKey then
 		aimlockKeyHeld = true
 		if aimlockMode == "Toggle" then
@@ -1521,10 +1459,8 @@ RunService.RenderStepped:Connect(function()
 
 	local aimActive = isAimbotActive()
 
-	-- Silent Aim
 	if silentAimEnabled and aimActive then
 		updateSilentAimTarget()
-
 		if silentAimTarget then
 			local tool = lp.Character and lp.Character:FindFirstChildOfClass("Tool")
 			if tool and (tick() - lastSilentShot >= SILENT_FIRE_RATE) then
@@ -1540,7 +1476,6 @@ RunService.RenderStepped:Connect(function()
 		silentAimTarget = nil
 	end
 
-	-- FOV Circle
 	if aimbotEnabled and showFOV then
 		local mousePos = frameCache.mousePos
 		fovCircle.Position = mousePos
@@ -1550,17 +1485,13 @@ RunService.RenderStepped:Connect(function()
 		fovCircle.Visible = false
 	end
 
-	-- Regular Aimbot (not silent)
 	if aimbotEnabled and not silentAimEnabled and aimActive then
 		local targetHead = getTarget()
-
 		if targetHead then
 			local plr = Players:GetPlayerFromCharacter(targetHead.Parent)
 			local validTarget = plr and isValidTarget(plr, targetHead)
-
 			if validTarget then
 				Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(targetHead))
-
 				if autofireEnabled then
 					currentTool = lp.Character and lp.Character:FindFirstChildOfClass("Tool")
 					if currentTool then currentTool:Activate() end
@@ -1574,25 +1505,13 @@ RunService.RenderStepped:Connect(function()
 			if currentTool then currentTool:Deactivate(); currentTool = nil end
 		end
 	else
-		if not silentAimEnabled and currentTool then
-			currentTool:Deactivate()
-			currentTool = nil
-		end
-		if not aimActive then
-			currentTarget = nil
-			targetLocked = false
-		end
+		if not silentAimEnabled and currentTool then currentTool:Deactivate(); currentTool = nil end
+		if not aimActive then currentTarget = nil; targetLocked = false end
 	end
 
-	-- ESP
 	updatePlayersInRangeCache()
 	cacheViewportPoints()
-
 	for plr, isInRange in pairs(playersInRange) do
-		if isInRange then
-			updatePlayerESP(plr)
-		else
-			hidePlayerESP(plr)
-		end
+		if isInRange then updatePlayerESP(plr) else hidePlayerESP(plr) end
 	end
 end)
