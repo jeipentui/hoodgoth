@@ -122,14 +122,11 @@ local frameCache = {
 	time = 0,
 }
 
--- FOV degree to pixel radius conversion
 local function getFOVPixelRadius()
-	if fovDegrees >= 180 then
-		return 9999
-	end
+	if fovDegrees >= 180 then return 9999 end
 	local halfAngle = math.rad(fovDegrees / 2)
 	local viewportH = Camera.ViewportSize.Y
-	local fovY = math.rad(70) -- default roblox fov
+	local fovY = math.rad(70)
 	local pixelsPerRad = (viewportH / 2) / math.tan(fovY / 2)
 	return math.tan(halfAngle) * pixelsPerRad
 end
@@ -339,8 +336,7 @@ local function getTarget()
 	if currentTarget and targetLocked then
 		local plr = Players:GetPlayerFromCharacter(currentTarget.Parent)
 		if not plr then
-			currentTarget = nil
-			targetLocked = false
+			currentTarget = nil; targetLocked = false
 			return nil
 		end
 		if isValidTarget(plr, currentTarget) then
@@ -348,15 +344,13 @@ local function getTarget()
 				return currentTarget
 			end
 		end
-		currentTarget = nil
-		targetLocked = false
+		currentTarget = nil; targetLocked = false
 		return nil
 	end
 	if not currentTarget then
 		local newTarget = getNearestToCursor()
 		if newTarget then
-			currentTarget = newTarget
-			targetLocked = true
+			currentTarget = newTarget; targetLocked = true
 		end
 	end
 	return currentTarget
@@ -364,22 +358,19 @@ end
 
 local function updateSilentAimTarget()
 	if not silentAimEnabled or not aimbotEnabled then
-		silentAimTarget = nil
-		return
+		silentAimTarget = nil; return
 	end
 	local now = frameCache.time
 	if now - lastSilentAimUpdate < SILENT_AIM_UPDATE_INTERVAL then
 		if silentAimTarget then
 			local plr = Players:GetPlayerFromCharacter(silentAimTarget.Parent)
-			if not plr or not isValidTarget(plr, silentAimTarget) then
-				silentAimTarget = nil
-			end
+			if not plr or not isValidTarget(plr, silentAimTarget) then silentAimTarget = nil end
 		end
 		return
 	end
 	lastSilentAimUpdate = now
 	local localChar = lp.Character
-	if not localChar then silentAimTarget = nil return end
+	if not localChar then silentAimTarget = nil; return end
 	local mousePos = frameCache.mousePos
 	local pixelRadius = getFOVPixelRadius()
 	local candidates = {}
@@ -402,12 +393,11 @@ local function updateSilentAimTarget()
 			end
 		end
 	end
-	if #candidates == 0 then silentAimTarget = nil return end
+	if #candidates == 0 then silentAimTarget = nil; return end
 	table.sort(candidates, function(a, b) return a.dist < b.dist end)
 	for _, c in ipairs(candidates) do
 		if WallCheck(c.head, localChar, c.plr) then
-			silentAimTarget = c.head
-			return
+			silentAimTarget = c.head; return
 		end
 	end
 	silentAimTarget = nil
@@ -432,7 +422,7 @@ end
 
 local function stopNoFall()
 	NoFallEnabled = false
-	if NoFallConnection then NoFallConnection:Disconnect() NoFallConnection = nil end
+	if NoFallConnection then NoFallConnection:Disconnect(); NoFallConnection = nil end
 end
 
 local function isAimbotActive()
@@ -725,79 +715,58 @@ end
 -- ==================== UI COMPONENTS ====================
 local TEXT_OFFSET = 22
 
--- Context menu that stays open properly
 local function openContextMenu(anchorFrame, modes, getCurrentMode, onSelect)
 	closeActiveContext()
-
 	local ctxHeight = #modes * 22 + 8
 	local ctxWidth = 95
-
 	local absPos = anchorFrame.AbsolutePosition
 	local ctx = mk("Frame", {
 		Size = UDim2.fromOffset(ctxWidth, ctxHeight),
 		Position = UDim2.fromOffset(absPos.X - ctxWidth - 5, absPos.Y),
 		BackgroundColor3 = C.contextBg, BorderSizePixel = 0, ZIndex = 500,
 	}, gui)
-
 	mk("UIStroke", {
 		Color = C.contextBorder, Thickness = 1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, ctx)
-
 	activeContextMenu = ctx
-
 	local currentMode = getCurrentMode and getCurrentMode() or "On hotkey"
-
 	for i, mode in ipairs(modes) do
 		local isSelected = (mode == currentMode)
-
 		local itemBtn = mk("TextButton", {
 			Size = UDim2.new(1, -8, 0, 20),
 			Position = UDim2.fromOffset(4, 4 + (i - 1) * 22),
 			BackgroundTransparency = 1, BorderSizePixel = 0,
 			Text = "", AutoButtonColor = false, ZIndex = 501,
 		}, ctx)
-
-		local itemLabel = mk("TextLabel", {
-			Size = UDim2.new(1, -4, 1, 0),
-			Position = UDim2.fromOffset(4, 0),
-			BackgroundTransparency = 1,
-			Text = mode, Font = MENU_FONT, TextSize = 12,
+		mk("TextLabel", {
+			Size = UDim2.new(1, -4, 1, 0), Position = UDim2.fromOffset(4, 0),
+			BackgroundTransparency = 1, Text = mode, Font = MENU_FONT, TextSize = 12,
 			TextColor3 = isSelected and C.contextSelected or C.contextUnselected,
 			TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 502,
 		}, itemBtn)
-
 		itemBtn.MouseEnter:Connect(function()
-			itemBtn.BackgroundTransparency = 0
-			itemBtn.BackgroundColor3 = C.contextHover
+			itemBtn.BackgroundTransparency = 0; itemBtn.BackgroundColor3 = C.contextHover
 		end)
-
 		itemBtn.MouseLeave:Connect(function()
 			itemBtn.BackgroundTransparency = 1
 		end)
-
 		itemBtn.MouseButton1Click:Connect(function()
 			if onSelect then onSelect(mode) end
 			closeActiveContext()
 		end)
 	end
-
-	-- Close on outside click with delay
 	local closeConn
 	closeConn = UIS.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
 			task.defer(function()
 				if not activeContextMenu or activeContextMenu ~= ctx then
-					if closeConn then closeConn:Disconnect() end
-					return
+					if closeConn then closeConn:Disconnect() end; return
 				end
 				local mousePos = UIS:GetMouseLocation()
-				local ctxPos = ctx.AbsolutePosition
-				local ctxSize = ctx.AbsoluteSize
-				if mousePos.X < ctxPos.X or mousePos.X > ctxPos.X + ctxSize.X
-					or mousePos.Y < ctxPos.Y or mousePos.Y > ctxPos.Y + ctxSize.Y then
-					closeActiveContext()
-					closeConn:Disconnect()
+				local ctxPos = ctx.AbsolutePosition; local ctxSize = ctx.AbsoluteSize
+				if mousePos.X < ctxPos.X or mousePos.X > ctxPos.X + ctxSize.X or mousePos.Y < ctxPos.Y or mousePos.Y > ctxPos.Y + ctxSize.Y then
+					closeActiveContext(); closeConn:Disconnect()
 				end
 			end)
 		end
@@ -807,71 +776,53 @@ end
 local function createCheckboxWithBind(parent, yPos, labelText, defaultValue, bindText, onToggle, onBindClick, onContextSelect, getCurrentMode)
 	local ROW_HEIGHT = 18
 	local container = mk("Frame", {
-		Size = UDim2.new(1, -16, 0, ROW_HEIGHT),
-		Position = UDim2.fromOffset(8, yPos),
+		Size = UDim2.new(1, -16, 0, ROW_HEIGHT), Position = UDim2.fromOffset(8, yPos),
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, parent)
-
 	local checkBox = mk("Frame", {
 		Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(0, 5),
 		BackgroundColor3 = defaultValue and C.checkOn or C.checkOff,
 		BorderSizePixel = 0, ZIndex = 6,
 	}, container)
-
-	mk("UIStroke", {
-		Color = Color3.fromRGB(3, 3, 3), Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, checkBox)
-
+	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, checkBox)
 	mk("TextLabel", {
 		Size = UDim2.new(1, -55, 1, 0), Position = UDim2.fromOffset(TEXT_OFFSET, 0),
 		BackgroundTransparency = 1, Text = labelText, Font = MENU_FONT, TextSize = 13,
 		TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.None, ClipsDescendants = false, ZIndex = 6,
 	}, container)
-
 	local bindLabel = mk("TextLabel", {
 		Size = UDim2.fromOffset(40, 14), Position = UDim2.new(1, -40, 0, 2),
 		BackgroundTransparency = 1, Text = bindText or "[-]",
 		Font = MENU_FONT, TextSize = 11, TextColor3 = C.bindText,
 		TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
 	}, container)
-
 	local bindClickArea = mk("TextButton", {
 		Size = UDim2.fromOffset(40, 18), Position = UDim2.new(1, -40, 0, 0),
 		BackgroundTransparency = 1, Text = "", ZIndex = 9,
 	}, container)
-
 	local clickArea = mk("TextButton", {
 		Size = UDim2.new(1, -45, 1, 0), Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1, Text = "", ZIndex = 8,
 	}, container)
-
 	local enabled = defaultValue
-
 	clickArea.MouseButton1Click:Connect(function()
 		enabled = not enabled
 		checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
 		if onToggle then onToggle(enabled) end
 	end)
-
 	bindClickArea.MouseButton1Click:Connect(function()
 		if onBindClick then onBindClick(bindLabel) end
 	end)
-
 	bindClickArea.MouseButton2Click:Connect(function()
 		local modes = {"Always on", "On hotkey", "Toggle", "Off hotkey"}
 		openContextMenu(bindLabel, modes, getCurrentMode, function(mode)
 			if onContextSelect then onContextSelect(mode) end
 		end)
 	end)
-
 	return {
 		container = container, checkBox = checkBox, bindLabel = bindLabel,
-		setEnabled = function(val)
-			enabled = val
-			checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
-		end,
+		setEnabled = function(val) enabled = val; checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff end,
 		getEnabled = function() return enabled end,
 		setBindText = function(txt) bindLabel.Text = txt end,
 	}
@@ -880,35 +831,80 @@ end
 local function createCheckbox(parent, yPos, labelText, defaultValue, onToggle)
 	local ROW_HEIGHT = 18
 	local container = mk("Frame", {
-		Size = UDim2.new(1, -16, 0, ROW_HEIGHT),
-		Position = UDim2.fromOffset(8, yPos),
+		Size = UDim2.new(1, -16, 0, ROW_HEIGHT), Position = UDim2.fromOffset(8, yPos),
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, parent)
-
 	local checkBox = mk("Frame", {
 		Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(0, 5),
 		BackgroundColor3 = defaultValue and C.checkOn or C.checkOff,
 		BorderSizePixel = 0, ZIndex = 6,
 	}, container)
-
-	mk("UIStroke", {
-		Color = Color3.fromRGB(3, 3, 3), Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, checkBox)
-
+	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, checkBox)
 	mk("TextLabel", {
 		Size = UDim2.new(1, -30, 1, 0), Position = UDim2.fromOffset(TEXT_OFFSET, 0),
 		BackgroundTransparency = 1, Text = labelText, Font = MENU_FONT, TextSize = 13,
 		TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.None, ClipsDescendants = false, ZIndex = 6,
 	}, container)
-
 	local clickArea = mk("TextButton", {
 		Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1, Text = "", ZIndex = 8,
 	}, container)
+	local enabled = defaultValue
+	clickArea.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
+		if onToggle then onToggle(enabled) end
+	end)
+	return {
+		container = container, checkBox = checkBox,
+		setEnabled = function(val) enabled = val; checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff end,
+		getEnabled = function() return enabled end,
+	}
+end
+
+-- Checkbox with inline color preview on right side
+local function createCheckboxWithColor(parent, yPos, labelText, defaultValue, defaultColor, onToggle, onColorChanged)
+	local ROW_HEIGHT = 18
+	local container = mk("Frame", {
+		Size = UDim2.new(1, -16, 0, ROW_HEIGHT), Position = UDim2.fromOffset(8, yPos),
+		BackgroundTransparency = 1, ZIndex = 5,
+	}, parent)
+	local checkBox = mk("Frame", {
+		Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(0, 5),
+		BackgroundColor3 = defaultValue and C.checkOn or C.checkOff,
+		BorderSizePixel = 0, ZIndex = 6,
+	}, container)
+	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, checkBox)
+	mk("TextLabel", {
+		Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(TEXT_OFFSET, 0),
+		BackgroundTransparency = 1, Text = labelText, Font = MENU_FONT, TextSize = 13,
+		TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.None, ClipsDescendants = false, ZIndex = 6,
+	}, container)
+
+	-- Color preview square on right
+	local preview = mk("Frame", {
+		Size = UDim2.fromOffset(16, 10), Position = UDim2.new(1, -16, 0, 4),
+		BackgroundColor3 = defaultColor, BorderSizePixel = 0, ZIndex = 7,
+	}, container)
+	mk("UIStroke", {Color = C.pickerBorder, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, preview)
+
+	local previewBtn = mk("TextButton", {
+		Size = UDim2.fromOffset(16, 14), Position = UDim2.new(1, -16, 0, 2),
+		BackgroundTransparency = 1, Text = "", ZIndex = 10,
+	}, container)
+
+	local clickArea = mk("TextButton", {
+		Size = UDim2.new(1, -22, 1, 0), Position = UDim2.fromOffset(0, 0),
+		BackgroundTransparency = 1, Text = "", ZIndex = 8,
+	}, container)
 
 	local enabled = defaultValue
+	local currentH, currentS, currentV = Color3.toHSV(defaultColor)
+	local currentColor = defaultColor
+	local pickerOpen = false
+	local pickerFrame = nil
 
 	clickArea.MouseButton1Click:Connect(function()
 		enabled = not enabled
@@ -916,58 +912,169 @@ local function createCheckbox(parent, yPos, labelText, defaultValue, onToggle)
 		if onToggle then onToggle(enabled) end
 	end)
 
+	local function applyColor()
+		currentColor = Color3.fromHSV(currentH, currentS, currentV)
+		preview.BackgroundColor3 = currentColor
+		if onColorChanged then onColorChanged(currentColor) end
+	end
+
+	previewBtn.MouseButton1Click:Connect(function()
+		if pickerOpen and pickerFrame then
+			pickerFrame:Destroy(); pickerFrame = nil; pickerOpen = false; return
+		end
+		pickerOpen = true
+		local PICKER_SIZE = 120; local HUE_WIDTH = 14
+		local absPos = preview.AbsolutePosition
+		pickerFrame = mk("Frame", {
+			Size = UDim2.fromOffset(PICKER_SIZE + HUE_WIDTH + 12, PICKER_SIZE + 8),
+			Position = UDim2.fromOffset(absPos.X - PICKER_SIZE - HUE_WIDTH - 16, absPos.Y - 4),
+			BackgroundColor3 = C.contextBg, BorderSizePixel = 0, ZIndex = 600,
+		}, gui)
+		mk("UIStroke", {Color = C.contextBorder, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, pickerFrame)
+
+		local svField = mk("ImageLabel", {
+			Size = UDim2.fromOffset(PICKER_SIZE, PICKER_SIZE), Position = UDim2.fromOffset(4, 4),
+			BackgroundColor3 = Color3.fromHSV(currentH, 1, 1), BorderSizePixel = 0, ZIndex = 601, Image = "",
+		}, pickerFrame)
+		mk("UIStroke", {Color = C.pickerBorder, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, svField)
+
+		local whiteGrad = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 602}, svField)
+		local wg = gradient(whiteGrad, 0, ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))}))
+		wg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})
+
+		local blackGrad = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 603}, svField)
+		local bg = gradient(blackGrad, 90, ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)), ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))}))
+		bg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)})
+
+		local svCursor = mk("Frame", {
+			Size = UDim2.fromOffset(6, 6), Position = UDim2.new(currentS, -3, 1 - currentV, -3),
+			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 605,
+		}, svField)
+		mk("UICorner", {CornerRadius = UDim.new(0, 3)}, svCursor)
+		mk("UIStroke", {Color = Color3.new(0, 0, 0), Thickness = 1}, svCursor)
+
+		local hueBar = mk("Frame", {
+			Size = UDim2.fromOffset(HUE_WIDTH, PICKER_SIZE), Position = UDim2.fromOffset(PICKER_SIZE + 8, 4),
+			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 601,
+		}, pickerFrame)
+		mk("UIStroke", {Color = C.pickerBorder, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, hueBar)
+		gradient(hueBar, 90, ColorSequence.new({
+			ColorSequenceKeypoint.new(0.000, Color3.fromRGB(255, 0, 0)),
+			ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
+			ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
+			ColorSequenceKeypoint.new(0.500, Color3.fromRGB(0, 255, 255)),
+			ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
+			ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
+			ColorSequenceKeypoint.new(1.000, Color3.fromRGB(255, 0, 0)),
+		}))
+
+		local hueCursor = mk("Frame", {
+			Size = UDim2.new(1, 2, 0, 3), Position = UDim2.new(0, -1, currentH, -1),
+			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 605,
+		}, hueBar)
+		mk("UIStroke", {Color = Color3.new(0, 0, 0), Thickness = 1}, hueCursor)
+
+		local svDragging = false
+		local svBtn = mk("TextButton", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", ZIndex = 610}, svField)
+		local function updateSV(pos)
+			local ap = svField.AbsolutePosition; local sz = svField.AbsoluteSize
+			currentS = math.clamp((pos.X - ap.X) / sz.X, 0, 1)
+			currentV = math.clamp(1 - (pos.Y - ap.Y) / sz.Y, 0, 1)
+			svCursor.Position = UDim2.new(currentS, -3, 1 - currentV, -3)
+			applyColor()
+		end
+		svBtn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				svDragging = true; colorPickerDragging = true; sliderDragging = true; updateSV(input.Position)
+			end
+		end)
+		svBtn.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				svDragging = false; colorPickerDragging = false; sliderDragging = false
+			end
+		end)
+
+		local hueDragging = false
+		local hueBtn = mk("TextButton", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", ZIndex = 610}, hueBar)
+		local function updateHue(pos)
+			local ap = hueBar.AbsolutePosition; local sz = hueBar.AbsoluteSize
+			currentH = math.clamp((pos.Y - ap.Y) / sz.Y, 0, 0.999)
+			hueCursor.Position = UDim2.new(0, -1, currentH, -1)
+			svField.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
+			applyColor()
+		end
+		hueBtn.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				hueDragging = true; colorPickerDragging = true; sliderDragging = true; updateHue(input.Position)
+			end
+		end)
+		hueBtn.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				hueDragging = false; colorPickerDragging = false; sliderDragging = false
+			end
+		end)
+
+		local moveConn = UIS.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				if svDragging then updateSV(input.Position) end
+				if hueDragging then updateHue(input.Position) end
+			end
+		end)
+		local endConn = UIS.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				svDragging = false; hueDragging = false; colorPickerDragging = false; sliderDragging = false
+			end
+		end)
+		pickerFrame.Destroying:Connect(function()
+			if moveConn then moveConn:Disconnect() end
+			if endConn then endConn:Disconnect() end
+		end)
+	end)
+
 	return {
 		container = container, checkBox = checkBox,
-		setEnabled = function(val)
-			enabled = val
-			checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff
-		end,
+		setEnabled = function(val) enabled = val; checkBox.BackgroundColor3 = enabled and C.checkOn or C.checkOff end,
 		getEnabled = function() return enabled end,
 	}
 end
 
+-- Slider with value text INSIDE the bar
 local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal, suffix, onChanged)
-	local ROW_HEIGHT = 32
+	local ROW_HEIGHT = 22
 	local container = mk("Frame", {
-		Size = UDim2.new(1, -16, 0, ROW_HEIGHT),
-		Position = UDim2.fromOffset(8, yPos),
+		Size = UDim2.new(1, -16, 0, ROW_HEIGHT), Position = UDim2.fromOffset(8, yPos),
 		BackgroundTransparency = 1, ZIndex = 5,
 	}, parent)
 
 	mk("TextLabel", {
-		Size = UDim2.new(0.6, 0, 0, 14), Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(0.5, 0, 0, ROW_HEIGHT), Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1, Text = labelText, Font = MENU_FONT, TextSize = 13,
 		TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left,
 		ClipsDescendants = false, ZIndex = 6,
 	}, container)
 
-	local valueLabel = mk("TextLabel", {
-		Size = UDim2.new(0.4, 0, 0, 14), Position = UDim2.new(0.6, 0, 0, 0),
-		BackgroundTransparency = 1, Text = tostring(defaultVal) .. (suffix or ""),
-		Font = MENU_FONT, TextSize = 13, TextColor3 = C.textDim,
-		TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 6,
-	}, container)
-
 	local sliderTrack = mk("Frame", {
-		Size = UDim2.new(1, 0, 0, 8), Position = UDim2.fromOffset(0, 18),
+		Size = UDim2.new(0.47, 0, 0, 12), Position = UDim2.new(0.53, 0, 0, 5),
 		BackgroundColor3 = C.sliderBg, BorderSizePixel = 0, ZIndex = 6,
 	}, container)
-
-	mk("UIStroke", {
-		Color = Color3.fromRGB(3, 3, 3), Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, sliderTrack)
+	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, sliderTrack)
 
 	local fillPercent = (defaultVal - minVal) / (maxVal - minVal)
 	local sliderFill = mk("Frame", {
 		Size = UDim2.new(fillPercent, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
 		BackgroundColor3 = C.sliderFill, BorderSizePixel = 0, ZIndex = 7,
 	}, sliderTrack)
-
 	gradient(sliderFill, 0, ColorSequence.new({
-		ColorSequenceKeypoint.new(0, C.sliderFill),
-		ColorSequenceKeypoint.new(1, C.sliderFill2),
+		ColorSequenceKeypoint.new(0, C.sliderFill), ColorSequenceKeypoint.new(1, C.sliderFill2),
 	}))
+
+	-- Value text inside the slider bar
+	local valueLabel = mk("TextLabel", {
+		Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
+		BackgroundTransparency = 1, Text = tostring(defaultVal) .. (suffix or ""),
+		Font = MENU_FONT, TextSize = 11, TextColor3 = C.text,
+		TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 8,
+	}, sliderTrack)
 
 	local currentValue = defaultVal
 	local dragging = false
@@ -985,33 +1092,23 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	end
 
 	local sliderBtn = mk("TextButton", {
-		Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
-		BackgroundTransparency = 1, Text = "", ZIndex = 9,
+		Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", ZIndex = 9,
 	}, sliderTrack)
-
 	sliderBtn.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true; sliderDragging = true
-			updateSlider(input.Position.X)
+			dragging = true; sliderDragging = true; updateSlider(input.Position.X)
 		end
 	end)
-
 	sliderBtn.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = false; sliderDragging = false
 		end
 	end)
-
 	UIS.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			updateSlider(input.Position.X)
-		end
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then updateSlider(input.Position.X) end
 	end)
-
 	UIS.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
-			dragging = false; sliderDragging = false
-		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then dragging = false; sliderDragging = false end
 	end)
 
 	return {
@@ -1026,270 +1123,31 @@ local function createSlider(parent, yPos, labelText, minVal, maxVal, defaultVal,
 	}
 end
 
--- ==================== COLOR PICKER ====================
-local function createColorPicker(parent, yPos, labelText, defaultColor, onChanged)
-	local PICKER_SIZE = 120
-	local HUE_WIDTH = 14
-	local TOTAL_HEIGHT = 22
-	local container = mk("Frame", {
-		Size = UDim2.new(1, -16, 0, TOTAL_HEIGHT),
-		Position = UDim2.fromOffset(8, yPos),
-		BackgroundTransparency = 1, ZIndex = 5,
-	}, parent)
-
-	mk("TextLabel", {
-		Size = UDim2.new(1, -30, 0, 18), Position = UDim2.fromOffset(0, 0),
-		BackgroundTransparency = 1, Text = labelText, Font = MENU_FONT, TextSize = 13,
-		TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
-	}, container)
-
-	local preview = mk("Frame", {
-		Size = UDim2.fromOffset(16, 10), Position = UDim2.new(1, -16, 0, 4),
-		BackgroundColor3 = defaultColor, BorderSizePixel = 0, ZIndex = 7,
-	}, container)
-
-	mk("UIStroke", {
-		Color = C.pickerBorder, Thickness = 1,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, preview)
-
-	local previewBtn = mk("TextButton", {
-		Size = UDim2.fromOffset(16, 10), Position = UDim2.new(1, -16, 0, 4),
-		BackgroundTransparency = 1, Text = "", ZIndex = 8,
-	}, container)
-
-	local pickerOpen = false
-	local pickerFrame = nil
-
-	local currentH, currentS, currentV = Color3.toHSV(defaultColor)
-	local currentColor = defaultColor
-
-	local function applyColor()
-		currentColor = Color3.fromHSV(currentH, currentS, currentV)
-		preview.BackgroundColor3 = currentColor
-		if onChanged then onChanged(currentColor) end
-	end
-
-	previewBtn.MouseButton1Click:Connect(function()
-		if pickerOpen and pickerFrame then
-			pickerFrame:Destroy()
-			pickerFrame = nil
-			pickerOpen = false
-			return
-		end
-
-		pickerOpen = true
-
-		local absPos = preview.AbsolutePosition
-		pickerFrame = mk("Frame", {
-			Size = UDim2.fromOffset(PICKER_SIZE + HUE_WIDTH + 12, PICKER_SIZE + 8),
-			Position = UDim2.fromOffset(absPos.X - PICKER_SIZE - HUE_WIDTH - 16, absPos.Y - 4),
-			BackgroundColor3 = C.contextBg, BorderSizePixel = 0, ZIndex = 600,
-		}, gui)
-
-		mk("UIStroke", {
-			Color = C.contextBorder, Thickness = 1,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, pickerFrame)
-
-		-- SV field
-		local svField = mk("ImageLabel", {
-			Size = UDim2.fromOffset(PICKER_SIZE, PICKER_SIZE),
-			Position = UDim2.fromOffset(4, 4),
-			BackgroundColor3 = Color3.fromHSV(currentH, 1, 1),
-			BorderSizePixel = 0, ZIndex = 601, Image = "",
-		}, pickerFrame)
-
-		mk("UIStroke", {
-			Color = C.pickerBorder, Thickness = 1,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, svField)
-
-		-- White gradient left to right
-		local whiteGrad = mk("Frame", {
-			Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderSizePixel = 0, ZIndex = 602,
-		}, svField)
-		gradient(whiteGrad, 0, ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-			ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
-		}))
-		local whiteUIGrad = whiteGrad:FindFirstChildOfClass("UIGradient")
-		whiteUIGrad.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0),
-			NumberSequenceKeypoint.new(1, 1),
-		})
-
-		-- Black gradient top to bottom
-		local blackGrad = mk("Frame", {
-			Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(0, 0, 0),
-			BorderSizePixel = 0, ZIndex = 603,
-		}, svField)
-		gradient(blackGrad, 90, ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
-			ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0)),
-		}))
-		local blackUIGrad = blackGrad:FindFirstChildOfClass("UIGradient")
-		blackUIGrad.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(1, 0),
-		})
-
-		-- SV cursor
-		local svCursor = mk("Frame", {
-			Size = UDim2.fromOffset(6, 6),
-			Position = UDim2.new(currentS, -3, 1 - currentV, -3),
-			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 605,
-		}, svField)
-		mk("UICorner", {CornerRadius = UDim.new(0, 3)}, svCursor)
-		mk("UIStroke", {Color = Color3.new(0, 0, 0), Thickness = 1}, svCursor)
-
-		-- Hue bar
-		local hueBar = mk("Frame", {
-			Size = UDim2.fromOffset(HUE_WIDTH, PICKER_SIZE),
-			Position = UDim2.fromOffset(PICKER_SIZE + 8, 4),
-			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 601,
-		}, pickerFrame)
-
-		mk("UIStroke", {
-			Color = C.pickerBorder, Thickness = 1,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		}, hueBar)
-
-		gradient(hueBar, 90, ColorSequence.new({
-			ColorSequenceKeypoint.new(0.000, Color3.fromRGB(255, 0, 0)),
-			ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
-			ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
-			ColorSequenceKeypoint.new(0.500, Color3.fromRGB(0, 255, 255)),
-			ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
-			ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
-			ColorSequenceKeypoint.new(1.000, Color3.fromRGB(255, 0, 0)),
-		}))
-
-		-- Hue cursor
-		local hueCursor = mk("Frame", {
-			Size = UDim2.new(1, 2, 0, 3),
-			Position = UDim2.new(0, -1, currentH, -1),
-			BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 605,
-		}, hueBar)
-		mk("UIStroke", {Color = Color3.new(0, 0, 0), Thickness = 1}, hueCursor)
-
-		-- SV dragging
-		local svDragging = false
-		local svBtn = mk("TextButton", {
-			Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
-			BackgroundTransparency = 1, Text = "", ZIndex = 610,
-		}, svField)
-
-		local function updateSV(pos)
-			local ap = svField.AbsolutePosition
-			local sz = svField.AbsoluteSize
-			local s = math.clamp((pos.X - ap.X) / sz.X, 0, 1)
-			local v = math.clamp(1 - (pos.Y - ap.Y) / sz.Y, 0, 1)
-			currentS = s; currentV = v
-			svCursor.Position = UDim2.new(s, -3, 1 - v, -3)
-			applyColor()
-		end
-
-		svBtn.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				svDragging = true; colorPickerDragging = true; sliderDragging = true
-				updateSV(input.Position)
-			end
-		end)
-		svBtn.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				svDragging = false; colorPickerDragging = false; sliderDragging = false
-			end
-		end)
-
-		-- Hue dragging
-		local hueDragging = false
-		local hueBtn = mk("TextButton", {
-			Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0),
-			BackgroundTransparency = 1, Text = "", ZIndex = 610,
-		}, hueBar)
-
-		local function updateHue(pos)
-			local ap = hueBar.AbsolutePosition
-			local sz = hueBar.AbsoluteSize
-			local h = math.clamp((pos.Y - ap.Y) / sz.Y, 0, 0.999)
-			currentH = h
-			hueCursor.Position = UDim2.new(0, -1, h, -1)
-			svField.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-			applyColor()
-		end
-
-		hueBtn.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				hueDragging = true; colorPickerDragging = true; sliderDragging = true
-				updateHue(input.Position)
-			end
-		end)
-		hueBtn.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				hueDragging = false; colorPickerDragging = false; sliderDragging = false
-			end
-		end)
-
-		local moveConn = UIS.InputChanged:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseMovement then
-				if svDragging then updateSV(input.Position) end
-				if hueDragging then updateHue(input.Position) end
-			end
-		end)
-
-		local endConn = UIS.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				svDragging = false; hueDragging = false
-				colorPickerDragging = false; sliderDragging = false
-			end
-		end)
-
-		-- Store connections for cleanup
-		pickerFrame.Destroying:Connect(function()
-			if moveConn then moveConn:Disconnect() end
-			if endConn then endConn:Disconnect() end
-		end)
-	end)
-
-	return {
-		container = container,
-		getColor = function() return currentColor end,
-	}
-end
-
 -- ==================== GROUP BUILDER ====================
 local function createGroup(parent, x, y, w, h, titleText)
 	local g0 = mk("Frame", {
 		Size = UDim2.fromOffset(w, h), Position = UDim2.fromOffset(x, y),
 		BackgroundColor3 = C.bg0, BorderSizePixel = 0, ZIndex = 2,
 	}, parent)
-
 	local g1 = mk("Frame", {
 		Size = UDim2.new(1, -2, 1, -2), Position = UDim2.fromOffset(1, 1),
 		BackgroundColor3 = C.inner, BorderSizePixel = 0, ZIndex = 2,
 	}, g0)
-
 	local g2 = mk("Frame", {
 		Size = UDim2.new(1, -2, 1, -2), Position = UDim2.fromOffset(1, 1),
-		BackgroundColor3 = C.groupBg, BorderSizePixel = 0, ZIndex = 2,
-		ClipsDescendants = false,
+		BackgroundColor3 = C.groupBg, BorderSizePixel = 0, ZIndex = 2, ClipsDescendants = false,
 	}, g1)
-
 	local titleBack = mk("Frame", {
 		AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 14),
 		Position = UDim2.fromOffset(8, -7), BackgroundColor3 = C.groupBg,
 		BorderSizePixel = 0, ZIndex = 4,
 	}, g2)
-
 	mk("TextLabel", {
 		AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 14),
 		BackgroundTransparency = 1, Text = " " .. titleText .. " ",
 		Font = MENU_FONT, TextSize = 13, TextColor3 = C.text,
 		TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
 	}, titleBack)
-
 	return g2
 end
 
@@ -1301,12 +1159,10 @@ local function buildRagebotPage(parent)
 	local rightX = 290
 	local groupGap = 10
 	local totalH = contentHeight - pageTopPadding - pageBottomPadding
-
 	local weaponGroupH = 40
 	local aimbotGroupH = totalH - weaponGroupH - groupGap
 
 	createGroup(parent, leftX, pageTopPadding, 274, weaponGroupH, "Weapon type")
-
 	local aimbotGroup = createGroup(parent, leftX, pageTopPadding + weaponGroupH + groupGap, 274, aimbotGroupH, "Aimbot")
 
 	createCheckboxWithBind(
@@ -1323,8 +1179,7 @@ local function buildRagebotPage(parent)
 			conn = UIS.InputBegan:Connect(function(input)
 				if isRecordingKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
 					isRecordingKeybind = false; conn:Disconnect()
-					aimlockKey = input.KeyCode
-					aimlockKeyName = input.KeyCode.Name
+					aimlockKey = input.KeyCode; aimlockKeyName = input.KeyCode.Name
 					bindLabel.Text = "[" .. aimlockKeyName .. "]"
 					bindLabel.TextColor3 = C.bindText
 				end
@@ -1342,37 +1197,36 @@ local function buildRagebotPage(parent)
 		function() return aimlockMode end
 	)
 
-	-- Other group (right)
+	-- Other group
 	local otherGroup = createGroup(parent, rightX, pageTopPadding, 274, totalH, "Other")
 
 	local y = 12
+	-- 1. Automatic fire
+	createCheckbox(otherGroup, y, "Automatic fire", false, function(val) autofireEnabled = val end)
+	y = y + 22
+	-- 2. Silent aim
 	createCheckbox(otherGroup, y, "Silent aim", false, function(val)
-		silentAimEnabled = val
-		if not val then silentAimTarget = nil end
+		silentAimEnabled = val; if not val then silentAimTarget = nil end
 	end)
 	y = y + 22
-	createCheckbox(otherGroup, y, "Wallcheck", true, function(val) wallCheckEnabled = val end)
-	y = y + 22
-	createCheckbox(otherGroup, y, "Autofire", false, function(val) autofireEnabled = val end)
-	y = y + 22
+	-- 3. Remove recoil
 	createCheckbox(otherGroup, y, "Remove recoil", false, function(val)
 		if val then activateNoVisualRecoil() else deactivateNoVisualRecoil() end
 	end)
 	y = y + 22
-	createCheckbox(otherGroup, y, "Show FOV", false, function(val) showFOV = val end)
-	y = y + 28
-
-	-- FOV color picker (above slider)
-	createColorPicker(otherGroup, y, "FOV color", Color3.new(1, 1, 1), function(col)
-		fovColor = col
-		fovCircle.Color = col
-	end)
-	y = y + 28
-
-	-- Maximum FOV slider in degrees
+	-- 4. Maximum FOV slider (inline value)
 	createSlider(otherGroup, y, "Maximum FOV", 0, 180, 180, "°", function(val)
 		fovDegrees = val
 	end)
+	y = y + 28
+	-- 5. Show FOV with color picker on right
+	createCheckboxWithColor(otherGroup, y, "Show FOV", false, Color3.new(1, 1, 1),
+		function(val) showFOV = val end,
+		function(col) fovColor = col; fovCircle.Color = col end
+	)
+	y = y + 22
+	-- 6. Wallcheck
+	createCheckbox(otherGroup, y, "Wallcheck", true, function(val) wallCheckEnabled = val end)
 end
 
 -- ==================== PAGE 4 (ESP + MISC) ====================
@@ -1384,7 +1238,6 @@ local function buildESPPage(parent)
 	local totalH = contentHeight - pageTopPadding - pageBottomPadding
 
 	local espGroup = createGroup(parent, leftX, pageTopPadding, 274, totalH, "ESP Settings")
-
 	local y = 12
 	createCheckbox(espGroup, y, "Health ESP", false, function(val) ESP_HPEnabled = val end)
 	y = y + 22
@@ -1412,13 +1265,11 @@ local function buildDefaultPage(parent)
 	local rightX = 290
 	local groupGap = 10
 	local totalH = contentHeight - pageTopPadding - pageBottomPadding
-
 	local leftTopH = math.floor(totalH * 0.45)
 	local leftBottomH = totalH - leftTopH - groupGap
 	local rightTopH = math.floor(totalH * 0.3)
 	local rightMidH = math.floor(totalH * 0.3)
 	local rightBottomH = totalH - rightTopH - rightMidH - (groupGap * 2)
-
 	createGroup(parent, leftX, pageTopPadding, 274, leftTopH, "Group A")
 	createGroup(parent, leftX, pageTopPadding + leftTopH + groupGap, 274, leftBottomH, "Group B")
 	createGroup(parent, rightX, pageTopPadding, 274, rightTopH, "Group C")
@@ -1429,35 +1280,25 @@ end
 -- ==================== CREATE TABS ====================
 local function createTab(index, imageId)
 	local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
-
 	local holder = mk("TextButton", {
 		Name = "TabButton_" .. index, Size = UDim2.fromOffset(buttonWidth, iconSize),
 		Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1,
 		BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21,
 	}, iconHolder)
-
 	local icon = mk("ImageLabel", {
 		Name = "Icon", Size = UDim2.fromOffset(36, 36),
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0),
 		BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22,
 	}, holder)
-
 	local page = mk("Frame", {
 		Name = "Page_" .. index, Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, ZIndex = 2,
 	}, pageHolder)
-
-	if index == 1 then
-		buildRagebotPage(page)
-	elseif index == 4 then
-		buildESPPage(page)
-	else
-		buildDefaultPage(page)
-	end
-
+	if index == 1 then buildRagebotPage(page)
+	elseif index == 4 then buildESPPage(page)
+	else buildDefaultPage(page) end
 	tabButtons[index] = {button = holder, icon = icon}
 	pages[index] = page
-
 	holder.MouseButton1Click:Connect(function()
 		closeActiveContext()
 		for i = 1, #tabButtons do
@@ -1468,7 +1309,6 @@ local function createTab(index, imageId)
 end
 
 for i, id in ipairs(ICONS) do createTab(i, id) end
-
 for i = 1, #tabButtons do
 	tabButtons[i].icon.ImageColor3 = (i == 1) and C.iconOn or Color3.new(1, 1, 1)
 	pages[i].Visible = (i == 1)
@@ -1478,7 +1318,6 @@ local topLine = mk("Frame", {
 	Size = UDim2.new(1, -2, 0, 2), Position = UDim2.fromOffset(1, 1),
 	BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 100,
 }, body)
-
 gradient(topLine, 0, ColorSequence.new({
 	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 170, 255)),
 	ColorSequenceKeypoint.new(0.18, Color3.fromRGB(80, 120, 255)),
@@ -1490,19 +1329,15 @@ gradient(topLine, 0, ColorSequence.new({
 
 -- Dragging
 do
-	local dragging = false
-	local dragStart, startPos
-
+	local dragging = false; local dragStart, startPos
 	dragZone.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 and not sliderDragging and not colorPickerDragging then
 			dragging = true; dragStart = input.Position; startPos = main.Position
 		end
 	end)
-
 	dragZone.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 	end)
-
 	UIS.InputChanged:Connect(function(input)
 		if dragging and not sliderDragging and not colorPickerDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
@@ -1548,8 +1383,7 @@ RunService.RenderStepped:Connect(function()
 			if tool and (tick() - lastSilentShot >= SILENT_FIRE_RATE) then
 				lastSilentShot = tick()
 				local savedCFrame = Camera.CFrame
-				local predictedPos = getPredictedPosition(silentAimTarget)
-				Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
+				Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, getPredictedPosition(silentAimTarget))
 				tool:Activate()
 				Camera.CFrame = savedCFrame
 			end
@@ -1558,10 +1392,8 @@ RunService.RenderStepped:Connect(function()
 		silentAimTarget = nil
 	end
 
-	-- FOV Circle
 	if aimbotEnabled and showFOV and fovDegrees < 180 then
-		local mousePos = frameCache.mousePos
-		fovCircle.Position = mousePos
+		fovCircle.Position = frameCache.mousePos
 		fovCircle.Radius = getFOVPixelRadius()
 		fovCircle.Color = fovColor
 		fovCircle.Visible = true
@@ -1569,7 +1401,6 @@ RunService.RenderStepped:Connect(function()
 		fovCircle.Visible = false
 	end
 
-	-- Regular aimbot
 	if aimbotEnabled and not silentAimEnabled and aimActive then
 		local targetHead = getTarget()
 		if targetHead then
@@ -1592,7 +1423,6 @@ RunService.RenderStepped:Connect(function()
 		if not aimActive then currentTarget = nil; targetLocked = false end
 	end
 
-	-- ESP
 	updatePlayersInRangeCache()
 	cacheViewportPoints()
 	for plr, isInRange in pairs(playersInRange) do
