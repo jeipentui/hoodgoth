@@ -584,12 +584,12 @@ end
 
 -- ==================== PAGE 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
-	local leftX=6
-	local rightX=290
 	local totalH=contentHeight-15
 
-	local playerGroup=createGroup(parent,leftX,5,250,totalH,"Player ESP")
-	local otherGroup=createGroup(parent,rightX,5,250,totalH,"Other")
+	local playerGroup=createGroup(parent,6,5,250,totalH,"Player ESP")
+	local otherGroup=createGroup(parent,290,5,250,115,"Other ESP")
+	local coloredGroup=createGroup(parent,6,280,250,155,"Colored models")
+	local effectsGroup=createGroup(parent,290,145,250,170,"Effects")
 
 	local y=12
 	createCheckboxWithBind(playerGroup,y,"Activation type",false,"[-]",
@@ -640,7 +640,29 @@ local function buildPlayerESPPage(parent)
 	createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
 	createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
 
-	createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
+	-- Other ESP
+	local oy=12
+	createCheckbox(otherGroup,oy,"Radar",false);oy=oy+22
+	createCheckbox(otherGroup,oy,"Grenades",false);oy=oy+22
+	createCheckbox(otherGroup,oy,"Crosshair",false);oy=oy+22
+	createCheckbox(otherGroup,oy,"Spectators",false)
+
+	-- Colored models
+	local cy=12
+	createCheckbox(coloredGroup,cy,"Player",false);cy=cy+22
+	createCheckbox(coloredGroup,cy,"Player behind wall",false);cy=cy+22
+	createCheckbox(coloredGroup,cy,"Teammate",false);cy=cy+22
+	createCheckbox(coloredGroup,cy,"Teammate behind wall",false);cy=cy+22
+	createCheckbox(coloredGroup,cy,"Local player",false);cy=cy+22
+	createCheckbox(coloredGroup,cy,"Local player fake",false)
+
+	-- Effects
+	local ey=12
+	createCheckbox(effectsGroup,ey,"Remove flashbang effects",false);ey=ey+22
+	createCheckbox(effectsGroup,ey,"Remove smoke grenades",false);ey=ey+22
+	createCheckbox(effectsGroup,ey,"Remove fog",false);ey=ey+22
+	createCheckbox(effectsGroup,ey,"Remove skybox",false);ey=ey+22
+	createCheckbox(effectsGroup,ey,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 -- ==================== DEFAULT PAGE ====================
