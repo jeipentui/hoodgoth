@@ -560,19 +560,9 @@ end
 
 -- ==================== СТРАНИЦА 3 (как было в оригинале) ====================
 local function buildESPSettingsPage(parent)
-local totalH=contentHeight-15
-local espGroup=createGroup(parent,6,5,274,totalH,"ESP Settings")
-local y=12
-createCheckbox(espGroup,y,"Health ESP",false,function(v) ESP_HPEnabled=v end);y=y+22
-createCheckbox(espGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+22
-createCheckbox(espGroup,y,"Box ESP",false,function(v) Box_ESP_Enabled=v end);y=y+22
-createCheckbox(espGroup,y,"Name ESP",false,function(v) ESP_NameEnabled=v end);y=y+22
-createCheckbox(espGroup,y,"Weapon ESP",false,function(v) ESP_WeaponEnabled=v end);y=y+28
-createSlider(espGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
-local otherGroup=createGroup(parent,290,5,274,totalH,"Other")
-createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
+-- ==================== СТРАНИЦА 4 (Player ESP) ====================
 -- ==================== СТРАНИЦА 4 (Player ESP) ====================
 -- ==================== СТРАНИЦА 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
@@ -582,9 +572,8 @@ local rightX = 290
 local playerGroup = createGroup(parent, leftX, 5, 250, 270, "Player ESP")
 local otherGroup = createGroup(parent, rightX, 5, 250, 250, "Other ESP")
 local coloredGroup = createGroup(parent, leftX, 295, 250, 220, "Colored models")
-local effectsGroup = createGroup(parent, rightX, 280, 250, 250, "Effects")
+local effectsGroup = createGroup(parent, rightX, 280, 250, 235, "Effects")
 
--- Player ESP (рабочие функции)
 local y = 12
 createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 	function(val)
@@ -631,16 +620,11 @@ createCheckbox(playerGroup, y, "Weapon text", false, function(v) ESP_WeaponEnabl
 createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
 
--- Other ESP (пустая группа)
--- Colored models (пустая группа)
-
--- Effects (только NoFall работает)
 local ey = 12
 createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
 	if v then startNoFall() else stopNoFall() end
 end)
 end
-
 -- ==================== ДЕФОЛТНАЯ СТРАНИЦА ====================
 local function buildDefaultPage(parent)
 local totalH=contentHeight-15;local gg=10
