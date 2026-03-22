@@ -534,7 +534,7 @@ mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.Appl
 local fp=(defaultVal-minVal)/(maxVal-minVal)
 local sliderFill=mk("Frame",{Size=UDim2.new(fp,0,1,0),BackgroundColor3=C.sliderFill,BorderSizePixel=0,ZIndex=7,ClipsDescendants=false},sliderTrack)
 gradient(sliderFill,0,ColorSequence.new({ColorSequenceKeypoint.new(0,C.sliderFill),ColorSequenceKeypoint.new(1,C.sliderFill2)}))
-local valueLabel=mk("TextLabel",{Size=UDim2.fromOffset(50,12),AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,0,0,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=10},sliderFill)
+local valueLabel=mk("TextLabel",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=10},sliderTrack)
 local currentValue=defaultVal;local dragging=false
 local function upd(inputX)
 local tp,ts=sliderTrack.AbsolutePosition.X,sliderTrack.AbsoluteSize.X
@@ -563,89 +563,6 @@ mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),B
 return g2
 end
 
-local function createDropdown(parent,yPos,labelText,options,defaultOption,onChanged)
-local container=mk("Frame",{Size=UDim2.new(1,-16,0,40),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
-mk("TextLabel",{Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
-local dropBtn=mk("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.fromOffset(0,18),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6},container)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropBtn)
-local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=defaultOption or options[1],Font=MENU_FONT,TextSize=12,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},dropBtn)
-mk("TextLabel",{Size=UDim2.fromOffset(14,20),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▼",Font=MENU_FONT,TextSize=10,TextColor3=C.textDim,ZIndex=7},dropBtn)
-local dropOpen=false;local dropFrame=nil
-local function closeDrop() if dropFrame then dropFrame:Destroy();dropFrame=nil;dropOpen=false end end
-dropBtn.MouseButton1Click:Connect(function()
-if dropOpen then closeDrop();return end;dropOpen=true
-local btnAbs=dropBtn.AbsolutePosition;local mainAbs=main.AbsolutePosition
-local dH=#options*20+4
-dropFrame=mk("Frame",{Size=UDim2.fromOffset(dropBtn.AbsoluteSize.X,dH),Position=UDim2.fromOffset(btnAbs.X-mainAbs.X,btnAbs.Y-mainAbs.Y+22),BackgroundColor3=C.contextBg,BorderSizePixel=0,ZIndex=550},main)
-mk("UIStroke",{Color=C.contextBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropFrame)
-for i,opt in ipairs(options) do
-local optBtn=mk("TextButton",{Size=UDim2.new(1,-4,0,18),Position=UDim2.fromOffset(2,2+(i-1)*20),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=551},dropFrame)
-mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=opt,Font=MENU_FONT,TextSize=12,TextColor3=(opt==selectedLabel.Text) and C.contextSelected or C.contextUnselected,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=552},optBtn)
-optBtn.MouseEnter:Connect(function() optBtn.BackgroundTransparency=0;optBtn.BackgroundColor3=C.contextHover end)
-optBtn.MouseLeave:Connect(function() optBtn.BackgroundTransparency=1 end)
-optBtn.MouseButton1Click:Connect(function() selectedLabel.Text=opt;if onChanged then onChanged(opt) end;closeDrop() end)
-end
-task.delay(0.15,function()
-if not dropOpen then return end
-local conn;conn=UIS.InputBegan:Connect(function(input)
-if input.UserInputType==Enum.UserInputType.MouseButton1 then
-task.delay(0.05,function()
-if not dropFrame then if conn then conn:Disconnect() end;return end
-local mp=UIS:GetMouseLocation();local dp=dropFrame.AbsolutePosition;local ds=dropFrame.AbsoluteSize
-if mp.X<dp.X or mp.X>dp.X+ds.X or mp.Y<dp.Y or mp.Y>dp.Y+ds.Y then closeDrop();conn:Disconnect() end
-end)
-end
-end)
-end)
-end)
-return{getSelected=function() return selectedLabel.Text end}
-end
-
-local function createScrollList(parent,yPos,labelText,items,defaultItem,onChanged)
-local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
-local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=C.checkOff,BorderSizePixel=0,ZIndex=6},container)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
-mk("TextLabel",{Size=UDim2.new(1,-30,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
-
--- Выпадающий бокс
-local dropBox=mk("Frame",{Size=UDim2.new(1,-16,0,22),Position=UDim2.fromOffset(8,yPos+22),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=6},parent)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropBox)
-local selLabel=mk("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=defaultItem or "_",Font=MENU_FONT,TextSize=12,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},dropBox)
-mk("TextLabel",{Size=UDim2.fromOffset(14,22),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▼",Font=MENU_FONT,TextSize=10,TextColor3=C.textDim,ZIndex=7},dropBox)
-
--- Список скинов
-local listHeight = parent.Size.Y.Offset - yPos - 52 - 16
-if listHeight < 60 then listHeight = 200 end
-local listFrame=mk("Frame",{Size=UDim2.new(1,-16,0,listHeight),Position=UDim2.fromOffset(8,yPos+48),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=6,ClipsDescendants=true},parent)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},listFrame)
-
-local scrollFrame=mk("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=4,ScrollBarImageColor3=Color3.fromRGB(80,80,80),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=7},listFrame)
-mk("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,0)},scrollFrame)
-
--- Зелёная линия выбранного
-local selectedItem = defaultItem
-for i,item in ipairs(items) do
-	local isSel = (item == selectedItem)
-	local itemBtn=mk("TextButton",{Size=UDim2.new(1,-2,0,20),BackgroundColor3=isSel and Color3.fromRGB(28,28,28) or Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=8,LayoutOrder=i},scrollFrame)
-	local itemLabel=mk("TextLabel",{Size=UDim2.new(1,-12,1,0),Position=UDim2.fromOffset(8,0),BackgroundTransparency=1,Text=item,Font=MENU_FONT,TextSize=12,TextColor3=isSel and C.checkOn or C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9},itemBtn)
-	itemBtn.MouseEnter:Connect(function() if selectedItem~=item then itemBtn.BackgroundColor3=Color3.fromRGB(25,25,25) end end)
-	itemBtn.MouseLeave:Connect(function() if selectedItem~=item then itemBtn.BackgroundColor3=Color3.fromRGB(15,15,15) end end)
-	itemBtn.MouseButton1Click:Connect(function()
-		selectedItem=item;selLabel.Text=item
-		for _,ch in pairs(scrollFrame:GetChildren()) do
-			if ch:IsA("TextButton") then
-				local lbl=ch:FindFirstChildOfClass("TextLabel")
-				if lbl then
-					if lbl.Text==item then lbl.TextColor3=C.checkOn;ch.BackgroundColor3=Color3.fromRGB(28,28,28)
-					else lbl.TextColor3=C.text;ch.BackgroundColor3=Color3.fromRGB(15,15,15) end
-				end
-			end
-		end
-		if onChanged then onChanged(item) end
-	end)
-end
-end
-
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
 createGroup(parent,6,5,274,wgH,"Weapon type")
@@ -666,36 +583,45 @@ end
 
 local function buildESPSettingsPage(parent)
 	local topPad = 25
-	local gapAW = 20
 	local gapHoriz = 20
 	local bottomPad = 20
 
-	-- Weapon type: справа сверху, пустой
-	local wtW = 250
-	local wtH = 60
-	local wtX = 6 + 250 + gapHoriz
-	local wtY = topPad
-	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type")
-
-	-- Triggerbot: справа, растянут вверх до уровня weapon type
-	local trigW = 250
-	local otherH = 130
-	local otherY_bottom = wtY + wtH + gapAW + 250 + bottomPad + otherH
-	-- Тригербот от верхнего края weapon type до начала other
-	local trigX = wtX
-	local trigY = wtY + wtH + gapAW
-	local trigBottom = trigY + 250
-	createGroup(parent, trigX, trigY, trigW, 250, "Triggerbot")
-
-	-- Other: справа, под тригерботом
-	local otherW = 250
-	local otherX = wtX
-	local otherY = trigY + 250 + bottomPad
-	createGroup(parent, otherX, otherY, otherW, otherH, "Other")
-
-	-- Aimbot: слева, низ на уровне с Other
+	-- Размеры групп
 	local aimbotW = 250
 	local aimbotH = 420
+	local wtW = 250
+	local wtH = 60
+	local trigW = 250
+	local otherW = 250
+	local otherH = 130
+
+	-- Правая колонка X
+	local rightX = 6 + aimbotW + gapHoriz
+
+	-- Weapon type: справа сверху
+	local wtY = topPad
+	createGroup(parent, rightX, wtY, wtW, wtH, "Weapon type")
+
+	-- Triggerbot: справа, от верха weapon type растянут вниз
+	-- Верх тригербота на уровне верха weapon type
+	local trigY = wtY
+	-- Низ тригербота = низ weapon type + gap + высота тригербота
+	-- Тригербот растянут так чтобы его верх был напротив weapon type
+	-- Общая высота = wtH + gap + trigH оригинальный
+	local trigH = wtH + gapHoriz + 250
+	createGroup(parent, rightX, trigY, trigW, trigH, "Triggerbot")
+
+	-- Weapon type поверх тригербота (рисуется после = сверху)
+	-- Пересоздаём weapon type чтобы он был поверх
+	-- Нет, лучше тригербот начнётся ПОД weapon type
+	-- Переделаю: weapon type сверху, тригербот сразу под ним растянут
+
+	-- Other: справа, под тригерботом
+	local otherX = rightX
+	local otherY = trigY + trigH + bottomPad
+	createGroup(parent, otherX, otherY, otherW, otherH, "Other")
+
+	-- Aimbot: слева, низ на уровне с низом Other
 	local aimbotX = 6
 	local aimbotBottomY = otherY + otherH
 	local aimbotY = aimbotBottomY - aimbotH
@@ -736,40 +662,12 @@ end
 local function buildSkinsPage(parent)
 	local topPad = 20
 	local gapHoriz = 20
-
-	-- Model options: слева
 	local moW = 250
 	local moH = 500
-	local moX = 6
-	local moY = topPad
-	local modelGroup = createGroup(parent, moX, moY, moW, moH, "Model options")
-
-	local my = 12
-	createCheckbox(modelGroup, my, "Knife changer", false, nil); my = my + 22
-	createCheckbox(modelGroup, my, "Glove changer", false, nil); my = my + 22
-	createCheckbox(modelGroup, my, "Mask changer", false, nil); my = my + 22
-	createCheckbox(modelGroup, my, "Agent changer", false, nil)
-
-	-- Weapon skin: справа
 	local wsW = 250
 	local wsH = 500
-	local wsX = moX + moW + gapHoriz
-	local wsY = topPad
-	local skinGroup = createGroup(parent, wsX, wsY, wsW, wsH, "Weapon skin")
-
-	local sy = 12
-	createCheckbox(skinGroup, sy, "Enabled", false, nil); sy = sy + 22
-	createCheckbox(skinGroup, sy, "StatTrak", false, nil); sy = sy + 22
-	createSlider(skinGroup, sy, "Quality", 0, 100, 100, "%", nil); sy = sy + 28
-	createSlider(skinGroup, sy, "Seed", 0, 1000, 0, "", nil); sy = sy + 28
-
-	-- Список скинов с чекбоксом "Filter by weapon"
-	local skinItems = {
-		"-","Condition Zero","Global Offensive","Integrale","O.S.I.P.R.",
-		"Panthera onca","ZX Spectron","dev_texture","Авария","Автосвалка",
-		"Автотроника","Автотроника","Автотроника","Автотроника","Автотроника","Автотроника"
-	}
-	createScrollList(skinGroup, sy, "Filter by weapon", skinItems, "-", nil)
+	createGroup(parent, 6, topPad, moW, moH, "Model options")
+	createGroup(parent, 6 + moW + gapHoriz, topPad, wsW, wsH, "Weapon skin")
 end
 
 local function buildPlayersPage(parent)
