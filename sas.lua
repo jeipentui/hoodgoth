@@ -583,50 +583,32 @@ createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function
 end
 
 local function buildAntiAimPage(parent)
-	local topPad = 20
-	local gapHoriz = 25
-	local gapVert = 20
-	createGroup(parent, 6, topPad, 250, 500, "Anti-aimbot angles")
-	createGroup(parent, 6 + 250 + gapHoriz, topPad, 250, 230, "Fake lag")
-	createGroup(parent, 6 + 250 + gapHoriz, topPad + 230 + gapVert, 250, 230, "Other")
+	createGroup(parent, 6, 20, 250, 500, "Anti-aimbot angles")
+	createGroup(parent, 6 + 250 + 25, 20, 250, 230, "Fake lag")
+	createGroup(parent, 6 + 250 + 25, 20 + 230 + 20, 250, 230, "Other")
 end
 
 local function buildESPSettingsPage(parent)
 	local topPad = 25
 	local gapHoriz = 20
 	local gapVert = 20
-
-	-- ЛІВА КОЛОНКА
-	-- Weapon type зверху зліва
 	local wtW = 250
 	local wtH = 60
 	local wtX = 6
 	local wtY = topPad
 	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type")
-
-	-- Aimbot під weapon type зліва
 	local aimbotW = 250
 	local aimbotH = 420
 	local aimbotX = 6
 	local aimbotY = wtY + wtH + gapVert
 	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
-
-	-- ПРАВА КОЛОНКА
 	local rightX = 6 + 250 + gapHoriz
-
-	-- Triggerbot справа, розтягнутий від верху до Other
-	-- Його верх на рівні з Weapon type
 	local trigY = topPad
-	-- Other внизу справа
 	local otherH = 130
-	-- Низ Other на рівні з низом Aimbot
 	local aimbotBottom = aimbotY + aimbotH
 	local otherY = aimbotBottom - otherH
-	-- Triggerbot від верху до Other
 	local trigH = otherY - trigY - gapVert
 	createGroup(parent, rightX, trigY, 250, trigH, "Triggerbot")
-
-	-- Other справа внизу
 	createGroup(parent, rightX, otherY, 250, otherH, "Other")
 end
 
@@ -662,10 +644,8 @@ end)
 end
 
 local function buildSkinsPage(parent)
-	local topPad = 20
-	local gapHoriz = 20
-	createGroup(parent, 6, topPad, 250, 500, "Model options")
-	createGroup(parent, 6 + 250 + gapHoriz, topPad, 250, 500, "Weapon skin")
+	createGroup(parent, 6, 20, 250, 500, "Model options")
+	createGroup(parent, 6 + 250 + 20, 20, 250, 500, "Weapon skin")
 end
 
 local function buildPlayersPage(parent)
@@ -705,12 +685,9 @@ Players.PlayerAdded:Connect(function() task.wait(0.5);refreshPlayerList() end)
 Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==plr.Name then playerPageData.selectedPlayer=nil;selectedLabel.Text="No player selected";selectedLabel.TextColor3=C.textDim end;task.wait(0.1);refreshPlayerList() end)
 end
 
-local function buildDefaultPage(parent)
-local totalH=contentHeight-15;local gg=10
-local lt=math.floor(totalH*0.45);local lb=totalH-lt-gg
-local rt=math.floor(totalH*0.3);local rm=math.floor(totalH*0.3);local rb=totalH-rt-rm-gg*2
-createGroup(parent,6,5,274,lt,"Group A");createGroup(parent,6,5+lt+gg,274,lb,"Group B")
-createGroup(parent,290,5,274,rt,"Group C");createGroup(parent,290,5+rt+gg,274,rm,"Group D");createGroup(parent,290,5+rt+gg+rm+gg,274,rb,"Group E")
+local function buildConfigPage(parent)
+	createGroup(parent, 6, 20, 250, 500, "Presets")
+	createGroup(parent, 6 + 250 + 20, 20, 250, 500, "Lua")
 end
 
 local function createTab(index,imageId)
@@ -725,7 +702,8 @@ elseif index==4 then buildPlayerESPPage(page)
 elseif index==5 then buildMiscPage(page)
 elseif index==6 then buildSkinsPage(page)
 elseif index==7 then buildPlayersPage(page)
-else buildDefaultPage(page) end
+elseif index==8 then buildConfigPage(page)
+end
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
 holder.MouseButton1Click:Connect(function() closeActiveContext();for _,closeFunc in ipairs(allColorPickers) do closeFunc() end;for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end end)
 end
