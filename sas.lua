@@ -693,7 +693,12 @@ end
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
+mk("UIStroke",{Color=Color3.fromRGB(50,50,50),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},holder)
 local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
+local hasTriangle=(index==2 or index==3 or index==5 or index==7 or index==8)
+if hasTriangle then
+local tri=mk("Frame",{Size=UDim2.fromOffset(5,5),Position=UDim2.new(0,-2,1,-2),BackgroundColor3=Color3.fromRGB(50,50,50),BorderSizePixel=0,ZIndex=23,ClipsDescendants=true,Rotation=45},holder)
+end
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
 if index==1 then buildRagebotPage(page)
 elseif index==2 then buildAntiAimPage(page)
