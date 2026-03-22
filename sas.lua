@@ -624,7 +624,16 @@ refreshPlayerList();searchBox:GetPropertyChangedSignal("Text"):Connect(function(
 Players.PlayerAdded:Connect(function() task.wait(0.5);refreshPlayerList() end)
 Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==plr.Name then playerPageData.selectedPlayer=nil;selectedLabel.Text="No player selected";selectedLabel.TextColor3=C.textDim end;task.wait(0.1);refreshPlayerList() end)
 end
+local function buildMiscPage(parent)
+local miscGroup = createGroup(parent, 6, 5, 250, 510, "Miscellaneous")
+local movGroup = createGroup(parent, 281, 5, 250, 245, "Movement")
+local setGroup = createGroup(parent, 281, 270, 250, 245, "Settings")
 
+local my = 12
+createCheckbox(movGroup, my, "NoFall protection", false, function(v)
+	if v then startNoFall() else stopNoFall() end
+end)
+end
 local function buildDefaultPage(parent)
 local totalH=contentHeight-15;local gg=10
 local lt=math.floor(totalH*0.45);local lb=totalH-lt-gg
@@ -638,7 +647,7 @@ local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
 local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
-if index==1 then buildRagebotPage(page) elseif index==3 then buildESPSettingsPage(page) elseif index==4 then buildPlayerESPPage(page) elseif index==7 then buildPlayersPage(page) else buildDefaultPage(page) end
+if index==1 then buildRagebotPage(page) elseif index==3 then buildESPSettingsPage(page) elseif index==4 then buildPlayerESPPage(page) elseif index==5 then buildMiscPage(page) elseif index==7 then buildPlayersPage(page) else buildDefaultPage(page) end
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
 holder.MouseButton1Click:Connect(function() closeActiveContext();for _,closeFunc in ipairs(allColorPickers) do closeFunc() end;for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end end)
 end
