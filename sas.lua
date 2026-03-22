@@ -563,7 +563,6 @@ local function buildESPSettingsPage(parent)
 end
 
 -- ==================== СТРАНИЦА 4 (Player ESP) ====================
--- ==================== СТРАНИЦА 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
 local leftX = 6
 local rightX = 290
