@@ -89,6 +89,27 @@ local Settings={
     Weapon_Color=Color3.fromRGB(255,0,0)
 }
 
+local playerPageData = {
+    selectedPlayer = nil,
+    playerSettings = {},
+    buttons = {},
+    searchText = "",
+}
+
+local function getPlayerSettings(plrName)
+    if not playerPageData.playerSettings[plrName] then
+        playerPageData.playerSettings[plrName] = {
+            whitelisted = false,
+            disableVisuals = false,
+            boxColor = Color3.fromRGB(255,0,0),
+            nameColor = Color3.fromRGB(255,0,0),
+            hpColor = Color3.fromRGB(255,0,0),
+            weaponColor = Color3.fromRGB(255,0,0),
+        }
+    end
+    return playerPageData.playerSettings[plrName]
+end
+
 local fovCircle=Drawing.new("Circle")
 fovCircle.Visible=false;fovCircle.Color=fovColor;fovCircle.Thickness=2;fovCircle.NumSides=100
 
@@ -327,20 +348,29 @@ end
 end
 local function updatePlayerESP(plr)
 if not isESPActive() then hidePlayerESP(plr);return end
+if playerPageData.playerSettings[plr.Name] then
+    if playerPageData.playerSettings[plr.Name].disableVisuals then hidePlayerESP(plr);return end
+end
 if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then hidePlayerESP(plr);return end
 local char=plr.Character;if not char then cleanupPlayerESP(plr);return end
 local h=char:FindFirstChild("Humanoid");if not h or h.Health<=0 then cleanupPlayerESP(plr);return end
 if not ESP_HPText[plr] then createESPObjects(plr) end
 local data=viewportCache[plr];if not data or not data.anyVisible then hidePlayerESP(plr);return end
+local ps = playerPageData.playerSettings[plr.Name]
+local hpCol = (ps and ps.hpColor) or Settings.HP_Color
+local nameCol = (ps and ps.nameColor) or Settings.Name_Color
+local weapCol = (ps and ps.weaponColor) or Settings.Weapon_Color
+local boxCol = (ps and ps.boxColor) or Settings.Box_Color
+if isFriend(plr) then hpCol=Settings.Friend_Color;nameCol=Settings.Friend_Color;weapCol=Settings.Friend_Color;boxCol=Settings.Friend_Color end
 if data.head and data.head.visible then local hp2=data.head.pos
-if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or (isFriend(plr) and Settings.Friend_Color or Settings.HP_Color);ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
-if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=isFriend(plr) and Settings.Friend_Color or Settings.Name_Color;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
-if ESP_WeaponEnabled then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=isFriend(plr) and Settings.Friend_Color or Settings.Weapon_Color;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
+if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or hpCol;ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
+if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=nameCol;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
+if ESP_WeaponEnabled then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=weapCol;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
 else ESP_HPText[plr].Visible=false;ESP_NameText[plr].Visible=false;ESP_WeaponText[plr].Visible=false end
 if Box_ESP_Enabled and ESP_Boxes[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
-if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes[plr].box.Size=Vector2.new(w,hh);ESP_Boxes[plr].box.Color=isFriend(plr) and Settings.Friend_Color or Settings.Box_Color;ESP_Boxes[plr].box.Visible=true;ESP_Boxes[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline.Visible=true
+if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes[plr].box.Size=Vector2.new(w,hh);ESP_Boxes[plr].box.Color=boxCol;ESP_Boxes[plr].box.Visible=true;ESP_Boxes[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline.Visible=true
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 elseif ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
@@ -350,7 +380,6 @@ local function initPlayer(plr) if plr==lp then return end;plr.CharacterAdded:Con
 for _,plr in pairs(Players:GetPlayers()) do if plr~=lp then initPlayer(plr) end end
 Players.PlayerAdded:Connect(function(plr) if plr~=lp then initPlayer(plr) end end)
 Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
-
 local function mk(class,props,parent) local o=Instance.new(class);for k,v in pairs(props) do o[k]=v end;if parent then o.Parent=parent end;return o end
 local function gradient(parent,rotation,seq) local g=Instance.new("UIGradient");g.Rotation=rotation or 0;g.Color=seq;g.Parent=parent;return g end
 local function addDotPattern(parent,colorA,colorB,tile)
@@ -468,22 +497,13 @@ local pickerOpen=false;local pickerFrame=nil;local pickerConns={}
 clickArea.MouseButton1Click:Connect(function() enabled=not enabled;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff;if onToggle then onToggle(enabled) end end)
 local function applyColor() currentColor=Color3.fromHSV(currentH,currentS,currentV);preview.BackgroundColor3=currentColor;if onColorChanged then onColorChanged(currentColor) end end
 local function closePicker()
-if pickerFrame then
-for _,c in ipairs(pickerConns) do c:Disconnect() end
-pickerConns={}
-pickerFrame:Destroy()
-pickerFrame=nil
-pickerOpen=false
-for i,p in ipairs(allColorPickers) do
-if p==closePicker then table.remove(allColorPickers,i);break end
-end
-end
-end
+if pickerFrame then for _,c in ipairs(pickerConns) do c:Disconnect() end;pickerConns={};pickerFrame:Destroy();pickerFrame=nil;pickerOpen=false
+for i,p in ipairs(allColorPickers) do if p==closePicker then table.remove(allColorPickers,i);break end end
+end end
 previewBtn.MouseButton1Click:Connect(function()
 if pickerOpen then closePicker();return end
 for _,closeFunc in ipairs(allColorPickers) do closeFunc() end
-pickerOpen=true
-table.insert(allColorPickers,closePicker)
+pickerOpen=true;table.insert(allColorPickers,closePicker)
 local PS=120;local HW=14
 local anchorAbs=preview.AbsolutePosition;local mainAbs=main.AbsolutePosition
 pickerFrame=mk("Frame",{Size=UDim2.fromOffset(PS+HW+12,PS+8),Position=UDim2.fromOffset(anchorAbs.X-mainAbs.X-PS-HW-16,anchorAbs.Y-mainAbs.Y-4),BackgroundColor3=C.contextBg,BorderSizePixel=0,ZIndex=600},main)
@@ -578,68 +598,95 @@ createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v 
 createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
-local function buildESPSettingsPage(parent)
-end
+local function buildESPSettingsPage(parent) end
 
 local function buildPlayerESPPage(parent)
-local leftX = 6
-local rightX = 290
-
-local playerGroup = createGroup(parent, leftX, 5, 250, 270, "Player ESP")
-local otherGroup = createGroup(parent, rightX, 5, 250, 250, "Other ESP")
-local coloredGroup = createGroup(parent, leftX, 295, 250, 220, "Colored models")
-local effectsGroup = createGroup(parent, rightX, 280, 250, 235, "Effects")
-
-local y = 12
-createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
-	function(val)
-		espVisualEnabled = val
-		if not val then
-			for plr, _ in pairs(ESP_HPText) do hidePlayerESP(plr) end
-		end
-	end,
-	function(bindLabel)
-		if isRecordingESPKeybind then return end
-		isRecordingESPKeybind = true
-		bindLabel.Text = "[-]"
-		bindLabel.TextColor3 = C.bindRecording
-		local conn
-		conn = UIS.InputBegan:Connect(function(input)
-			if not isRecordingESPKeybind then return end
-			if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-			if input.KeyCode == Enum.KeyCode.Escape then
-				isRecordingESPKeybind = false; conn:Disconnect()
-				espVisualKey = nil; espVisualKeyName = "Not Set"
-				bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return
-			end
-			if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end
-			isRecordingESPKeybind = false; conn:Disconnect()
-			espVisualKey = input.KeyCode; espVisualKeyName = input.KeyCode.Name
-			bindLabel.Text = "[" .. espVisualKeyName .. "]"; bindLabel.TextColor3 = C.bindText
-		end)
-		task.delay(5, function()
-			if isRecordingESPKeybind then
-				isRecordingESPKeybind = false; if conn then conn:Disconnect() end
-				bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"
-				bindLabel.TextColor3 = C.bindText
-			end
-		end)
-	end,
-	function(mode) espVisualMode = mode end,
-	function() return espVisualMode end
-)
-y = y + 22
-createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255,0,0), function(v) Box_ESP_Enabled = v end, function(c) Settings.Box_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255,0,0), function(v) ESP_HPEnabled = v end, function(c) Settings.HP_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255,0,0), function(v) ESP_NameEnabled = v end, function(c) Settings.Name_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255,0,0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.Weapon_Color = c end); y = y + 22
-createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
-createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
-
-local ey = 12
-createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
-	if v then startNoFall() else stopNoFall() end
+local leftX=6;local rightX=290
+local playerGroup=createGroup(parent,leftX,5,250,270,"Player ESP")
+local otherGroup=createGroup(parent,rightX,5,250,250,"Other ESP")
+local coloredGroup=createGroup(parent,leftX,295,250,220,"Colored models")
+local effectsGroup=createGroup(parent,rightX,280,250,235,"Effects")
+local y=12
+createCheckboxWithBind(playerGroup,y,"Activation type",false,"[-]",
+function(val) espVisualEnabled=val;if not val then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end,
+function(bindLabel)
+if isRecordingESPKeybind then return end;isRecordingESPKeybind=true;bindLabel.Text="[-]";bindLabel.TextColor3=C.bindRecording
+local conn;conn=UIS.InputBegan:Connect(function(input)
+if not isRecordingESPKeybind then return end;if input.UserInputType~=Enum.UserInputType.Keyboard then return end
+if input.KeyCode==Enum.KeyCode.Escape then isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=nil;espVisualKeyName="Not Set";bindLabel.Text="[-]";bindLabel.TextColor3=C.bindText;return end
+if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift or input.KeyCode==Enum.KeyCode.LeftControl or input.KeyCode==Enum.KeyCode.RightControl or input.KeyCode==Enum.KeyCode.LeftAlt or input.KeyCode==Enum.KeyCode.RightAlt then return end
+isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=input.KeyCode;espVisualKeyName=input.KeyCode.Name;bindLabel.Text="["..espVisualKeyName.."]";bindLabel.TextColor3=C.bindText
 end)
+task.delay(5,function() if isRecordingESPKeybind then isRecordingESPKeybind=false;if conn then conn:Disconnect() end;bindLabel.Text=espVisualKey and("["..espVisualKeyName.."]") or "[-]";bindLabel.TextColor3=C.bindText end end)
+end,
+function(mode) espVisualMode=mode end,function() return espVisualMode end)
+y=y+22
+createCheckboxWithColor(playerGroup,y,"Bounding box",false,Color3.fromRGB(255,0,0),function(v) Box_ESP_Enabled=v end,function(c) Settings.Box_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Health bar",false,Color3.fromRGB(255,0,0),function(v) ESP_HPEnabled=v end,function(c) Settings.HP_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Name",false,Color3.fromRGB(255,0,0),function(v) ESP_NameEnabled=v end,function(c) Settings.Name_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Weapon text",false,Color3.fromRGB(255,0,0),function(v) ESP_WeaponEnabled=v end,function(c) Settings.Weapon_Color=c end);y=y+22
+createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
+createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
+local ey=12
+createCheckbox(effectsGroup,ey,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
+end
+
+local function buildPlayersPage(parent)
+local playersGroup=createGroup(parent,6,5,250,510,"Players")
+local adjustGroup=createGroup(parent,266,5,298,510,"Adjustments")
+local listFrame=mk("Frame",{Size=UDim2.new(1,-16,1,-52),Position=UDim2.fromOffset(8,12),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=4,ClipsDescendants=true},playersGroup)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},listFrame)
+local scrollFrame=mk("ScrollingFrame",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=4,ScrollBarImageColor3=Color3.fromRGB(80,80,80),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=5},listFrame)
+mk("UIListLayout",{SortOrder=Enum.SortOrder.Name,Padding=UDim.new(0,1)},scrollFrame)
+local searchBox=mk("TextBox",{Size=UDim2.new(1,-16,0,22),Position=UDim2.new(0,8,1,-32),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",PlaceholderText="Search player...",Font=MENU_FONT,TextSize=12,TextColor3=C.text,PlaceholderColor3=C.textDim,ClearTextOnFocus=false,ZIndex=5},playersGroup)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},searchBox)
+local rightContent=mk("Frame",{Size=UDim2.new(1,-16,1,-20),Position=UDim2.fromOffset(8,12),BackgroundTransparency=1,ZIndex=4},adjustGroup)
+local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,0,0,18),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,Text="No player selected",Font=MENU_FONT,TextSize=13,TextColor3=C.textDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},rightContent)
+local adjustY=24
+local whitelistCB=createCheckbox(rightContent,adjustY,"Add to whitelist",false,function(v)
+if playerPageData.selectedPlayer then
+local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.whitelisted=v
+if v then local found=false;for _,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then found=true;break end end;if not found then table.insert(FriendList,playerPageData.selectedPlayer) end
+else for i,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then table.remove(FriendList,i);break end end end
+end end)
+adjustY=adjustY+22
+local disableVisCB=createCheckbox(rightContent,adjustY,"Disable visuals",false,function(v)
+if playerPageData.selectedPlayer then
+local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.disableVisuals=v
+if v then local plr=Players:FindFirstChild(playerPageData.selectedPlayer);if plr then hidePlayerESP(plr) end end
+end end)
+adjustY=adjustY+28
+createCheckboxWithColor(rightContent,adjustY,"Box color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).boxColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"HP color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).hpColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"Name color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).nameColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"Weapon color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).weaponColor=c end end)
+
+local function refreshPlayerList()
+for _,child in pairs(scrollFrame:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+playerPageData.buttons={}
+local search=searchBox.Text:lower()
+local plist=Players:GetPlayers();table.sort(plist,function(a,b) return a.Name:lower()<b.Name:lower() end)
+for _,plr in pairs(plist) do
+if plr~=lp then
+if search=="" or plr.Name:lower():find(search,1,true) then
+local isSelected=(playerPageData.selectedPlayer==plr.Name)
+local btn=mk("TextButton",{Size=UDim2.new(1,-2,0,20),BackgroundColor3=isSelected and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6,Name=plr.Name},scrollFrame)
+local ps=getPlayerSettings(plr.Name)
+local nameCol=ps.whitelisted and Settings.Friend_Color or C.text
+mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=plr.Name,Font=MENU_FONT,TextSize=12,TextColor3=nameCol,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},btn)
+btn.MouseEnter:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(28,28,28) end end)
+btn.MouseLeave:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(18,18,18) end end)
+btn.MouseButton1Click:Connect(function()
+playerPageData.selectedPlayer=plr.Name;selectedLabel.Text=plr.Name
+local s=getPlayerSettings(plr.Name);whitelistCB.setEnabled(s.whitelisted);disableVisCB.setEnabled(s.disableVisuals)
+for _,b in pairs(playerPageData.buttons) do b.BackgroundColor3=(b.Name==plr.Name) and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18) end
+end)
+playerPageData.buttons[#playerPageData.buttons+1]=btn
+end end end end
+refreshPlayerList()
+searchBox:GetPropertyChangedSignal("Text"):Connect(function() refreshPlayerList() end)
+Players.PlayerAdded:Connect(function() task.wait(0.5);refreshPlayerList() end)
+Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==plr.Name then playerPageData.selectedPlayer=nil;selectedLabel.Text="No player selected" end;task.wait(0.1);refreshPlayerList() end)
 end
 
 local function buildDefaultPage(parent)
@@ -656,20 +703,15 @@ local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
 local icon=mk("ImageLabel",{Size=UDim2.fromOffset(36,36),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
-
 if index==1 then buildRagebotPage(page)
 elseif index==3 then buildESPSettingsPage(page)
 elseif index==4 then buildPlayerESPPage(page)
+elseif index==7 then buildPlayersPage(page)
 else buildDefaultPage(page) end
-
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
 holder.MouseButton1Click:Connect(function()
-    closeActiveContext()
-    for _,closeFunc in ipairs(allColorPickers) do closeFunc() end
-    for i=1,#tabButtons do
-        tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1)
-        pages[i].Visible=(i==index)
-    end
+closeActiveContext();for _,closeFunc in ipairs(allColorPickers) do closeFunc() end
+for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end
 end)
 end
 
@@ -694,47 +736,28 @@ UIS.InputBegan:Connect(function(input,gp)
 if gp then return end
 if input.KeyCode==Enum.KeyCode.K then gui.Enabled=not gui.Enabled;return end
 if isRecordingKeybind or isRecordingESPKeybind then return end
-
 if espVisualKey and input.KeyCode==espVisualKey then
-	if espVisualMode=="Toggle" then
-		espVisualToggled=not espVisualToggled
-		if not isESPActive() then
-			for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
-		end
-	elseif espVisualMode=="On hotkey" then
-		espVisualKeyHeld=true
-	elseif espVisualMode=="Off hotkey" then
-		espVisualKeyHeld=true
-		if not isESPActive() then
-			for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
-		end
-	end
+if espVisualMode=="Toggle" then espVisualToggled=not espVisualToggled;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
+elseif espVisualMode=="On hotkey" then espVisualKeyHeld=true
+elseif espVisualMode=="Off hotkey" then espVisualKeyHeld=true;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end
 end
-
 if aimlockKey and input.KeyCode==aimlockKey then
-	aimlockKeyHeld=true
-	if aimlockMode=="Toggle" then keyHeld=not keyHeld
-	elseif aimlockMode=="On hotkey" then keyHeld=true;currentTarget=nil;targetLocked=false
-	elseif aimlockMode=="Off hotkey" then keyHeld=false end
+aimlockKeyHeld=true
+if aimlockMode=="Toggle" then keyHeld=not keyHeld
+elseif aimlockMode=="On hotkey" then keyHeld=true;currentTarget=nil;targetLocked=false
+elseif aimlockMode=="Off hotkey" then keyHeld=false end
 end
 end)
 
 UIS.InputEnded:Connect(function(input)
 if espVisualKey and input.KeyCode==espVisualKey then
-	if espVisualMode=="On hotkey" then
-		espVisualKeyHeld=false
-		if not isESPActive() then
-			for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end
-		end
-	elseif espVisualMode=="Off hotkey" then
-		espVisualKeyHeld=false
-	end
+if espVisualMode=="On hotkey" then espVisualKeyHeld=false;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
+elseif espVisualMode=="Off hotkey" then espVisualKeyHeld=false end
 end
-
 if aimlockKey and input.KeyCode==aimlockKey then
-	aimlockKeyHeld=false
-	if aimlockMode=="On hotkey" then keyHeld=false;currentTarget=nil;targetLocked=false
-	elseif aimlockMode=="Off hotkey" then keyHeld=true end
+aimlockKeyHeld=false
+if aimlockMode=="On hotkey" then keyHeld=false;currentTarget=nil;targetLocked=false
+elseif aimlockMode=="Off hotkey" then keyHeld=true end
 end
 end)
 
@@ -743,24 +766,20 @@ local currentTool;local lastSilentShot=0;local SILENT_FIRE_RATE=0.08
 RunService.RenderStepped:Connect(function()
 updateFrameCache()
 local aimActive=isAimbotActive()
-
 if silentAimEnabled and aimActive then
-	updateSilentAimTarget()
-	if silentAimTarget then local tool=lp.Character and lp.Character:FindFirstChildOfClass("Tool")
-		if tool and(tick()-lastSilentShot>=SILENT_FIRE_RATE) then lastSilentShot=tick();local saved=Camera.CFrame;Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,getPredictedPosition(silentAimTarget));tool:Activate();Camera.CFrame=saved end
-	end
+updateSilentAimTarget()
+if silentAimTarget then local tool=lp.Character and lp.Character:FindFirstChildOfClass("Tool")
+if tool and(tick()-lastSilentShot>=SILENT_FIRE_RATE) then lastSilentShot=tick();local saved=Camera.CFrame;Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,getPredictedPosition(silentAimTarget));tool:Activate();Camera.CFrame=saved end
+end
 else silentAimTarget=nil end
-
 if aimbotEnabled and showFOV and fovDegrees<180 then fovCircle.Position=frameCache.mousePos;fovCircle.Radius=getFOVPixelRadius();fovCircle.Color=fovColor;fovCircle.Visible=true else fovCircle.Visible=false end
-
 if aimbotEnabled and not silentAimEnabled and aimActive then
-	local th=getTarget()
-	if th then local plr=Players:GetPlayerFromCharacter(th.Parent)
-		if plr and isValidTarget(plr,th) then Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,getPredictedPosition(th));if autofireEnabled then currentTool=lp.Character and lp.Character:FindFirstChildOfClass("Tool");if currentTool then currentTool:Activate() end end
-		else currentTarget=nil;targetLocked=false;if currentTool then currentTool:Deactivate();currentTool=nil end end
-	else if currentTool then currentTool:Deactivate();currentTool=nil end end
+local th=getTarget()
+if th then local plr=Players:GetPlayerFromCharacter(th.Parent)
+if plr and isValidTarget(plr,th) then Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,getPredictedPosition(th));if autofireEnabled then currentTool=lp.Character and lp.Character:FindFirstChildOfClass("Tool");if currentTool then currentTool:Activate() end end
+else currentTarget=nil;targetLocked=false;if currentTool then currentTool:Deactivate();currentTool=nil end end
+else if currentTool then currentTool:Deactivate();currentTool=nil end end
 else if not silentAimEnabled and currentTool then currentTool:Deactivate();currentTool=nil end;if not aimActive then currentTarget=nil;targetLocked=false end end
-
 updatePlayersInRangeCache();cacheViewportPoints()
 for plr,inR in pairs(playersInRange) do if inR then updatePlayerESP(plr) else hidePlayerESP(plr) end end
 end)
