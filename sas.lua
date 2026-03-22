@@ -40,6 +40,7 @@ bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
 contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
 contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
+greenText=Color3.fromRGB(156,199,40),
 }
 
 local aimbotEnabled=false
@@ -563,6 +564,56 @@ mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),B
 return g2
 end
 
+local function createDropdown(parent,yPos,labelText,options,defaultOption,onChanged)
+local container=mk("Frame",{Size=UDim2.new(1,-16,0,40),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
+mk("TextLabel",{Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
+local dropBtn=mk("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.fromOffset(0,18),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6},container)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropBtn)
+local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=defaultOption or options[1],Font=MENU_FONT,TextSize=12,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},dropBtn)
+mk("TextLabel",{Size=UDim2.fromOffset(14,20),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▼",Font=MENU_FONT,TextSize=10,TextColor3=C.textDim,ZIndex=7},dropBtn)
+local dropOpen=false;local dropFrame=nil
+local function closeDrop() if dropFrame then dropFrame:Destroy();dropFrame=nil;dropOpen=false end end
+dropBtn.MouseButton1Click:Connect(function()
+if dropOpen then closeDrop();return end;dropOpen=true
+local btnAbs=dropBtn.AbsolutePosition;local mainAbs=main.AbsolutePosition
+local dH=#options*20+4
+dropFrame=mk("Frame",{Size=UDim2.fromOffset(dropBtn.AbsoluteSize.X,dH),Position=UDim2.fromOffset(btnAbs.X-mainAbs.X,btnAbs.Y-mainAbs.Y+22),BackgroundColor3=C.contextBg,BorderSizePixel=0,ZIndex=550},main)
+mk("UIStroke",{Color=C.contextBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropFrame)
+for i,opt in ipairs(options) do
+local optBtn=mk("TextButton",{Size=UDim2.new(1,-4,0,18),Position=UDim2.fromOffset(2,2+(i-1)*20),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=551},dropFrame)
+mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=opt,Font=MENU_FONT,TextSize=12,TextColor3=(opt==selectedLabel.Text) and C.contextSelected or C.contextUnselected,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=552},optBtn)
+optBtn.MouseEnter:Connect(function() optBtn.BackgroundTransparency=0;optBtn.BackgroundColor3=C.contextHover end)
+optBtn.MouseLeave:Connect(function() optBtn.BackgroundTransparency=1 end)
+optBtn.MouseButton1Click:Connect(function() selectedLabel.Text=opt;if onChanged then onChanged(opt) end;closeDrop() end)
+end
+task.delay(0.15,function()
+if not dropOpen then return end
+local conn;conn=UIS.InputBegan:Connect(function(input)
+if input.UserInputType==Enum.UserInputType.MouseButton1 then
+task.delay(0.05,function()
+if not dropFrame then if conn then conn:Disconnect() end;return end
+local mp=UIS:GetMouseLocation();local dp=dropFrame.AbsolutePosition;local ds=dropFrame.AbsoluteSize
+if mp.X<dp.X or mp.X>dp.X+ds.X or mp.Y<dp.Y or mp.Y>dp.Y+ds.Y then closeDrop();conn:Disconnect() end
+end)
+end
+end)
+end)
+end)
+return{getSelected=function() return selectedLabel.Text end}
+end
+
+-- Чекбокс с зелёным текстом и биндом (для On shot anti-aim, Fake peek)
+local function createGreenCheckboxWithBind(parent,yPos,labelText,defaultValue,bindText)
+local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
+local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=defaultValue and C.checkOn or C.checkOff,BorderSizePixel=0,ZIndex=6},container)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
+mk("TextLabel",{Size=UDim2.new(1,-55,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.greenText,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
+mk("TextLabel",{Size=UDim2.fromOffset(40,14),Position=UDim2.new(1,-40,0,2),BackgroundTransparency=1,Text=bindText or "[-]",Font=MENU_FONT,TextSize=11,TextColor3=C.bindText,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=7},container)
+local clickArea=mk("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=8},container)
+local enabled=defaultValue
+clickArea.MouseButton1Click:Connect(function() enabled=not enabled;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff end)
+end
+
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
 createGroup(parent,6,5,274,wgH,"Weapon type")
@@ -581,51 +632,82 @@ createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v 
 createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
+local function buildAntiAimPage(parent)
+	local topPad = 20
+	local gapHoriz = 25
+	local gapVert = 20
+
+	-- Anti-aimbot angles: слева
+	local aaW = 250
+	local aaH = 500
+	local aaX = 6
+	local aaY = topPad
+	local aaGroup = createGroup(parent, aaX, aaY, aaW, aaH, "Anti-aimbot angles")
+
+	local ay = 12
+	createCheckbox(aaGroup, ay, "Enabled", false, nil); ay = ay + 22
+	createDropdown(aaGroup, ay, "Pitch", {"Off","Down","Minimal","Up"}, "Off", nil); ay = ay + 48
+	createDropdown(aaGroup, ay, "Yaw base", {"Local view","At targets"}, "Local view", nil); ay = ay + 48
+	createDropdown(aaGroup, ay, "Yaw", {"Off","180","Spin","Static","Manual"}, "Off", nil); ay = ay + 48
+	createDropdown(aaGroup, ay, "Body yaw", {"Off","Opposite","Jitter","Static"}, "Off", nil); ay = ay + 48
+	createCheckbox(aaGroup, ay, "Edge yaw", false, nil); ay = ay + 22
+	createCheckboxWithBind(aaGroup, ay, "Freestanding", false, "[-]", nil, nil, nil, nil); ay = ay + 22
+	createSlider(aaGroup, ay, "Roll", 0, 360, 0, "°", nil)
+
+	-- Правая колонка X
+	local rightX = aaX + aaW + gapHoriz
+
+	-- Fake lag: справа сверху
+	local flW = 250
+	local flH = 230
+	local flY = topPad
+	local flGroup = createGroup(parent, rightX, flY, flW, flH, "Fake lag")
+
+	local fy = 12
+	createCheckboxWithBind(flGroup, fy, "Enabled", false, "[-]", nil, nil, nil, nil); fy = fy + 22
+	createDropdown(flGroup, fy, "Amount", {"Dynamic","Maximum","Fluctuate"}, "Dynamic", nil); fy = fy + 48
+	createSlider(flGroup, fy, "Variance", 0, 100, 0, "%", nil); fy = fy + 28
+	createSlider(flGroup, fy, "Limit", 0, 64, 13, "", nil)
+
+	-- Other: справа, под fake lag
+	local otW = 250
+	local otH = 230
+	local otY = flY + flH + gapVert
+	local otGroup = createGroup(parent, rightX, otY, otW, otH, "Other")
+
+	local oy = 12
+	createCheckboxWithBind(otGroup, oy, "Slow motion", false, "[CAP]", nil, nil, nil, nil); oy = oy + 22
+	createDropdown(otGroup, oy, "Leg movement", {"Off","Always slide","Never slide"}, "Off", nil); oy = oy + 48
+	createGreenCheckboxWithBind(otGroup, oy, "On shot anti-aim", false, "[-]"); oy = oy + 22
+	createGreenCheckboxWithBind(otGroup, oy, "Fake peek", false, "[*]")
+end
+
 local function buildESPSettingsPage(parent)
 	local topPad = 25
 	local gapHoriz = 20
 	local bottomPad = 20
 
-	-- Размеры групп
 	local aimbotW = 250
 	local aimbotH = 420
-	local wtW = 250
-	local wtH = 60
 	local trigW = 250
 	local otherW = 250
 	local otherH = 130
 
-	-- Правая колонка X
 	local rightX = 6 + aimbotW + gapHoriz
 
-	-- Weapon type: справа сверху
-	local wtY = topPad
-	createGroup(parent, rightX, wtY, wtW, wtH, "Weapon type")
-
-	-- Triggerbot: справа, от верха weapon type растянут вниз
-	-- Верх тригербота на уровне верха weapon type
-	local trigY = wtY
-	-- Низ тригербота = низ weapon type + gap + высота тригербота
-	-- Тригербот растянут так чтобы его верх был напротив weapon type
-	-- Общая высота = wtH + gap + trigH оригинальный
-	local trigH = wtH + gapHoriz + 250
+	-- Тригербот: справа, от самого верха
+	local trigY = topPad
+	local trigH = 330
 	createGroup(parent, rightX, trigY, trigW, trigH, "Triggerbot")
 
-	-- Weapon type поверх тригербота (рисуется после = сверху)
-	-- Пересоздаём weapon type чтобы он был поверх
-	-- Нет, лучше тригербот начнётся ПОД weapon type
-	-- Переделаю: weapon type сверху, тригербот сразу под ним растянут
-
 	-- Other: справа, под тригерботом
-	local otherX = rightX
 	local otherY = trigY + trigH + bottomPad
-	createGroup(parent, otherX, otherY, otherW, otherH, "Other")
+	createGroup(parent, rightX, otherY, otherW, otherH, "Other")
 
-	-- Aimbot: слева, низ на уровне с низом Other
-	local aimbotX = 6
+	-- Aimbot: слева, низ на уровне с Other
 	local aimbotBottomY = otherY + otherH
 	local aimbotY = aimbotBottomY - aimbotH
-	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
+	createGroup(parent, 6, aimbotY, aimbotW, aimbotH, "Aimbot")
 end
 
 local function buildPlayerESPPage(parent)
@@ -662,12 +744,8 @@ end
 local function buildSkinsPage(parent)
 	local topPad = 20
 	local gapHoriz = 20
-	local moW = 250
-	local moH = 500
-	local wsW = 250
-	local wsH = 500
-	createGroup(parent, 6, topPad, moW, moH, "Model options")
-	createGroup(parent, 6 + moW + gapHoriz, topPad, wsW, wsH, "Weapon skin")
+	createGroup(parent, 6, topPad, 250, 500, "Model options")
+	createGroup(parent, 6 + 250 + gapHoriz, topPad, 250, 500, "Weapon skin")
 end
 
 local function buildPlayersPage(parent)
@@ -721,6 +799,7 @@ local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Positi
 local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
 if index==1 then buildRagebotPage(page)
+elseif index==2 then buildAntiAimPage(page)
 elseif index==3 then buildESPSettingsPage(page)
 elseif index==4 then buildPlayerESPPage(page)
 elseif index==5 then buildMiscPage(page)
