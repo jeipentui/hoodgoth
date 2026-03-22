@@ -564,7 +564,6 @@ end
 
 -- ==================== СТРАНИЦА 4 (Player ESP) ====================
 -- ==================== СТРАНИЦА 4 (Player ESP) ====================
--- ==================== СТРАНИЦА 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
 local leftX = 6
 local rightX = 290
@@ -613,10 +612,10 @@ createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 	function() return espVisualMode end
 )
 y = y + 22
-createCheckbox(playerGroup, y, "Bounding box", false, function(v) Box_ESP_Enabled = v end); y = y + 22
-createCheckbox(playerGroup, y, "Health bar", false, function(v) ESP_HPEnabled = v end); y = y + 22
-createCheckbox(playerGroup, y, "Name", false, function(v) ESP_NameEnabled = v end); y = y + 22
-createCheckbox(playerGroup, y, "Weapon text", false, function(v) ESP_WeaponEnabled = v end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255,0,0), function(v) Box_ESP_Enabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255,0,0), function(v) ESP_HPEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255,0,0), function(v) ESP_NameEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255,0,0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
 createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
 
