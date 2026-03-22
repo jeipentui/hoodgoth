@@ -384,10 +384,8 @@ local colorPickerDragging=false
 local allColorPickers={}
 
 local main=mk("Frame",{Name="Main",Size=UDim2.fromOffset(658,558),Position=UDim2.new(0.5,-329,0.5,-279),BackgroundColor3=Color3.fromRGB(12,12,12),BorderSizePixel=0,ClipsDescendants=false},gui)
-local borderOuter=mk("Frame",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundColor3=Color3.fromRGB(12,12,12),BorderSizePixel=0},main)
-local borderMid=mk("Frame",{Size=UDim2.new(1,-10,1,-20),Position=UDim2.fromOffset(5,10),BackgroundColor3=Color3.fromRGB(60,60,60),BorderSizePixel=0},borderOuter)
-local borderInner=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=Color3.fromRGB(40,40,40),BorderSizePixel=0},borderMid)
-local body=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.dotA,BorderSizePixel=0,ClipsDescendants=true},borderInner)
+local borderMid=mk("Frame",{Size=UDim2.new(1,-10,1,-20),Position=UDim2.fromOffset(5,10),BackgroundColor3=Color3.fromRGB(60,60,60),BorderSizePixel=0},main)
+local body=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=Color3.fromRGB(40,40,40),BorderSizePixel=0,ClipsDescendants=true},borderMid)
 addDotPattern(body,C.dotA,C.dotB,6)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
