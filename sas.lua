@@ -391,14 +391,14 @@ addDotPattern(body,C.dotA,C.dotB,6)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
 local contentHeight=530;local contentYStart=20
-local side=mk("Frame",{Size=UDim2.fromOffset(75,contentHeight+contentYStart),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.side,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
+local side=mk("Frame",{Size=UDim2.fromOffset(75,contentHeight),Position=UDim2.fromOffset(0,contentYStart),BackgroundColor3=C.side,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
 mk("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),BackgroundColor3=C.divider,BorderSizePixel=0,ZIndex=3},side)
 local content=mk("Frame",{Size=UDim2.fromOffset(570,contentHeight),Position=UDim2.fromOffset(82,contentYStart),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
 local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ZIndex=2},content)
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=20;local bottomPadding=20;local iconSize=42;local buttonWidth=50
+local topPadding=20;local bottomPadding=20;local iconSize=36;local buttonWidth=50
 local countIcons=#ICONS
 local gapIcons=math.max((contentHeight-topPadding-bottomPadding-countIcons*iconSize)/(countIcons-1),2)
 
@@ -632,7 +632,7 @@ end
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
-local icon=mk("ImageLabel",{Size=UDim2.fromOffset(42,42),AnchorPoint=Vector2.new(0.5,0.5),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
+local icon=mk("ImageLabel",{Size=UDim2.fromOffset(36,36),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
 if index==1 then buildRagebotPage(page) elseif index==3 then buildESPSettingsPage(page) elseif index==4 then buildPlayerESPPage(page) elseif index==7 then buildPlayersPage(page) else buildDefaultPage(page) end
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
