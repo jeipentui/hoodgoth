@@ -636,7 +636,7 @@ end
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
-local icon=mk("ImageLabel",{Size=UDim2.fromOffset(70,70),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
+local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
 if index==1 then buildRagebotPage(page) elseif index==3 then buildESPSettingsPage(page) elseif index==4 then buildPlayerESPPage(page) elseif index==7 then buildPlayersPage(page) else buildDefaultPage(page) end
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
