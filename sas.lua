@@ -41,6 +41,7 @@ contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
 contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
 greenText=Color3.fromRGB(156,199,40),
+groupStroke=Color3.fromRGB(50,50,50),
 }
 
 local aimbotEnabled=false
@@ -555,14 +556,73 @@ UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseB
 return{getValue=function() return currentValue end}
 end
 
-local function createGroup(parent,x,y,w,h,titleText)
-local g0=mk("Frame",{Size=UDim2.fromOffset(w,h),Position=UDim2.fromOffset(x,y),BackgroundColor3=C.bg0,BorderSizePixel=0,ZIndex=2},parent)
-local g1=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.inner,BorderSizePixel=0,ZIndex=2},g0)
-local g2=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.groupBg,BorderSizePixel=0,ZIndex=2,ClipsDescendants=false},g1)
-local tb=mk("Frame",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),Position=UDim2.fromOffset(8,-7),BackgroundColor3=C.groupBg,BorderSizePixel=0,ZIndex=4},g2)
-mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),BackgroundTransparency=1,Text=" "..titleText.." ",Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},tb)
-return g2
+-- Helper to add a small gray triangle at bottom-left of a container
+local function addBottomLeftTriangle(parent, zindex)
+	local triSize = 6
+	local tri = mk("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		Position = UDim2.new(0, 0, 1, 0),
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundTransparency = 1,
+		ZIndex = (zindex or 3) + 5,
+		ClipsDescendants = false,
+	}, parent)
+	-- Use an ImageLabel with a triangle or build from frames
+	-- Simple approach: small rotated frame to simulate triangle
+	local triFrame = mk("Frame", {
+		Size = UDim2.fromOffset(triSize, triSize),
+		Position = UDim2.fromOffset(-1, -1),
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundColor3 = Color3.fromRGB(55, 55, 55),
+		BorderSizePixel = 0,
+		Rotation = 45,
+		ZIndex = (zindex or 3) + 6,
+	}, tri)
+	-- Clip it so only bottom-left triangle shows: we use the parent's ClipsDescendants
+	-- Actually, let's use a different approach - ImageLabel triangle
+	tri:Destroy()
+	
+	-- Use a small triangle via overlapping approach
+	local triContainer = mk("Frame", {
+		Size = UDim2.fromOffset(triSize, triSize),
+		Position = UDim2.new(0, 2, 1, -2),
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundTransparency = 1,
+		ZIndex = (zindex or 3) + 5,
+		ClipsDescendants = true,
+	}, parent)
+	
+	local innerTri = mk("Frame", {
+		Size = UDim2.fromOffset(triSize * 2, triSize * 2),
+		Position = UDim2.fromOffset(0, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(55, 55, 55),
+		BorderSizePixel = 0,
+		Rotation = 45,
+		ZIndex = (zindex or 3) + 6,
+	}, triContainer)
+	
+	return triContainer
 end
+
+local function createGroup(parent, x, y, w, h, titleText, addTriangle)
+	local g0 = mk("Frame", {Size=UDim2.fromOffset(w,h), Position=UDim2.fromOffset(x,y), BackgroundColor3=C.bg0, BorderSizePixel=0, ZIndex=2}, parent)
+	-- Add gray stroke to outer frame
+	mk("UIStroke", {Color=C.groupStroke, Thickness=1, ApplyStrokeMode=Enum.ApplyStrokeMode.Border}, g0)
+	local g1 = mk("Frame", {Size=UDim2.new(1,-2,1,-2), Position=UDim2.fromOffset(1,1), BackgroundColor3=C.inner, BorderSizePixel=0, ZIndex=2}, g0)
+	local g2 = mk("Frame", {Size=UDim2.new(1,-2,1,-2), Position=UDim2.fromOffset(1,1), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, g1)
+	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0,14), Position=UDim2.fromOffset(8,-7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=4}, g2)
+	mk("TextLabel", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0,14), BackgroundTransparency=1, Text=" "..titleText.." ", Font=MENU_FONT, TextSize=13, TextColor3=C.text, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, tb)
+	
+	-- Add triangle if requested
+	if addTriangle then
+		addBottomLeftTriangle(g0, 2)
+	end
+	
+	return g2
+end
+
+local LEFT_PAD = 20 -- padding for tabs 2,3,4,5,6,8
 
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
@@ -583,9 +643,9 @@ createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function
 end
 
 local function buildAntiAimPage(parent)
-	createGroup(parent, 6, 20, 250, 500, "Anti-aimbot angles")
-	createGroup(parent, 6 + 250 + 25, 20, 250, 230, "Fake lag")
-	createGroup(parent, 6 + 250 + 25, 20 + 230 + 20, 250, 230, "Other")
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Anti-aimbot angles", true)
+	createGroup(parent, LEFT_PAD + 250 + 25, 20, 250, 230, "Fake lag", true)
+	createGroup(parent, LEFT_PAD + 250 + 25, 20 + 230 + 20, 250, 230, "Other", true)
 end
 
 local function buildESPSettingsPage(parent)
@@ -594,26 +654,26 @@ local function buildESPSettingsPage(parent)
 	local gapVert = 20
 	local wtW = 250
 	local wtH = 60
-	local wtX = 6
+	local wtX = LEFT_PAD
 	local wtY = topPad
-	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type")
+	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type", true)
 	local aimbotW = 250
 	local aimbotH = 420
-	local aimbotX = 6
+	local aimbotX = LEFT_PAD
 	local aimbotY = wtY + wtH + gapVert
-	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
-	local rightX = 6 + 250 + gapHoriz
+	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot", true)
+	local rightX = LEFT_PAD + 250 + gapHoriz
 	local trigY = topPad
 	local otherH = 130
 	local aimbotBottom = aimbotY + aimbotH
 	local otherY = aimbotBottom - otherH
 	local trigH = otherY - trigY - gapVert
-	createGroup(parent, rightX, trigY, 250, trigH, "Triggerbot")
-	createGroup(parent, rightX, otherY, 250, otherH, "Other")
+	createGroup(parent, rightX, trigY, 250, trigH, "Triggerbot", true)
+	createGroup(parent, rightX, otherY, 250, otherH, "Other", true)
 end
 
 local function buildPlayerESPPage(parent)
-local leftX=6;local rightX=290
+local leftX=LEFT_PAD;local rightX=LEFT_PAD+250+24
 local playerGroup=createGroup(parent,leftX,5,250,270,"Player ESP")
 local otherGroup=createGroup(parent,rightX,5,250,250,"Other ESP")
 local coloredGroup=createGroup(parent,leftX,295,250,220,"Colored models")
@@ -634,9 +694,9 @@ createCheckbox(effectsGroup,12,"NoFall protection",false,function(v) if v then s
 end
 
 local function buildMiscPage(parent)
-local miscGroup = createGroup(parent, 6, 5, 250, 510, "Miscellaneous")
-local movGroup = createGroup(parent, 281, 5, 250, 245, "Movement")
-local setGroup = createGroup(parent, 281, 270, 250, 245, "Settings")
+local miscGroup = createGroup(parent, LEFT_PAD, 5, 250, 510, "Miscellaneous", true)
+local movGroup = createGroup(parent, LEFT_PAD + 250 + 11, 5, 250, 245, "Movement", true)
+local setGroup = createGroup(parent, LEFT_PAD + 250 + 11, 270, 250, 245, "Settings", true)
 local my = 12
 createCheckbox(movGroup, my, "NoFall protection", false, function(v)
 	if v then startNoFall() else stopNoFall() end
@@ -644,13 +704,13 @@ end)
 end
 
 local function buildSkinsPage(parent)
-	createGroup(parent, 6, 20, 250, 500, "Model options")
-	createGroup(parent, 6 + 250 + 20, 20, 250, 500, "Weapon skin")
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Model options")
+	createGroup(parent, LEFT_PAD + 250 + 20, 20, 250, 500, "Weapon skin")
 end
 
 local function buildPlayersPage(parent)
-local playersGroup=createGroup(parent,6,5,250,510,"Players")
-local adjustGroup=createGroup(parent,266,5,298,510,"Adjustments")
+local playersGroup=createGroup(parent,6,5,250,510,"Players", true)
+local adjustGroup=createGroup(parent,266,5,298,510,"Adjustments", true)
 local listFrame=mk("Frame",{Size=UDim2.new(1,-16,1,-52),Position=UDim2.fromOffset(8,12),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=4,ClipsDescendants=true},playersGroup)
 mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},listFrame)
 local scrollFrame=mk("ScrollingFrame",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=4,ScrollBarImageColor3=Color3.fromRGB(80,80,80),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=5},listFrame)
@@ -686,8 +746,8 @@ Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==p
 end
 
 local function buildConfigPage(parent)
-	createGroup(parent, 6, 20, 250, 500, "Presets")
-	createGroup(parent, 6 + 250 + 20, 20, 250, 500, "Lua")
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Presets", true)
+	createGroup(parent, LEFT_PAD + 250 + 20, 20, 250, 500, "Lua", true)
 end
 
 local function createTab(index,imageId)
