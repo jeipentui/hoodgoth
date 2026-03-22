@@ -383,10 +383,11 @@ local sliderDragging=false
 local colorPickerDragging=false
 local allColorPickers={}
 
-local main=mk("Frame",{Name="Main",Size=UDim2.fromOffset(658,558),Position=UDim2.new(0.5,-329,0.5,-279),BackgroundColor3=C.outer,BorderSizePixel=0,ClipsDescendants=false},gui)
-local border1=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.inner,BorderSizePixel=0},main)
-local border2=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.bg0,BorderSizePixel=0},border1)
-local body=mk("Frame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.fromOffset(2,2),BackgroundColor3=C.dotA,BorderSizePixel=0,ClipsDescendants=true},border2)
+local main=mk("Frame",{Name="Main",Size=UDim2.fromOffset(658,558),Position=UDim2.new(0.5,-329,0.5,-279),BackgroundColor3=Color3.fromRGB(12,12,12),BorderSizePixel=0,ClipsDescendants=false},gui)
+local borderOuter=mk("Frame",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundColor3=Color3.fromRGB(12,12,12),BorderSizePixel=0},main)
+local borderMid=mk("Frame",{Size=UDim2.new(1,-10,1,-20),Position=UDim2.fromOffset(5,10),BackgroundColor3=Color3.fromRGB(60,60,60),BorderSizePixel=0},borderOuter)
+local borderInner=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=Color3.fromRGB(40,40,40),BorderSizePixel=0},borderMid)
+local body=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.dotA,BorderSizePixel=0,ClipsDescendants=true},borderInner)
 addDotPattern(body,C.dotA,C.dotB,6)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
@@ -398,7 +399,7 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=20;local bottomPadding=20;local iconSize=36;local buttonWidth=50
+local topPadding=25;local bottomPadding=30;local iconSize=36;local buttonWidth=50
 local countIcons=#ICONS
 local gapIcons=math.max((contentHeight-topPadding-bottomPadding-countIcons*iconSize)/(countIcons-1),2)
 
