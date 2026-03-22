@@ -94,11 +94,25 @@ local function getPlayerSettings(plrName)
 if not playerPageData.playerSettings[plrName] then
 playerPageData.playerSettings[plrName]={
 whitelisted=false,teamColor=false,disableVisuals=false,
-boxColor=Color3.fromRGB(255,0,0),nameColor=Color3.fromRGB(255,0,0),
-hpColor=Color3.fromRGB(255,0,0),weaponColor=Color3.fromRGB(255,0,0),
+boxColor=nil,nameColor=nil,
+hpColor=nil,weaponColor=nil,
 }
 end
 return playerPageData.playerSettings[plrName]
+end
+
+local function getEffectiveColor(plrName,colorType)
+local ps=playerPageData.playerSettings[plrName]
+if ps then
+if ps.disableVisuals then return nil end
+if ps[colorType] then return ps[colorType] end
+if ps.teamColor then return Color3.fromRGB(0,255,0) end
+end
+if colorType=="boxColor" then return Settings.Box_Color
+elseif colorType=="hpColor" then return Settings.HP_Color
+elseif colorType=="nameColor" then return Settings.Name_Color
+elseif colorType=="weaponColor" then return Settings.Weapon_Color end
+return Color3.fromRGB(255,0,0)
 end
 
 local fovCircle=Drawing.new("Circle")
@@ -347,17 +361,10 @@ local char=plr.Character;if not char then cleanupPlayerESP(plr);return end
 local h=char:FindFirstChild("Humanoid");if not h or h.Health<=0 then cleanupPlayerESP(plr);return end
 if not ESP_HPText[plr] then createESPObjects(plr) end
 local data=viewportCache[plr];if not data or not data.anyVisible then hidePlayerESP(plr);return end
-local hpCol=Settings.HP_Color;local nameCol=Settings.Name_Color;local weapCol=Settings.Weapon_Color;local boxCol=Settings.Box_Color
-if ps then
-if ps.teamColor then
-hpCol=Color3.fromRGB(0,255,0);nameCol=Color3.fromRGB(0,255,0);weapCol=Color3.fromRGB(0,255,0);boxCol=Color3.fromRGB(0,255,0)
-else
-boxCol=ps.boxColor or boxCol
-hpCol=ps.hpColor or hpCol
-nameCol=ps.nameColor or nameCol
-weapCol=ps.weaponColor or weapCol
-end
-end
+local boxCol=getEffectiveColor(plr.Name,"boxColor")
+local hpCol=getEffectiveColor(plr.Name,"hpColor")
+local nameCol=getEffectiveColor(plr.Name,"nameColor")
+local weapCol=getEffectiveColor(plr.Name,"weaponColor")
 if data.head and data.head.visible then local hp2=data.head.pos
 if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or hpCol;ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
 if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=nameCol;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
@@ -523,14 +530,24 @@ end
 local function createSlider(parent,yPos,labelText,minVal,maxVal,defaultVal,suffix,onChanged)
 local container=mk("Frame",{Size=UDim2.new(1,-16,0,22),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
 mk("TextLabel",{Size=UDim2.new(0.5,0,0,22),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
-local sliderTrack=mk("Frame",{Size=UDim2.new(0.47,0,0,12),Position=UDim2.new(0.53,0,0,5),BackgroundColor3=C.sliderBg,BorderSizePixel=0,ZIndex=6},container)
+local sliderTrack=mk("Frame",{Size=UDim2.new(0.47,0,0,12),Position=UDim2.new(0.53,0,0,5),BackgroundColor3=C.sliderBg,BorderSizePixel=0,ZIndex=6,ClipsDescendants=false},container)
 mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},sliderTrack)
 local fp=(defaultVal-minVal)/(maxVal-minVal)
 local sliderFill=mk("Frame",{Size=UDim2.new(fp,0,1,0),BackgroundColor3=C.sliderFill,BorderSizePixel=0,ZIndex=7},sliderTrack)
 gradient(sliderFill,0,ColorSequence.new({ColorSequenceKeypoint.new(0,C.sliderFill),ColorSequenceKeypoint.new(1,C.sliderFill2)}))
-local valueLabel=mk("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=8},sliderTrack)
+local valueLabel=mk("TextLabel",{Size=UDim2.fromOffset(50,12),Position=UDim2.new(fp,2,0,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},sliderTrack)
 local currentValue=defaultVal;local dragging=false
-local function upd(inputX) local tp,ts=sliderTrack.AbsolutePosition.X,sliderTrack.AbsoluteSize.X;if ts==0 then return end;local p=math.clamp((inputX-tp)/ts,0,1);local v=math.floor(minVal+(maxVal-minVal)*p);currentValue=v;sliderFill.Size=UDim2.new(p,0,1,0);valueLabel.Text=tostring(v)..(suffix or "");if onChanged then onChanged(v) end end
+local function upd(inputX)
+local tp,ts=sliderTrack.AbsolutePosition.X,sliderTrack.AbsoluteSize.X
+if ts==0 then return end
+local p=math.clamp((inputX-tp)/ts,0,1)
+local v=math.floor(minVal+(maxVal-minVal)*p)
+currentValue=v
+sliderFill.Size=UDim2.new(p,0,1,0)
+valueLabel.Text=tostring(v)..(suffix or "")
+valueLabel.Position=UDim2.new(p,2,0,0)
+if onChanged then onChanged(v) end
+end
 local sb=mk("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=9},sliderTrack)
 sb.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true;sliderDragging=true;upd(i.Position.X) end end)
 sb.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false;sliderDragging=false end end)
@@ -565,7 +582,7 @@ dropFrame=mk("Frame",{Size=UDim2.fromOffset(dropBtn.AbsoluteSize.X,dH),Position=
 mk("UIStroke",{Color=C.contextBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropFrame)
 for i,opt in ipairs(options) do
 local optBtn=mk("TextButton",{Size=UDim2.new(1,-4,0,18),Position=UDim2.fromOffset(2,2+(i-1)*20),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=551},dropFrame)
-local optLabel=mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=opt,Font=MENU_FONT,TextSize=12,TextColor3=(opt==selectedLabel.Text) and C.contextSelected or C.contextUnselected,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=552},optBtn)
+mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=opt,Font=MENU_FONT,TextSize=12,TextColor3=(opt==selectedLabel.Text) and C.contextSelected or C.contextUnselected,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=552},optBtn)
 optBtn.MouseEnter:Connect(function() optBtn.BackgroundTransparency=0;optBtn.BackgroundColor3=C.contextHover end)
 optBtn.MouseLeave:Connect(function() optBtn.BackgroundTransparency=1 end)
 optBtn.MouseButton1Click:Connect(function() selectedLabel.Text=opt;if onChanged then onChanged(opt) end;closeDrop() end)
@@ -622,92 +639,39 @@ createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function
 end
 
 local function buildESPSettingsPage(parent)
-	-- Layout constants from user specification
 	local topPad = 25
-	local gapAW = 20  -- gap between aimbot and weapon type
-	local gapAT = 20  -- horizontal gap between aimbot and triggerbot
+	local gapAW = 20
+	local gapHoriz = 20
 	local bottomPad = 20
 
-	-- Weapon type from first tab (same style with weapon icons)
+	-- Weapon type: right side top, empty
 	local wtW = 250
 	local wtH = 60
-	local weaponTypeGroup = createGroup(parent, 6, topPad, wtW, wtH, "Weapon type")
+	local wtX = 6 + 250 + gapHoriz
+	local wtY = topPad
+	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type")
 
-	local weaponIcons = {
-		"rbxassetid://105116724761033",
-		"rbxassetid://132839343837016",
-		"rbxassetid://115681878826468",
-		"rbxassetid://76086521145727",
-		"rbxassetid://87119088029378",
-	}
-	local weaponIconSize = 32
-	local weaponSpacing = 8
-	local weaponStartX = 8
-	for i, wIcon in ipairs(weaponIcons) do
-		local wx = weaponStartX + (i-1) * (weaponIconSize + weaponSpacing)
-		local wBtn = mk("TextButton",{Size=UDim2.fromOffset(weaponIconSize,weaponIconSize),Position=UDim2.fromOffset(wx,8),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=6},weaponTypeGroup)
-		mk("ImageLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image=wIcon,ScaleType=Enum.ScaleType.Fit,ZIndex=7,ImageColor3=(i==1) and C.checkOn or C.textDim},wBtn)
-	end
-
-	-- Aimbot group: left side, below weapon type
-	local aimbotX = 6
-	local aimbotY = topPad + wtH + gapAW
-	local aimbotW = 250
-	local aimbotH = 420
-	local aimbotGroup = createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
-
-	-- Aimbot contents (matching screenshot)
-	local ay = 12
-	createCheckboxWithBind(aimbotGroup, ay, "Enabled", false, "[M5]", function() end, function() end, nil, nil); ay = ay + 22
-	createSlider(aimbotGroup, ay, "Speed", 0, 100, 65, "", nil); ay = ay + 28
-	createSlider(aimbotGroup, ay, "Speed (in attack)", 0, 100, 65, "", nil); ay = ay + 28
-	createSlider(aimbotGroup, ay, "Speed scale - FOV", 0, 100, 100, "%", nil); ay = ay + 28
-	createSlider(aimbotGroup, ay, "Maximum lock-on time", 0, 100, 100, "", nil); ay = ay + 28
-	createSlider(aimbotGroup, ay, "Reaction time", 0, 500, 100, "ms", nil); ay = ay + 28
-	createSlider(aimbotGroup, ay, "Maximum FOV", 0, 180, 10, "°", nil); ay = ay + 28
-	-- Recoil compensation (P/Y) - two sliders
-	mk("TextLabel",{Size=UDim2.new(1,-16,0,16),Position=UDim2.fromOffset(8,ay),BackgroundTransparency=1,Text="Recoil compensation (P/Y)",Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},aimbotGroup); ay = ay + 18
-	createSlider(aimbotGroup, ay, "", 0, 100, 0, "%", nil); ay = ay + 24
-	createSlider(aimbotGroup, ay, "", 0, 100, 0, "%", nil); ay = ay + 28
-	createCheckbox(aimbotGroup, ay, "Quick stop", false, nil); ay = ay + 22
-	createCheckbox(aimbotGroup, ay, "Aim through smoke", false, nil); ay = ay + 22
-	createCheckbox(aimbotGroup, ay, "Aim while blind", false, nil); ay = ay + 22
-	-- Hitbox selectors
-	createCheckbox(aimbotGroup, ay, "Head", false, nil); ay = ay + 22
-	createCheckboxWithColor(aimbotGroup, ay, "Chest", true, C.checkOn, nil, nil); ay = ay + 22
-	createCheckboxWithColor(aimbotGroup, ay, "Stomach", true, Color3.fromRGB(200,200,0), nil, nil)
-
-	-- Triggerbot group: right side, same Y level as Aimbot
-	local trigX = aimbotX + aimbotW + gapAT
-	local trigY = aimbotY
+	-- Triggerbot: right side, starts at same level as weapon type top, stretches to meet weapon type
 	local trigW = 250
 	local trigH = 250
-	local trigGroup = createGroup(parent, trigX, trigY, trigW, trigH, "Triggerbot")
+	local trigX = wtX
+	local trigY = wtY + wtH + gapAW
+	createGroup(parent, trigX, trigY, trigW, trigH, "Triggerbot")
 
-	local ty = 12
-	createCheckboxWithBind(trigGroup, ty, "Enabled", false, "[M5]", function() end, function() end, nil, nil); ty = ty + 22
-	createSlider(trigGroup, ty, "Minimum hit chance", 0, 100, 75, "%", nil); ty = ty + 28
-	createSlider(trigGroup, ty, "Reaction time", 0, 500, 0, "ms", nil); ty = ty + 28
-	createCheckbox(trigGroup, ty, "Burst fire", false, nil); ty = ty + 22
-	createSlider(trigGroup, ty, "Minimum damage", 0, 100, 1, "", nil); ty = ty + 28
-	createCheckbox(trigGroup, ty, "Automatic penetration", false, nil); ty = ty + 22
-	createCheckbox(trigGroup, ty, "Shoot through smoke", false, nil); ty = ty + 22
-	createCheckbox(trigGroup, ty, "Shoot while blind", false, nil); ty = ty + 22
-	-- Hitbox selectors for triggerbot
-	createCheckboxWithColor(trigGroup, ty, "Head", false, Color3.fromRGB(255,0,0), nil, nil); ty = ty + 22
-	createCheckboxWithColor(trigGroup, ty, "Chest", false, Color3.fromRGB(255,0,0), nil, nil); ty = ty + 22
-	createCheckboxWithColor(trigGroup, ty, "Stomach", false, Color3.fromRGB(200,200,0), nil, nil)
-
-	-- Other group: below triggerbot, right side
-	local otherX = trigX
-	local otherY = trigY + trigH + bottomPad
+	-- Other: right side, below triggerbot
 	local otherW = 250
 	local otherH = 130
-	local otherGroup = createGroup(parent, otherX, otherY, otherW, otherH, "Other")
+	local otherX = wtX
+	local otherY = trigY + trigH + bottomPad
+	createGroup(parent, otherX, otherY, otherW, otherH, "Other")
 
-	local oy = 12
-	createDropdown(otherGroup, oy, "Accuracy boost", {"Off","Low","Medium","High"}, "Off", nil); oy = oy + 48
-	createCheckbox(otherGroup, oy, "Standalone recoil compensation", false, nil)
+	-- Aimbot: left side, bottom aligned with Other
+	local aimbotW = 250
+	local aimbotH = 420
+	local aimbotX = 6
+	local aimbotBottomY = otherY + otherH
+	local aimbotY = aimbotBottomY - aimbotH
+	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
 end
 
 local function buildPlayerESPPage(parent)
@@ -744,7 +708,7 @@ local rightContent=mk("Frame",{Size=UDim2.new(1,-16,1,-20),Position=UDim2.fromOf
 local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,0,0,18),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,Text="No player selected",Font=MENU_FONT,TextSize=13,TextColor3=C.textDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},rightContent)
 local adjustY=24
 local whitelistCB=createCheckbox(rightContent,adjustY,"Add to whitelist",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.whitelisted=v;if v then local found=false;for _,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then found=true;break end end;if not found then table.insert(FriendList,playerPageData.selectedPlayer) end else for i,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then table.remove(FriendList,i);break end end end end end);adjustY=adjustY+22
-local teamColorCB=createCheckbox(rightContent,adjustY,"Team color",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.teamColor=v;if v then ps.savedBoxColor=ps.boxColor;ps.savedHpColor=ps.hpColor;ps.savedNameColor=ps.nameColor;ps.savedWeaponColor=ps.weaponColor;ps.boxColor=Color3.fromRGB(0,255,0);ps.hpColor=Color3.fromRGB(0,255,0);ps.nameColor=Color3.fromRGB(0,255,0);ps.weaponColor=Color3.fromRGB(0,255,0) else ps.boxColor=ps.savedBoxColor or Color3.fromRGB(255,0,0);ps.hpColor=ps.savedHpColor or Color3.fromRGB(255,0,0);ps.nameColor=ps.savedNameColor or Color3.fromRGB(255,0,0);ps.weaponColor=ps.savedWeaponColor or Color3.fromRGB(255,0,0) end end end);adjustY=adjustY+22
+local teamColorCB=createCheckbox(rightContent,adjustY,"Team color",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.teamColor=v end end);adjustY=adjustY+22
 local disableVisCB=createCheckbox(rightContent,adjustY,"Disable visuals",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.disableVisuals=v;if v then local plr=Players:FindFirstChild(playerPageData.selectedPlayer);if plr then hidePlayerESP(plr) end end end end);adjustY=adjustY+28
 createCheckboxWithColor(rightContent,adjustY,"Box color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).boxColor=c end end);adjustY=adjustY+22
 createCheckboxWithColor(rightContent,adjustY,"HP color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).hpColor=c end end);adjustY=adjustY+22
