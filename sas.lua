@@ -90,7 +90,6 @@ local function getPlayerSettings(plrName)
 if not playerPageData.playerSettings[plrName] then
 playerPageData.playerSettings[plrName]={
 whitelisted=false,teamColor=false,disableVisuals=false,
-overrideBox=false,overrideHP=false,overrideName=false,overrideWeapon=false,
 boxColor=Color3.fromRGB(255,0,0),nameColor=Color3.fromRGB(255,0,0),
 hpColor=Color3.fromRGB(255,0,0),weaponColor=Color3.fromRGB(255,0,0),
 }
@@ -284,6 +283,7 @@ elseif espVisualMode=="On hotkey" then return espVisualKeyHeld
 elseif espVisualMode=="Toggle" then return espVisualToggled
 elseif espVisualMode=="Off hotkey" then return not espVisualKeyHeld end;return false
 end
+
 local function cleanupPlayerESP(plr)
 if ESP_HPText[plr] then ESP_HPText[plr].Visible=false;ESP_HPText[plr]:Remove();ESP_HPText[plr]=nil end
 if ESP_NameText[plr] then ESP_NameText[plr].Visible=false;ESP_NameText[plr]:Remove();ESP_NameText[plr]=nil end
@@ -345,28 +345,21 @@ if not ESP_HPText[plr] then createESPObjects(plr) end
 local data=viewportCache[plr];if not data or not data.anyVisible then hidePlayerESP(plr);return end
 local hpCol=Settings.HP_Color;local nameCol=Settings.Name_Color;local weapCol=Settings.Weapon_Color;local boxCol=Settings.Box_Color
 if ps then
-if ps.teamColor then hpCol=Color3.fromRGB(0,255,0);nameCol=Color3.fromRGB(0,255,0);weapCol=Color3.fromRGB(0,255,0);boxCol=Color3.fromRGB(0,255,0)
+if ps.teamColor then
+hpCol=Color3.fromRGB(0,255,0);nameCol=Color3.fromRGB(0,255,0);weapCol=Color3.fromRGB(0,255,0);boxCol=Color3.fromRGB(0,255,0)
 else
-if ps.overrideBox then boxCol=ps.boxColor end
-if ps.overrideHP then hpCol=ps.hpColor end
-if ps.overrideName then nameCol=ps.nameColor end
-if ps.overrideWeapon then weapCol=ps.weaponColor end
+boxCol=ps.boxColor or boxCol
+hpCol=ps.hpColor or hpCol
+nameCol=ps.nameColor or nameCol
+weapCol=ps.weaponColor or weapCol
 end
-end
-if isFriend(plr) then hpCol=Settings.Friend_Color;nameCol=Settings.Friend_Color;weapCol=Settings.Friend_Color;boxCol=Settings.Friend_Color end
-local showBox=Box_ESP_Enabled;local showHP=ESP_HPEnabled;local showName=ESP_NameEnabled;local showWeapon=ESP_WeaponEnabled
-if ps then
-if ps.overrideBox then showBox=true end
-if ps.overrideHP then showHP=true end
-if ps.overrideName then showName=true end
-if ps.overrideWeapon then showWeapon=true end
 end
 if data.head and data.head.visible then local hp2=data.head.pos
-if showHP then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or hpCol;ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
-if showName then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=nameCol;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
-if showWeapon then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=weapCol;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
+if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or hpCol;ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
+if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=nameCol;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
+if ESP_WeaponEnabled then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=weapCol;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
 else ESP_HPText[plr].Visible=false;ESP_NameText[plr].Visible=false;ESP_WeaponText[plr].Visible=false end
-if showBox and ESP_Boxes[plr] then local bc=data.boxCorners
+if Box_ESP_Enabled and ESP_Boxes[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
 if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes[plr].box.Size=Vector2.new(w,hh);ESP_Boxes[plr].box.Color=boxCol;ESP_Boxes[plr].box.Visible=true;ESP_Boxes[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline.Visible=true
@@ -379,7 +372,6 @@ local function initPlayer(plr) if plr==lp then return end;plr.CharacterAdded:Con
 for _,plr in pairs(Players:GetPlayers()) do if plr~=lp then initPlayer(plr) end end
 Players.PlayerAdded:Connect(function(plr) if plr~=lp then initPlayer(plr) end end)
 Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
-
 local function mk(class,props,parent) local o=Instance.new(class);for k,v in pairs(props) do o[k]=v end;if parent then o.Parent=parent end;return o end
 local function gradient(parent,rotation,seq) local g=Instance.new("UIGradient");g.Rotation=rotation or 0;g.Color=seq;g.Parent=parent;return g end
 local function addDotPattern(parent,colorA,colorB,tile)
@@ -606,11 +598,7 @@ local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,0,0,18),Position=UDim2.from
 local adjustY=24
 local whitelistCB=createCheckbox(rightContent,adjustY,"Add to whitelist",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.whitelisted=v;if v then local found=false;for _,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then found=true;break end end;if not found then table.insert(FriendList,playerPageData.selectedPlayer) end else for i,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then table.remove(FriendList,i);break end end end end end);adjustY=adjustY+22
 local teamColorCB=createCheckbox(rightContent,adjustY,"Team color",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.teamColor=v;if v then ps.boxColor=Color3.fromRGB(0,255,0);ps.hpColor=Color3.fromRGB(0,255,0);ps.nameColor=Color3.fromRGB(0,255,0);ps.weaponColor=Color3.fromRGB(0,255,0) end end end);adjustY=adjustY+22
-local disableVisCB=createCheckbox(rightContent,adjustY,"Disable visuals",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.disableVisuals=v;if v then local plr=Players:FindFirstChild(playerPageData.selectedPlayer);if plr then hidePlayerESP(plr) end end end end);adjustY=adjustY+22
-local pBoxCB=createCheckbox(rightContent,adjustY,"Override box",false,function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).overrideBox=v end end);adjustY=adjustY+22
-local pHpCB=createCheckbox(rightContent,adjustY,"Override HP",false,function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).overrideHP=v end end);adjustY=adjustY+22
-local pNameCB=createCheckbox(rightContent,adjustY,"Override name",false,function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).overrideName=v end end);adjustY=adjustY+22
-local pWeaponCB=createCheckbox(rightContent,adjustY,"Override weapon",false,function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).overrideWeapon=v end end);adjustY=adjustY+28
+local disableVisCB=createCheckbox(rightContent,adjustY,"Disable visuals",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.disableVisuals=v;if v then local plr=Players:FindFirstChild(playerPageData.selectedPlayer);if plr then hidePlayerESP(plr) end end end end);adjustY=adjustY+28
 createCheckboxWithColor(rightContent,adjustY,"Box color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).boxColor=c end end);adjustY=adjustY+22
 createCheckboxWithColor(rightContent,adjustY,"HP color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).hpColor=c end end);adjustY=adjustY+22
 createCheckboxWithColor(rightContent,adjustY,"Name color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).nameColor=c end end);adjustY=adjustY+22
@@ -625,7 +613,7 @@ local ps=getPlayerSettings(plr.Name);local nameCol=ps.whitelisted and Settings.F
 mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=plr.Name,Font=MENU_FONT,TextSize=12,TextColor3=nameCol,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},btn)
 btn.MouseEnter:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(28,28,28) end end)
 btn.MouseLeave:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(18,18,18) end end)
-btn.MouseButton1Click:Connect(function() playerPageData.selectedPlayer=plr.Name;selectedLabel.Text=plr.Name;selectedLabel.TextColor3=C.text;local s=getPlayerSettings(plr.Name);whitelistCB.setEnabled(s.whitelisted);teamColorCB.setEnabled(s.teamColor or false);disableVisCB.setEnabled(s.disableVisuals);pBoxCB.setEnabled(s.overrideBox or false);pHpCB.setEnabled(s.overrideHP or false);pNameCB.setEnabled(s.overrideName or false);pWeaponCB.setEnabled(s.overrideWeapon or false);for _,b in pairs(playerPageData.buttons) do b.BackgroundColor3=(b.Name==plr.Name) and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18) end end)
+btn.MouseButton1Click:Connect(function() playerPageData.selectedPlayer=plr.Name;selectedLabel.Text=plr.Name;selectedLabel.TextColor3=C.text;local s=getPlayerSettings(plr.Name);whitelistCB.setEnabled(s.whitelisted);teamColorCB.setEnabled(s.teamColor or false);disableVisCB.setEnabled(s.disableVisuals);for _,b in pairs(playerPageData.buttons) do b.BackgroundColor3=(b.Name==plr.Name) and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18) end end)
 playerPageData.buttons[#playerPageData.buttons+1]=btn
 end end end end
 refreshPlayerList();searchBox:GetPropertyChangedSignal("Text"):Connect(function() refreshPlayerList() end)
