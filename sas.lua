@@ -525,7 +525,7 @@ mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),B
 return g2
 end
 
--- ==================== PAGE 1 (RAGEBOT) ====================
+-- ==================== СТРАНИЦА 1 (RAGEBOT) ====================
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
 createGroup(parent,6,5,274,wgH,"Weapon type")
@@ -558,7 +558,7 @@ createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v 
 createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
--- ==================== PAGE 3 (ESP Settings) ====================
+-- ==================== СТРАНИЦА 3 (как было в оригинале) ====================
 local function buildESPSettingsPage(parent)
 local totalH=contentHeight-15
 local espGroup=createGroup(parent,6,5,274,totalH,"ESP Settings")
@@ -573,18 +573,17 @@ local otherGroup=createGroup(parent,290,5,274,totalH,"Other")
 createCheckbox(otherGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
--- ==================== PAGE 4 (Player ESP) ====================
+-- ==================== СТРАНИЦА 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
 local leftX = 6
 local rightX = 290
-local totalH = contentHeight - 15
 
 local playerGroup = createGroup(parent, leftX, 5, 250, 270, "Player ESP")
 local otherGroup = createGroup(parent, rightX, 5, 250, 250, "Other ESP")
 local coloredGroup = createGroup(parent, leftX, 295, 250, 220, "Colored models")
 local effectsGroup = createGroup(parent, rightX, 280, 250, 250, "Effects")
 
--- Player ESP
+-- Player ESP (рабочие функции)
 local y = 12
 createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 	function(val)
@@ -624,52 +623,46 @@ createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 	function() return espVisualMode end
 )
 y = y + 22
-
-createCheckbox(playerGroup, y, "Bounding box", false, function(v) Box_ESP_Enabled = v end)
-y = y + 22
-createCheckbox(playerGroup, y, "Health bar", false, function(v) ESP_HPEnabled = v end)
-y = y + 22
-createCheckbox(playerGroup, y, "Name", false, function(v) ESP_NameEnabled = v end)
-y = y + 22
-createCheckbox(playerGroup, y, "Weapon text", false, function(v) ESP_WeaponEnabled = v end)
-y = y + 22
-createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end)
-y = y + 28
+createCheckbox(playerGroup, y, "Bounding box", false, function(v) Box_ESP_Enabled = v end); y = y + 22
+createCheckbox(playerGroup, y, "Health bar", false, function(v) ESP_HPEnabled = v end); y = y + 22
+createCheckbox(playerGroup, y, "Name", false, function(v) ESP_NameEnabled = v end); y = y + 22
+createCheckbox(playerGroup, y, "Weapon text", false, function(v) ESP_WeaponEnabled = v end); y = y + 22
+createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
 
--- Other ESP (visual only, no function behind them)
+-- Other ESP (просто визуальные чекбоксы, без заглушек)
 local oy = 12
-createCheckbox(otherGroup, oy, "Radar", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Grenades", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Inaccuracy overlay", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Recoil overlay", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Crosshair", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Bomb", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Grenade trajectory", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Grenade proximity warning", false, function(v) end); oy = oy + 22
-createCheckbox(otherGroup, oy, "Spectators", false, function(v) end)
+createCheckbox(otherGroup, oy, "Radar", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Grenades", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Inaccuracy overlay", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Recoil overlay", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Crosshair", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Bomb", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Grenade trajectory", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Grenade proximity warning", false); oy = oy + 22
+createCheckbox(otherGroup, oy, "Spectators", false)
 
--- Colored models (visual only)
+-- Colored models (просто визуальные чекбоксы, без заглушек)
 local cy = 12
-createCheckbox(coloredGroup, cy, "Player", false, function(v) end); cy = cy + 22
-createCheckbox(coloredGroup, cy, "Player behind wall", false, function(v) end); cy = cy + 22
-createCheckbox(coloredGroup, cy, "Teammate", false, function(v) end); cy = cy + 22
-createCheckbox(coloredGroup, cy, "Teammate behind wall", false, function(v) end); cy = cy + 22
-createCheckbox(coloredGroup, cy, "Local player", false, function(v) end); cy = cy + 22
-createCheckbox(coloredGroup, cy, "Local player fake", false, function(v) end)
+createCheckbox(coloredGroup, cy, "Player", false); cy = cy + 22
+createCheckbox(coloredGroup, cy, "Player behind wall", false); cy = cy + 22
+createCheckbox(coloredGroup, cy, "Teammate", false); cy = cy + 22
+createCheckbox(coloredGroup, cy, "Teammate behind wall", false); cy = cy + 22
+createCheckbox(coloredGroup, cy, "Local player", false); cy = cy + 22
+createCheckbox(coloredGroup, cy, "Local player fake", false)
 
--- Effects (visual only except NoFall)
+-- Effects (только NoFall работает, остальные просто визуальные)
 local ey = 12
-createCheckbox(effectsGroup, ey, "Remove flashbang effects", false, function(v) end); ey = ey + 22
-createCheckbox(effectsGroup, ey, "Remove smoke grenades", false, function(v) end); ey = ey + 22
-createCheckbox(effectsGroup, ey, "Remove fog", false, function(v) end); ey = ey + 22
-createCheckbox(effectsGroup, ey, "Remove skybox", false, function(v) end); ey = ey + 22
+createCheckbox(effectsGroup, ey, "Remove flashbang effects", false); ey = ey + 22
+createCheckbox(effectsGroup, ey, "Remove smoke grenades", false); ey = ey + 22
+createCheckbox(effectsGroup, ey, "Remove fog", false); ey = ey + 22
+createCheckbox(effectsGroup, ey, "Remove skybox", false); ey = ey + 22
 createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
 	if v then startNoFall() else stopNoFall() end
 end)
 end
 
--- ==================== DEFAULT PAGE ====================
+-- ==================== ДЕФОЛТНАЯ СТРАНИЦА ====================
 local function buildDefaultPage(parent)
 local totalH=contentHeight-15;local gg=10
 local lt=math.floor(totalH*0.45);local lb=totalH-lt-gg
@@ -679,7 +672,7 @@ createGroup(parent,290,5,274,rt,"Group C");createGroup(parent,290,5+rt+gg,274,rm
 createGroup(parent,290,5+rt+gg+rm+gg,274,rb,"Group E")
 end
 
--- ==================== TABS ====================
+-- ==================== ВКЛАДКИ ====================
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
