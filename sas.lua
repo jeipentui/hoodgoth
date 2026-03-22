@@ -34,11 +34,11 @@ outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(47,47,47),bg0=Color3.fromRGB(8,
 side=Color3.fromRGB(12,12,12),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
 textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(23,23,23),
 dotA=Color3.fromRGB(12,12,12),dotB=Color3.fromRGB(20,20,20),topMini=Color3.fromRGB(40,40,40),
-checkOn=Color3.fromRGB(0,200,0),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
-sliderFill=Color3.fromRGB(0,200,0),sliderFill2=Color3.fromRGB(0,255,50),
+checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
+sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
 bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
 contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
-contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(0,200,0),
+contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
 }
 
@@ -547,9 +547,65 @@ local tb=mk("Frame",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,
 mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),BackgroundTransparency=1,Text=" "..titleText.." ",Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},tb)
 return g2
 end
+
+local function createDropdown(parent,yPos,labelText,options,defaultOption,onChanged)
+local container=mk("Frame",{Size=UDim2.new(1,-16,0,40),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
+mk("TextLabel",{Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
+local dropBtn=mk("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.fromOffset(0,18),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6},container)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropBtn)
+local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=defaultOption or options[1],Font=MENU_FONT,TextSize=12,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},dropBtn)
+mk("TextLabel",{Size=UDim2.fromOffset(14,20),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▼",Font=MENU_FONT,TextSize=10,TextColor3=C.textDim,ZIndex=7},dropBtn)
+local dropOpen=false;local dropFrame=nil
+local function closeDrop() if dropFrame then dropFrame:Destroy();dropFrame=nil;dropOpen=false end end
+dropBtn.MouseButton1Click:Connect(function()
+if dropOpen then closeDrop();return end;dropOpen=true
+local btnAbs=dropBtn.AbsolutePosition;local mainAbs=main.AbsolutePosition
+local dH=#options*20+4
+dropFrame=mk("Frame",{Size=UDim2.fromOffset(dropBtn.AbsoluteSize.X,dH),Position=UDim2.fromOffset(btnAbs.X-mainAbs.X,btnAbs.Y-mainAbs.Y+22),BackgroundColor3=C.contextBg,BorderSizePixel=0,ZIndex=550},main)
+mk("UIStroke",{Color=C.contextBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropFrame)
+for i,opt in ipairs(options) do
+local optBtn=mk("TextButton",{Size=UDim2.new(1,-4,0,18),Position=UDim2.fromOffset(2,2+(i-1)*20),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=551},dropFrame)
+local optLabel=mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=opt,Font=MENU_FONT,TextSize=12,TextColor3=(opt==selectedLabel.Text) and C.contextSelected or C.contextUnselected,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=552},optBtn)
+optBtn.MouseEnter:Connect(function() optBtn.BackgroundTransparency=0;optBtn.BackgroundColor3=C.contextHover end)
+optBtn.MouseLeave:Connect(function() optBtn.BackgroundTransparency=1 end)
+optBtn.MouseButton1Click:Connect(function() selectedLabel.Text=opt;if onChanged then onChanged(opt) end;closeDrop() end)
+end
+task.delay(0.15,function()
+if not dropOpen then return end
+local conn;conn=UIS.InputBegan:Connect(function(input)
+if input.UserInputType==Enum.UserInputType.MouseButton1 then
+task.delay(0.05,function()
+if not dropFrame then if conn then conn:Disconnect() end;return end
+local mp=UIS:GetMouseLocation();local dp=dropFrame.AbsolutePosition;local ds=dropFrame.AbsoluteSize
+if mp.X<dp.X or mp.X>dp.X+ds.X or mp.Y<dp.Y or mp.Y>dp.Y+ds.Y then closeDrop();conn:Disconnect() end
+end)
+end
+end)
+end)
+end)
+return{getSelected=function() return selectedLabel.Text end}
+end
+
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
-createGroup(parent,6,5,274,wgH,"Weapon type")
+local weaponTypeGroup=createGroup(parent,6,5,274,wgH,"Weapon type")
+
+local weaponIcons = {
+	"rbxassetid://105116724761033",
+	"rbxassetid://132839343837016",
+	"rbxassetid://115681878826468",
+	"rbxassetid://76086521145727",
+	"rbxassetid://87119088029378",
+}
+local weaponIconSize = 32
+local weaponSpacing = 8
+local weaponStartX = 8
+for i, wIcon in ipairs(weaponIcons) do
+	local wx = weaponStartX + (i-1) * (weaponIconSize + weaponSpacing)
+	local wBtn = mk("TextButton",{Size=UDim2.fromOffset(weaponIconSize,weaponIconSize),Position=UDim2.fromOffset(wx,4),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=6},weaponTypeGroup)
+	mk("ImageLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image=wIcon,ScaleType=Enum.ScaleType.Fit,ZIndex=7,ImageColor3=(i==1) and C.checkOn or C.textDim},wBtn)
+end
+
 local aimbotGroup=createGroup(parent,6,5+wgH+10,274,totalH-wgH-10,"Aimbot")
 createCheckboxWithBind(aimbotGroup,12,"Enabled",false,"[-]",
 function(val) aimbotEnabled=val;if not val then currentTarget=nil;targetLocked=false end end,
@@ -565,7 +621,94 @@ createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v 
 createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
-local function buildESPSettingsPage(parent) end
+local function buildESPSettingsPage(parent)
+	-- Layout constants from user specification
+	local topPad = 25
+	local gapAW = 20  -- gap between aimbot and weapon type
+	local gapAT = 20  -- horizontal gap between aimbot and triggerbot
+	local bottomPad = 20
+
+	-- Weapon type from first tab (same style with weapon icons)
+	local wtW = 250
+	local wtH = 60
+	local weaponTypeGroup = createGroup(parent, 6, topPad, wtW, wtH, "Weapon type")
+
+	local weaponIcons = {
+		"rbxassetid://105116724761033",
+		"rbxassetid://132839343837016",
+		"rbxassetid://115681878826468",
+		"rbxassetid://76086521145727",
+		"rbxassetid://87119088029378",
+	}
+	local weaponIconSize = 32
+	local weaponSpacing = 8
+	local weaponStartX = 8
+	for i, wIcon in ipairs(weaponIcons) do
+		local wx = weaponStartX + (i-1) * (weaponIconSize + weaponSpacing)
+		local wBtn = mk("TextButton",{Size=UDim2.fromOffset(weaponIconSize,weaponIconSize),Position=UDim2.fromOffset(wx,8),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=6},weaponTypeGroup)
+		mk("ImageLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image=wIcon,ScaleType=Enum.ScaleType.Fit,ZIndex=7,ImageColor3=(i==1) and C.checkOn or C.textDim},wBtn)
+	end
+
+	-- Aimbot group: left side, below weapon type
+	local aimbotX = 6
+	local aimbotY = topPad + wtH + gapAW
+	local aimbotW = 250
+	local aimbotH = 420
+	local aimbotGroup = createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot")
+
+	-- Aimbot contents (matching screenshot)
+	local ay = 12
+	createCheckboxWithBind(aimbotGroup, ay, "Enabled", false, "[M5]", function() end, function() end, nil, nil); ay = ay + 22
+	createSlider(aimbotGroup, ay, "Speed", 0, 100, 65, "", nil); ay = ay + 28
+	createSlider(aimbotGroup, ay, "Speed (in attack)", 0, 100, 65, "", nil); ay = ay + 28
+	createSlider(aimbotGroup, ay, "Speed scale - FOV", 0, 100, 100, "%", nil); ay = ay + 28
+	createSlider(aimbotGroup, ay, "Maximum lock-on time", 0, 100, 100, "", nil); ay = ay + 28
+	createSlider(aimbotGroup, ay, "Reaction time", 0, 500, 100, "ms", nil); ay = ay + 28
+	createSlider(aimbotGroup, ay, "Maximum FOV", 0, 180, 10, "°", nil); ay = ay + 28
+	-- Recoil compensation (P/Y) - two sliders
+	mk("TextLabel",{Size=UDim2.new(1,-16,0,16),Position=UDim2.fromOffset(8,ay),BackgroundTransparency=1,Text="Recoil compensation (P/Y)",Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},aimbotGroup); ay = ay + 18
+	createSlider(aimbotGroup, ay, "", 0, 100, 0, "%", nil); ay = ay + 24
+	createSlider(aimbotGroup, ay, "", 0, 100, 0, "%", nil); ay = ay + 28
+	createCheckbox(aimbotGroup, ay, "Quick stop", false, nil); ay = ay + 22
+	createCheckbox(aimbotGroup, ay, "Aim through smoke", false, nil); ay = ay + 22
+	createCheckbox(aimbotGroup, ay, "Aim while blind", false, nil); ay = ay + 22
+	-- Hitbox selectors
+	createCheckbox(aimbotGroup, ay, "Head", false, nil); ay = ay + 22
+	createCheckboxWithColor(aimbotGroup, ay, "Chest", true, C.checkOn, nil, nil); ay = ay + 22
+	createCheckboxWithColor(aimbotGroup, ay, "Stomach", true, Color3.fromRGB(200,200,0), nil, nil)
+
+	-- Triggerbot group: right side, same Y level as Aimbot
+	local trigX = aimbotX + aimbotW + gapAT
+	local trigY = aimbotY
+	local trigW = 250
+	local trigH = 250
+	local trigGroup = createGroup(parent, trigX, trigY, trigW, trigH, "Triggerbot")
+
+	local ty = 12
+	createCheckboxWithBind(trigGroup, ty, "Enabled", false, "[M5]", function() end, function() end, nil, nil); ty = ty + 22
+	createSlider(trigGroup, ty, "Minimum hit chance", 0, 100, 75, "%", nil); ty = ty + 28
+	createSlider(trigGroup, ty, "Reaction time", 0, 500, 0, "ms", nil); ty = ty + 28
+	createCheckbox(trigGroup, ty, "Burst fire", false, nil); ty = ty + 22
+	createSlider(trigGroup, ty, "Minimum damage", 0, 100, 1, "", nil); ty = ty + 28
+	createCheckbox(trigGroup, ty, "Automatic penetration", false, nil); ty = ty + 22
+	createCheckbox(trigGroup, ty, "Shoot through smoke", false, nil); ty = ty + 22
+	createCheckbox(trigGroup, ty, "Shoot while blind", false, nil); ty = ty + 22
+	-- Hitbox selectors for triggerbot
+	createCheckboxWithColor(trigGroup, ty, "Head", false, Color3.fromRGB(255,0,0), nil, nil); ty = ty + 22
+	createCheckboxWithColor(trigGroup, ty, "Chest", false, Color3.fromRGB(255,0,0), nil, nil); ty = ty + 22
+	createCheckboxWithColor(trigGroup, ty, "Stomach", false, Color3.fromRGB(200,200,0), nil, nil)
+
+	-- Other group: below triggerbot, right side
+	local otherX = trigX
+	local otherY = trigY + trigH + bottomPad
+	local otherW = 250
+	local otherH = 130
+	local otherGroup = createGroup(parent, otherX, otherY, otherW, otherH, "Other")
+
+	local oy = 12
+	createDropdown(otherGroup, oy, "Accuracy boost", {"Off","Low","Medium","High"}, "Off", nil); oy = oy + 48
+	createCheckbox(otherGroup, oy, "Standalone recoil compensation", false, nil)
+end
 
 local function buildPlayerESPPage(parent)
 local leftX=6;local rightX=290
