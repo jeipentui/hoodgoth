@@ -559,18 +559,19 @@ end
 
 local function addFilledTriangle(parent, baseZIndex)
 	local z = (baseZIndex or 2) + 10
-	local triSize = 8
+	local triSize = 7
 	local clipper = mk("Frame", {
 		Size = UDim2.fromOffset(triSize, triSize),
-		Position = UDim2.new(1, -triSize, 1, -triSize),
+		Position = UDim2.new(1, -triSize - 1, 1, -triSize - 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ZIndex = z,
 		ClipsDescendants = true,
 	}, parent)
 	mk("Frame", {
-		Size = UDim2.fromOffset(triSize * 2, triSize * 2),
-		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.fromOffset(triSize * 1.5, triSize * 1.5),
+		Position = UDim2.fromOffset(triSize * 0.25, triSize * 0.25),
+		AnchorPoint = Vector2.new(0, 0),
 		BackgroundColor3 = C.triangleColor,
 		BorderSizePixel = 0,
 		Rotation = 45,
