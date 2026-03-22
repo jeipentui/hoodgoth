@@ -42,7 +42,6 @@ contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40)
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
 greenText=Color3.fromRGB(156,199,40),
 groupLine=Color3.fromRGB(55,55,55),
-triangleColor=Color3.fromRGB(55,55,55),
 }
 
 local aimbotEnabled=false
@@ -557,77 +556,51 @@ UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseB
 return{getValue=function() return currentValue end}
 end
 
-local function addFilledTriangle(parent, baseZIndex)
+-- Triangle in bottom-right corner: one vertex pointing into the corner, two sides along edges
+-- Made with two thin 1px lines forming a right triangle
+local function addCornerTriangle(parent, baseZIndex)
 	local z = (baseZIndex or 2) + 10
 	local triSize = 7
-	local clipper = mk("Frame", {
-		Size = UDim2.fromOffset(triSize, triSize),
-		Position = UDim2.new(1, -triSize - 1, 1, -triSize - 1),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ZIndex = z,
-		ClipsDescendants = true,
-	}, parent)
-	mk("Frame", {
-		Size = UDim2.fromOffset(triSize * 1.5, triSize * 1.5),
-		Position = UDim2.fromOffset(triSize * 0.25, triSize * 0.25),
-		AnchorPoint = Vector2.new(0, 0),
-		BackgroundColor3 = C.triangleColor,
-		BorderSizePixel = 0,
-		Rotation = 45,
-		ZIndex = z + 1,
-	}, clipper)
+	-- Diagonal line from (w-triSize, h) to (w, h-triSize) using small 1px frames
+	-- We'll draw it with multiple 1px frames along the diagonal
+	for i = 0, triSize do
+		-- horizontal line piece at bottom
+		mk("Frame", {
+			Size = UDim2.fromOffset(1, 1),
+			Position = UDim2.new(1, -triSize + i - 1, 1, -i - 2),
+			BackgroundColor3 = C.groupLine,
+			BorderSizePixel = 0,
+			ZIndex = z,
+		}, parent)
+	end
 end
 
 local function createGroup(parent, x, y, w, h, titleText, addTriangle)
-	local wrapper = mk("Frame", {
-		Size = UDim2.fromOffset(w, h + 8),
-		Position = UDim2.fromOffset(x, y - 8),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-		ClipsDescendants = false,
-	}, parent)
-
-	local g0 = mk("Frame", {
-		Size = UDim2.fromOffset(w, h),
-		Position = UDim2.fromOffset(0, 8),
-		BackgroundColor3 = C.groupBg,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-		ClipsDescendants = false,
-	}, wrapper)
-
-	mk("Frame", {Size=UDim2.new(1,0,0,1), Position=UDim2.fromOffset(0,0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(1,0,0,1), Position=UDim2.new(0,0,1,-1), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(0,1,1,0), Position=UDim2.fromOffset(0,0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(0,1,1,0), Position=UDim2.new(1,-1,0,0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-
-	local tb = mk("Frame", {
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 14),
-		Position = UDim2.fromOffset(8, -7),
-		BackgroundColor3 = C.groupBg,
-		BorderSizePixel = 0,
-		ZIndex = 4,
-	}, g0)
-	mk("TextLabel", {
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 14),
-		BackgroundTransparency = 1,
-		Text = " " .. titleText .. " ",
-		Font = MENU_FONT,
-		TextSize = 13,
-		TextColor3 = C.text,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 5,
-	}, tb)
-
+	-- Outer border line (1px gray lines on all sides)
+	local g0 = mk("Frame", {Size=UDim2.fromOffset(w, h), Position=UDim2.fromOffset(x, y), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=true}, parent)
+	
+	-- Top line
+	mk("Frame", {Size=UDim2.new(1, 0, 0, 1), Position=UDim2.fromOffset(0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
+	-- Bottom line
+	mk("Frame", {Size=UDim2.new(1, 0, 0, 1), Position=UDim2.new(0, 0, 1, -1), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
+	-- Left line
+	mk("Frame", {Size=UDim2.new(0, 1, 1, 0), Position=UDim2.fromOffset(0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
+	-- Right line
+	mk("Frame", {Size=UDim2.new(0, 1, 1, 0), Position=UDim2.new(1, -1, 0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
+	
+	-- Inner content area
+	local g2 = mk("Frame", {Size=UDim2.new(1, -2, 1, -2), Position=UDim2.fromOffset(1, 1), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, g0)
+	
+	-- Title background
+	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), Position=UDim2.fromOffset(8, -7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=4}, g2)
+	mk("TextLabel", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), BackgroundTransparency=1, Text=" "..titleText.." ", Font=MENU_FONT, TextSize=13, TextColor3=C.text, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, tb)
+	
+	-- Add corner triangle if requested
 	if addTriangle then
-		addFilledTriangle(g0, 2)
+		addCornerTriangle(g0, 2)
 	end
-
-	return g0
+	
+	return g2
 end
 
 local LEFT_PAD = 20
@@ -658,11 +631,11 @@ local function buildAntiAimPage(parent)
 	local leftH = 500
 	local fakelagH = 230
 	local otherY = 20 + fakelagH + 20
-	local bottomY = 20 + leftH
-
+	local otherH = leftH - fakelagH - 20 -- align bottom with left column
+	
 	createGroup(parent, LEFT_PAD, 20, leftW, leftH, "Anti-aimbot angles", true)
 	createGroup(parent, rightX, 20, rightW, fakelagH, "Fake lag", true)
-	createGroup(parent, rightX, otherY, rightW, bottomY - otherY, "Other", true)
+	createGroup(parent, rightX, otherY, rightW, 20 + leftH - otherY, "Other", true)
 end
 
 local function buildESPSettingsPage(parent)
