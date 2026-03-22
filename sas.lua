@@ -80,7 +80,14 @@ local ESP_NameEnabled=false
 local ESP_HPDynamicEnabled=false
 local ESP_WeaponEnabled=false
 local ESP_MaxDistance=1500
-local Settings={ESP_Color=Color3.fromRGB(255,0,0),Friend_Color=Color3.fromRGB(0,255,0)}
+local Settings={
+    ESP_Color=Color3.fromRGB(255,0,0),
+    Friend_Color=Color3.fromRGB(0,255,0),
+    Box_Color=Color3.fromRGB(255,0,0),
+    HP_Color=Color3.fromRGB(255,0,0),
+    Name_Color=Color3.fromRGB(255,0,0),
+    Weapon_Color=Color3.fromRGB(255,0,0)
+}
 
 local fovCircle=Drawing.new("Circle")
 fovCircle.Visible=false;fovCircle.Color=fovColor;fovCircle.Thickness=2;fovCircle.NumSides=100
@@ -286,10 +293,10 @@ if ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutlin
 end
 local function createESPObjects(plr)
 cleanupPlayerESP(plr)
-ESP_HPText[plr]=Drawing.new("Text");ESP_HPText[plr].Visible=false;ESP_HPText[plr].Color=Settings.ESP_Color;ESP_HPText[plr].Size=14;ESP_HPText[plr].Center=true;ESP_HPText[plr].Outline=true
-ESP_NameText[plr]=Drawing.new("Text");ESP_NameText[plr].Visible=false;ESP_NameText[plr].Color=Settings.ESP_Color;ESP_NameText[plr].Size=9;ESP_NameText[plr].Center=true;ESP_NameText[plr].Outline=true
-ESP_WeaponText[plr]=Drawing.new("Text");ESP_WeaponText[plr].Visible=false;ESP_WeaponText[plr].Color=Settings.ESP_Color;ESP_WeaponText[plr].Size=12;ESP_WeaponText[plr].Center=true;ESP_WeaponText[plr].Outline=true
-local box=Drawing.new("Square");box.Visible=false;box.Thickness=1;box.Color=Settings.ESP_Color
+ESP_HPText[plr]=Drawing.new("Text");ESP_HPText[plr].Visible=false;ESP_HPText[plr].Color=Settings.HP_Color;ESP_HPText[plr].Size=14;ESP_HPText[plr].Center=true;ESP_HPText[plr].Outline=true
+ESP_NameText[plr]=Drawing.new("Text");ESP_NameText[plr].Visible=false;ESP_NameText[plr].Color=Settings.Name_Color;ESP_NameText[plr].Size=9;ESP_NameText[plr].Center=true;ESP_NameText[plr].Outline=true
+ESP_WeaponText[plr]=Drawing.new("Text");ESP_WeaponText[plr].Visible=false;ESP_WeaponText[plr].Color=Settings.Weapon_Color;ESP_WeaponText[plr].Size=12;ESP_WeaponText[plr].Center=true;ESP_WeaponText[plr].Outline=true
+local box=Drawing.new("Square");box.Visible=false;box.Thickness=1;box.Color=Settings.Box_Color
 local bxo=Drawing.new("Square");bxo.Visible=false;bxo.Thickness=1;bxo.Color=Color3.new(0,0,0)
 ESP_Boxes[plr]={box=box,boxoutline=bxo};characterCache[plr]=plr.Character
 end
@@ -325,16 +332,15 @@ local char=plr.Character;if not char then cleanupPlayerESP(plr);return end
 local h=char:FindFirstChild("Humanoid");if not h or h.Health<=0 then cleanupPlayerESP(plr);return end
 if not ESP_HPText[plr] then createESPObjects(plr) end
 local data=viewportCache[plr];if not data or not data.anyVisible then hidePlayerESP(plr);return end
-local color=isFriend(plr) and Settings.Friend_Color or Settings.ESP_Color
 if data.head and data.head.visible then local hp2=data.head.pos
-if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or color;ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
-if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=color;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
-if ESP_WeaponEnabled then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=color;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
+if ESP_HPEnabled then local hp=math.clamp(h.Health,0,h.MaxHealth);ESP_HPText[plr].Position=Vector2.new(hp2.X+20,hp2.Y);ESP_HPText[plr].Text=math.floor(hp).." HP";ESP_HPText[plr].Color=ESP_HPDynamicEnabled and Color3.fromHSV((hp/h.MaxHealth)/3,1,1) or (isFriend(plr) and Settings.Friend_Color or Settings.HP_Color);ESP_HPText[plr].Visible=true else ESP_HPText[plr].Visible=false end
+if ESP_NameEnabled then ESP_NameText[plr].Position=Vector2.new(hp2.X,hp2.Y-15);ESP_NameText[plr].Text=plr.Name;ESP_NameText[plr].Color=isFriend(plr) and Settings.Friend_Color or Settings.Name_Color;ESP_NameText[plr].Visible=true else ESP_NameText[plr].Visible=false end
+if ESP_WeaponEnabled then local tool=char:FindFirstChildOfClass("Tool");ESP_WeaponText[plr].Position=Vector2.new(hp2.X,hp2.Y+15);ESP_WeaponText[plr].Text=tool and tool.Name or "None";ESP_WeaponText[plr].Color=isFriend(plr) and Settings.Friend_Color or Settings.Weapon_Color;ESP_WeaponText[plr].Visible=true else ESP_WeaponText[plr].Visible=false end
 else ESP_HPText[plr].Visible=false;ESP_NameText[plr].Visible=false;ESP_WeaponText[plr].Visible=false end
 if Box_ESP_Enabled and ESP_Boxes[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
-if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes[plr].box.Size=Vector2.new(w,hh);ESP_Boxes[plr].box.Color=color;ESP_Boxes[plr].box.Visible=true;ESP_Boxes[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline.Visible=true
+if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes[plr].box.Size=Vector2.new(w,hh);ESP_Boxes[plr].box.Color=isFriend(plr) and Settings.Friend_Color or Settings.Box_Color;ESP_Boxes[plr].box.Visible=true;ESP_Boxes[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline.Visible=true
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 elseif ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
@@ -354,6 +360,7 @@ end
 
 local sliderDragging=false
 local colorPickerDragging=false
+local allColorPickers={}
 
 local main=mk("Frame",{Name="Main",Size=UDim2.fromOffset(658,558),Position=UDim2.new(0.5,-329,0.5,-279),BackgroundColor3=C.outer,BorderSizePixel=0,ClipsDescendants=false},gui)
 local border1=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.inner,BorderSizePixel=0},main)
@@ -460,9 +467,23 @@ local currentH,currentS,currentV=Color3.toHSV(defaultColor);local currentColor=d
 local pickerOpen=false;local pickerFrame=nil;local pickerConns={}
 clickArea.MouseButton1Click:Connect(function() enabled=not enabled;checkBox.BackgroundColor3=enabled and C.checkOn or C.checkOff;if onToggle then onToggle(enabled) end end)
 local function applyColor() currentColor=Color3.fromHSV(currentH,currentS,currentV);preview.BackgroundColor3=currentColor;if onColorChanged then onColorChanged(currentColor) end end
-local function closePicker() if pickerFrame then for _,c in ipairs(pickerConns) do c:Disconnect() end;pickerConns={};pickerFrame:Destroy();pickerFrame=nil;pickerOpen=false end end
+local function closePicker()
+if pickerFrame then
+for _,c in ipairs(pickerConns) do c:Disconnect() end
+pickerConns={}
+pickerFrame:Destroy()
+pickerFrame=nil
+pickerOpen=false
+for i,p in ipairs(allColorPickers) do
+if p==closePicker then table.remove(allColorPickers,i);break end
+end
+end
+end
 previewBtn.MouseButton1Click:Connect(function()
-if pickerOpen then closePicker();return end;pickerOpen=true
+if pickerOpen then closePicker();return end
+for _,closeFunc in ipairs(allColorPickers) do closeFunc() end
+pickerOpen=true
+table.insert(allColorPickers,closePicker)
 local PS=120;local HW=14
 local anchorAbs=preview.AbsolutePosition;local mainAbs=main.AbsolutePosition
 pickerFrame=mk("Frame",{Size=UDim2.fromOffset(PS+HW+12,PS+8),Position=UDim2.fromOffset(anchorAbs.X-mainAbs.X-PS-HW-16,anchorAbs.Y-mainAbs.Y-4),BackgroundColor3=C.contextBg,BorderSizePixel=0,ZIndex=600},main)
@@ -525,7 +546,6 @@ mk("TextLabel",{AutomaticSize=Enum.AutomaticSize.X,Size=UDim2.fromOffset(0,14),B
 return g2
 end
 
--- ==================== СТРАНИЦА 1 (RAGEBOT) ====================
 local function buildRagebotPage(parent)
 local totalH=contentHeight-15;local wgH=40
 createGroup(parent,6,5,274,wgH,"Weapon type")
@@ -558,11 +578,9 @@ createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v 
 createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
--- ==================== СТРАНИЦА 3 (как было в оригинале) ====================
 local function buildESPSettingsPage(parent)
 end
 
--- ==================== СТРАНИЦА 4 (Player ESP) ====================
 local function buildPlayerESPPage(parent)
 local leftX = 6
 local rightX = 290
@@ -611,10 +629,10 @@ createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 	function() return espVisualMode end
 )
 y = y + 22
-createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255,0,0), function(v) Box_ESP_Enabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255,0,0), function(v) ESP_HPEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255,0,0), function(v) ESP_NameEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
-createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255,0,0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.ESP_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255,0,0), function(v) Box_ESP_Enabled = v end, function(c) Settings.Box_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255,0,0), function(v) ESP_HPEnabled = v end, function(c) Settings.HP_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255,0,0), function(v) ESP_NameEnabled = v end, function(c) Settings.Name_Color = c end); y = y + 22
+createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255,0,0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.Weapon_Color = c end); y = y + 22
 createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
 
@@ -623,7 +641,7 @@ createCheckbox(effectsGroup, ey, "NoFall protection", false, function(v)
 	if v then startNoFall() else stopNoFall() end
 end)
 end
--- ==================== ДЕФОЛТНАЯ СТРАНИЦА ====================
+
 local function buildDefaultPage(parent)
 local totalH=contentHeight-15;local gg=10
 local lt=math.floor(totalH*0.45);local lb=totalH-lt-gg
@@ -633,7 +651,6 @@ createGroup(parent,290,5,274,rt,"Group C");createGroup(parent,290,5+rt+gg,274,rm
 createGroup(parent,290,5+rt+gg+rm+gg,274,rb,"Group E")
 end
 
--- ==================== ВКЛАДКИ ====================
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
@@ -646,7 +663,14 @@ elseif index==4 then buildPlayerESPPage(page)
 else buildDefaultPage(page) end
 
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
-holder.MouseButton1Click:Connect(function() closeActiveContext();for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end end)
+holder.MouseButton1Click:Connect(function()
+    closeActiveContext()
+    for _,closeFunc in ipairs(allColorPickers) do closeFunc() end
+    for i=1,#tabButtons do
+        tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1)
+        pages[i].Visible=(i==index)
+    end
+end)
 end
 
 for i,id in ipairs(ICONS) do createTab(i,id) end
