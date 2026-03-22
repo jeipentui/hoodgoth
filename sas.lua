@@ -94,8 +94,7 @@ local function getPlayerSettings(plrName)
 if not playerPageData.playerSettings[plrName] then
 playerPageData.playerSettings[plrName]={
 whitelisted=false,teamColor=false,disableVisuals=false,
-boxColor=nil,nameColor=nil,
-hpColor=nil,weaponColor=nil,
+boxColor=nil,nameColor=nil,hpColor=nil,weaponColor=nil,
 }
 end
 return playerPageData.playerSettings[plrName]
@@ -533,9 +532,9 @@ mk("TextLabel",{Size=UDim2.new(0.5,0,0,22),BackgroundTransparency=1,Text=labelTe
 local sliderTrack=mk("Frame",{Size=UDim2.new(0.47,0,0,12),Position=UDim2.new(0.53,0,0,5),BackgroundColor3=C.sliderBg,BorderSizePixel=0,ZIndex=6,ClipsDescendants=false},container)
 mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},sliderTrack)
 local fp=(defaultVal-minVal)/(maxVal-minVal)
-local sliderFill=mk("Frame",{Size=UDim2.new(fp,0,1,0),BackgroundColor3=C.sliderFill,BorderSizePixel=0,ZIndex=7},sliderTrack)
+local sliderFill=mk("Frame",{Size=UDim2.new(fp,0,1,0),BackgroundColor3=C.sliderFill,BorderSizePixel=0,ZIndex=7,ClipsDescendants=false},sliderTrack)
 gradient(sliderFill,0,ColorSequence.new({ColorSequenceKeypoint.new(0,C.sliderFill),ColorSequenceKeypoint.new(1,C.sliderFill2)}))
-local valueLabel=mk("TextLabel",{Size=UDim2.fromOffset(50,12),Position=UDim2.new(fp,2,0,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},sliderTrack)
+local valueLabel=mk("TextLabel",{Size=UDim2.fromOffset(50,12),AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,0,0,0),BackgroundTransparency=1,Text=tostring(defaultVal)..(suffix or ""),Font=MENU_FONT,TextSize=11,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=10},sliderFill)
 local currentValue=defaultVal;local dragging=false
 local function upd(inputX)
 local tp,ts=sliderTrack.AbsolutePosition.X,sliderTrack.AbsoluteSize.X
@@ -545,7 +544,6 @@ local v=math.floor(minVal+(maxVal-minVal)*p)
 currentValue=v
 sliderFill.Size=UDim2.new(p,0,1,0)
 valueLabel.Text=tostring(v)..(suffix or "")
-valueLabel.Position=UDim2.new(p,2,0,0)
 if onChanged then onChanged(v) end
 end
 local sb=mk("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=9},sliderTrack)
@@ -603,26 +601,54 @@ end)
 return{getSelected=function() return selectedLabel.Text end}
 end
 
-local function buildRagebotPage(parent)
-local totalH=contentHeight-15;local wgH=40
-local weaponTypeGroup=createGroup(parent,6,5,274,wgH,"Weapon type")
+local function createScrollList(parent,yPos,labelText,items,defaultItem,onChanged)
+local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
+local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=C.checkOff,BorderSizePixel=0,ZIndex=6},container)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
+mk("TextLabel",{Size=UDim2.new(1,-30,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
 
-local weaponIcons = {
-	"rbxassetid://105116724761033",
-	"rbxassetid://132839343837016",
-	"rbxassetid://115681878826468",
-	"rbxassetid://76086521145727",
-	"rbxassetid://87119088029378",
-}
-local weaponIconSize = 32
-local weaponSpacing = 8
-local weaponStartX = 8
-for i, wIcon in ipairs(weaponIcons) do
-	local wx = weaponStartX + (i-1) * (weaponIconSize + weaponSpacing)
-	local wBtn = mk("TextButton",{Size=UDim2.fromOffset(weaponIconSize,weaponIconSize),Position=UDim2.fromOffset(wx,4),BackgroundTransparency=1,Text="",AutoButtonColor=false,ZIndex=6},weaponTypeGroup)
-	mk("ImageLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image=wIcon,ScaleType=Enum.ScaleType.Fit,ZIndex=7,ImageColor3=(i==1) and C.checkOn or C.textDim},wBtn)
+-- Выпадающий бокс
+local dropBox=mk("Frame",{Size=UDim2.new(1,-16,0,22),Position=UDim2.fromOffset(8,yPos+22),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=6},parent)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},dropBox)
+local selLabel=mk("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=defaultItem or "_",Font=MENU_FONT,TextSize=12,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},dropBox)
+mk("TextLabel",{Size=UDim2.fromOffset(14,22),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▼",Font=MENU_FONT,TextSize=10,TextColor3=C.textDim,ZIndex=7},dropBox)
+
+-- Список скинов
+local listHeight = parent.Size.Y.Offset - yPos - 52 - 16
+if listHeight < 60 then listHeight = 200 end
+local listFrame=mk("Frame",{Size=UDim2.new(1,-16,0,listHeight),Position=UDim2.fromOffset(8,yPos+48),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=6,ClipsDescendants=true},parent)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},listFrame)
+
+local scrollFrame=mk("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=4,ScrollBarImageColor3=Color3.fromRGB(80,80,80),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=7},listFrame)
+mk("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,0)},scrollFrame)
+
+-- Зелёная линия выбранного
+local selectedItem = defaultItem
+for i,item in ipairs(items) do
+	local isSel = (item == selectedItem)
+	local itemBtn=mk("TextButton",{Size=UDim2.new(1,-2,0,20),BackgroundColor3=isSel and Color3.fromRGB(28,28,28) or Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=8,LayoutOrder=i},scrollFrame)
+	local itemLabel=mk("TextLabel",{Size=UDim2.new(1,-12,1,0),Position=UDim2.fromOffset(8,0),BackgroundTransparency=1,Text=item,Font=MENU_FONT,TextSize=12,TextColor3=isSel and C.checkOn or C.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9},itemBtn)
+	itemBtn.MouseEnter:Connect(function() if selectedItem~=item then itemBtn.BackgroundColor3=Color3.fromRGB(25,25,25) end end)
+	itemBtn.MouseLeave:Connect(function() if selectedItem~=item then itemBtn.BackgroundColor3=Color3.fromRGB(15,15,15) end end)
+	itemBtn.MouseButton1Click:Connect(function()
+		selectedItem=item;selLabel.Text=item
+		for _,ch in pairs(scrollFrame:GetChildren()) do
+			if ch:IsA("TextButton") then
+				local lbl=ch:FindFirstChildOfClass("TextLabel")
+				if lbl then
+					if lbl.Text==item then lbl.TextColor3=C.checkOn;ch.BackgroundColor3=Color3.fromRGB(28,28,28)
+					else lbl.TextColor3=C.text;ch.BackgroundColor3=Color3.fromRGB(15,15,15) end
+				end
+			end
+		end
+		if onChanged then onChanged(item) end
+	end)
+end
 end
 
+local function buildRagebotPage(parent)
+local totalH=contentHeight-15;local wgH=40
+createGroup(parent,6,5,274,wgH,"Weapon type")
 local aimbotGroup=createGroup(parent,6,5+wgH+10,274,totalH-wgH-10,"Aimbot")
 createCheckboxWithBind(aimbotGroup,12,"Enabled",false,"[-]",
 function(val) aimbotEnabled=val;if not val then currentTarget=nil;targetLocked=false end end,
@@ -644,28 +670,30 @@ local function buildESPSettingsPage(parent)
 	local gapHoriz = 20
 	local bottomPad = 20
 
-	-- Weapon type: right side top, empty
+	-- Weapon type: справа сверху, пустой
 	local wtW = 250
 	local wtH = 60
 	local wtX = 6 + 250 + gapHoriz
 	local wtY = topPad
 	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type")
 
-	-- Triggerbot: right side, starts at same level as weapon type top, stretches to meet weapon type
+	-- Triggerbot: справа, растянут вверх до уровня weapon type
 	local trigW = 250
-	local trigH = 250
+	local otherH = 130
+	local otherY_bottom = wtY + wtH + gapAW + 250 + bottomPad + otherH
+	-- Тригербот от верхнего края weapon type до начала other
 	local trigX = wtX
 	local trigY = wtY + wtH + gapAW
-	createGroup(parent, trigX, trigY, trigW, trigH, "Triggerbot")
+	local trigBottom = trigY + 250
+	createGroup(parent, trigX, trigY, trigW, 250, "Triggerbot")
 
-	-- Other: right side, below triggerbot
+	-- Other: справа, под тригерботом
 	local otherW = 250
-	local otherH = 130
 	local otherX = wtX
-	local otherY = trigY + trigH + bottomPad
+	local otherY = trigY + 250 + bottomPad
 	createGroup(parent, otherX, otherY, otherW, otherH, "Other")
 
-	-- Aimbot: left side, bottom aligned with Other
+	-- Aimbot: слева, низ на уровне с Other
 	local aimbotW = 250
 	local aimbotH = 420
 	local aimbotX = 6
@@ -693,6 +721,55 @@ createCheckboxWithColor(playerGroup,y,"Weapon text",false,Color3.fromRGB(255,0,0
 createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
 createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
 createCheckbox(effectsGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
+end
+
+local function buildMiscPage(parent)
+local miscGroup = createGroup(parent, 6, 5, 250, 510, "Miscellaneous")
+local movGroup = createGroup(parent, 281, 5, 250, 245, "Movement")
+local setGroup = createGroup(parent, 281, 270, 250, 245, "Settings")
+local my = 12
+createCheckbox(movGroup, my, "NoFall protection", false, function(v)
+	if v then startNoFall() else stopNoFall() end
+end)
+end
+
+local function buildSkinsPage(parent)
+	local topPad = 20
+	local gapHoriz = 20
+
+	-- Model options: слева
+	local moW = 250
+	local moH = 500
+	local moX = 6
+	local moY = topPad
+	local modelGroup = createGroup(parent, moX, moY, moW, moH, "Model options")
+
+	local my = 12
+	createCheckbox(modelGroup, my, "Knife changer", false, nil); my = my + 22
+	createCheckbox(modelGroup, my, "Glove changer", false, nil); my = my + 22
+	createCheckbox(modelGroup, my, "Mask changer", false, nil); my = my + 22
+	createCheckbox(modelGroup, my, "Agent changer", false, nil)
+
+	-- Weapon skin: справа
+	local wsW = 250
+	local wsH = 500
+	local wsX = moX + moW + gapHoriz
+	local wsY = topPad
+	local skinGroup = createGroup(parent, wsX, wsY, wsW, wsH, "Weapon skin")
+
+	local sy = 12
+	createCheckbox(skinGroup, sy, "Enabled", false, nil); sy = sy + 22
+	createCheckbox(skinGroup, sy, "StatTrak", false, nil); sy = sy + 22
+	createSlider(skinGroup, sy, "Quality", 0, 100, 100, "%", nil); sy = sy + 28
+	createSlider(skinGroup, sy, "Seed", 0, 1000, 0, "", nil); sy = sy + 28
+
+	-- Список скинов с чекбоксом "Filter by weapon"
+	local skinItems = {
+		"-","Condition Zero","Global Offensive","Integrale","O.S.I.P.R.",
+		"Panthera onca","ZX Spectron","dev_texture","Авария","Автосвалка",
+		"Автотроника","Автотроника","Автотроника","Автотроника","Автотроника","Автотроника"
+	}
+	createScrollList(skinGroup, sy, "Filter by weapon", skinItems, "-", nil)
 end
 
 local function buildPlayersPage(parent)
@@ -731,16 +808,7 @@ refreshPlayerList();searchBox:GetPropertyChangedSignal("Text"):Connect(function(
 Players.PlayerAdded:Connect(function() task.wait(0.5);refreshPlayerList() end)
 Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==plr.Name then playerPageData.selectedPlayer=nil;selectedLabel.Text="No player selected";selectedLabel.TextColor3=C.textDim end;task.wait(0.1);refreshPlayerList() end)
 end
-local function buildMiscPage(parent)
-local miscGroup = createGroup(parent, 6, 5, 250, 510, "Miscellaneous")
-local movGroup = createGroup(parent, 281, 5, 250, 245, "Movement")
-local setGroup = createGroup(parent, 281, 270, 250, 245, "Settings")
 
-local my = 12
-createCheckbox(movGroup, my, "NoFall protection", false, function(v)
-	if v then startNoFall() else stopNoFall() end
-end)
-end
 local function buildDefaultPage(parent)
 local totalH=contentHeight-15;local gg=10
 local lt=math.floor(totalH*0.45);local lb=totalH-lt-gg
@@ -754,7 +822,13 @@ local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
 local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
 local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
 local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
-if index==1 then buildRagebotPage(page) elseif index==3 then buildESPSettingsPage(page) elseif index==4 then buildPlayerESPPage(page) elseif index==5 then buildMiscPage(page) elseif index==7 then buildPlayersPage(page) else buildDefaultPage(page) end
+if index==1 then buildRagebotPage(page)
+elseif index==3 then buildESPSettingsPage(page)
+elseif index==4 then buildPlayerESPPage(page)
+elseif index==5 then buildMiscPage(page)
+elseif index==6 then buildSkinsPage(page)
+elseif index==7 then buildPlayersPage(page)
+else buildDefaultPage(page) end
 tabButtons[index]={button=holder,icon=icon};pages[index]=page
 holder.MouseButton1Click:Connect(function() closeActiveContext();for _,closeFunc in ipairs(allColorPickers) do closeFunc() end;for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end end)
 end
