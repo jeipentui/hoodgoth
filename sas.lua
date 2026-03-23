@@ -560,21 +560,18 @@ end
 -- Made with two thin 1px lines forming a right triangle
 local function addCornerTriangle(parent, baseZIndex)
 	local z = (baseZIndex or 2) + 10
-	local triSize = 7
-	-- Diagonal line from (w-triSize, h) to (w, h-triSize) using small 1px frames
-	-- We'll draw it with multiple 1px frames along the diagonal
-	for i = 0, triSize do
-		-- horizontal line piece at bottom
+	local triSize = 6
+	for row = 0, triSize - 1 do
+		local width = row + 1
 		mk("Frame", {
-			Size = UDim2.fromOffset(1, 1),
-			Position = UDim2.new(1, -triSize + i - 1, 1, -i - 2),
+			Size = UDim2.fromOffset(width, 1),
+			Position = UDim2.new(1, -width, 1, -triSize + row),
 			BackgroundColor3 = C.groupLine,
 			BorderSizePixel = 0,
 			ZIndex = z,
 		}, parent)
 	end
 end
-
 local function createGroup(parent, x, y, w, h, titleText, addTriangle)
 	-- Outer border line (1px gray lines on all sides)
 	local g0 = mk("Frame", {Size=UDim2.fromOffset(w, h), Position=UDim2.fromOffset(x, y), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=true}, parent)
