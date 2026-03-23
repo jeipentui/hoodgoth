@@ -402,7 +402,7 @@ local body=mk("Frame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.fromOffset(2,2),
 addDotPattern(body,C.dotA,C.dotB,6)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
-local contentHeight=538;local contentYStart=12
+local contentHeight=546;local contentYStart=4
 local side=mk("Frame",{Size=UDim2.fromOffset(75,contentHeight+contentYStart),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.side,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
 mk("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),BackgroundColor3=C.divider,BorderSizePixel=0,ZIndex=3},side)
 local content=mk("Frame",{Size=UDim2.fromOffset(570,contentHeight),Position=UDim2.fromOffset(82,contentYStart),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
@@ -762,9 +762,7 @@ local function buildConfigPage(parent)
 	createGroup(parent, lx, ty, COL_W, totalH, "Presets", true)
 	createGroup(parent, rx, ty, COL_W, totalH, "Lua", true)
 end
-	createGroup(parent, LEFT_PAD, 20, 250, 500, "Presets", true)
-	createGroup(parent, LEFT_PAD + 250 + 20, 20, 250, 500, "Lua", true)
-end
+
 
 local function createTab(index,imageId)
 local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
