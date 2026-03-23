@@ -402,7 +402,7 @@ local body=mk("Frame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.fromOffset(2,2),
 addDotPattern(body,C.dotA,C.dotB,6)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
-local contentHeight=530;local contentYStart=20
+local contentHeight=538;local contentYStart=12
 local side=mk("Frame",{Size=UDim2.fromOffset(75,contentHeight+contentYStart),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.side,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
 mk("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),BackgroundColor3=C.divider,BorderSizePixel=0,ZIndex=3},side)
 local content=mk("Frame",{Size=UDim2.fromOffset(570,contentHeight),Position=UDim2.fromOffset(82,contentYStart),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
