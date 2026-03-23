@@ -386,9 +386,43 @@ Players.PlayerAdded:Connect(function(plr) if plr~=lp then initPlayer(plr) end en
 Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
 local function mk(class,props,parent) local o=Instance.new(class);for k,v in pairs(props) do o[k]=v end;if parent then o.Parent=parent end;return o end
 local function gradient(parent,rotation,seq) local g=Instance.new("UIGradient");g.Rotation=rotation or 0;g.Color=seq;g.Parent=parent;return g end
-local function addDotPattern(parent,colorA,colorB,tile)
-mk("ImageLabel",{Name="DotPattern",BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),BorderSizePixel=0,ZIndex=parent.ZIndex,Image="rbxassetid://9968344105",ScaleType=Enum.ScaleType.Tile,TileSize=UDim2.fromOffset(tile or 6,tile or 6),ImageColor3=colorB or Color3.fromRGB(20,20,20)},parent)
-mk("Frame",{Name="DotBase",BackgroundColor3=colorA or Color3.fromRGB(12,12,12),BorderSizePixel=0,Size=UDim2.new(1,0,1,0),ZIndex=math.max((parent.ZIndex or 1)-1,0)},parent)
+local function addDotPattern(parent, colorA, colorB, spacing)
+    spacing = spacing or 4
+    mk("Frame", {
+        Name = "DotBase",
+        BackgroundColor3 = colorA or Color3.fromRGB(12, 12, 12),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = parent.ZIndex
+    }, parent)
+    local dots = mk("Frame", {
+        Name = "Dots",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        ClipsDescendants = true,
+        ZIndex = parent.ZIndex + 1
+    }, parent)
+    task.spawn(function()
+        task.wait(0.15)
+        local w = parent.AbsoluteSize.X
+        local h = parent.AbsoluteSize.Y
+        if w < 10 then w = 660 end
+        if h < 10 then h = 560 end
+        local count = 0
+        for y = 0, h, spacing do
+            for x = 0, w, spacing do
+                local dot = Instance.new("Frame")
+                dot.Size = UDim2.fromOffset(1, 1)
+                dot.Position = UDim2.fromOffset(x, y)
+                dot.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
+                dot.BorderSizePixel = 0
+                dot.ZIndex = parent.ZIndex + 1
+                dot.Parent = dots
+                count = count + 1
+                if count % 500 == 0 then task.wait() end
+            end
+        end
+    end)
 end
 
 local sliderDragging=false
