@@ -589,7 +589,7 @@ local function createGroup(parent, x, y, w, h, titleText, addTriangle)
 	local g2 = mk("Frame", {Size=UDim2.new(1, -2, 1, -2), Position=UDim2.fromOffset(1, 1), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, g0)
 	
 	-- Title background
-	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), Position=UDim2.fromOffset(8, -7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=50}, g2)
+	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), Position=UDim2.fromOffset(x + 9, y - 7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=50}, parent)
 mk("TextLabel", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), BackgroundTransparency=1, Text=" "..titleText.." ", Font=MENU_FONT, TextSize=13, TextColor3=C.text, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=51}, tb)
 	
 	-- Add corner triangle if requested
