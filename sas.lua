@@ -387,7 +387,7 @@ Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
 local function mk(class,props,parent) local o=Instance.new(class);for k,v in pairs(props) do o[k]=v end;if parent then o.Parent=parent end;return o end
 local function gradient(parent,rotation,seq) local g=Instance.new("UIGradient");g.Rotation=rotation or 0;g.Color=seq;g.Parent=parent;return g end
 local function addDotPattern(parent, colorA, colorB, spacing)
-    spacing = spacing or 4
+    spacing = spacing or 2
     mk("Frame", {
         Name = "DotBase",
         BackgroundColor3 = colorA or Color3.fromRGB(12, 12, 12),
@@ -395,8 +395,8 @@ local function addDotPattern(parent, colorA, colorB, spacing)
         Size = UDim2.new(1, 0, 1, 0),
         ZIndex = parent.ZIndex
     }, parent)
-    local dots = mk("Frame", {
-        Name = "Dots",
+    local pattern = mk("Frame", {
+        Name = "Dither",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
         ClipsDescendants = true,
@@ -405,26 +405,18 @@ local function addDotPattern(parent, colorA, colorB, spacing)
     task.spawn(function()
         task.wait(0.15)
         local w = parent.AbsoluteSize.X
-        local h = parent.AbsoluteSize.Y
         if w < 10 then w = 660 end
-        if h < 10 then h = 560 end
-        local count = 0
-        for y = 0, h, spacing do
-            for x = 0, w, spacing do
-                local dot = Instance.new("Frame")
-                dot.Size = UDim2.fromOffset(1, 1)
-                dot.Position = UDim2.fromOffset(x, y)
-                dot.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
-                dot.BorderSizePixel = 0
-                dot.ZIndex = parent.ZIndex + 1
-                dot.Parent = dots
-                count = count + 1
-                if count % 500 == 0 then task.wait() end
-            end
+        for x = 0, w, spacing do
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(0, 1, 1, 0)
+            line.Position = UDim2.fromOffset(x, 0)
+            line.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
+            line.BorderSizePixel = 0
+            line.ZIndex = parent.ZIndex + 1
+            line.Parent = pattern
         end
     end)
 end
-
 local sliderDragging=false
 local colorPickerDragging=false
 local allColorPickers={}
@@ -433,7 +425,7 @@ local main=mk("Frame",{Name="Main",Size=UDim2.fromOffset(658,558),Position=UDim2
 local border1=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.inner,BorderSizePixel=0},main)
 local border2=mk("Frame",{Size=UDim2.new(1,-2,1,-2),Position=UDim2.fromOffset(1,1),BackgroundColor3=C.bg0,BorderSizePixel=0},border1)
 local body=mk("Frame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.fromOffset(2,2),BackgroundColor3=C.dotA,BorderSizePixel=0,ClipsDescendants=true},border2)
-addDotPattern(body,C.dotA,C.dotB,6)
+addDotPattern(body, C.dotA, C.dotB, 2)
 mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.topMini,BorderSizePixel=0,ZIndex=50},body)
 
 local contentHeight=546;local contentYStart=4
