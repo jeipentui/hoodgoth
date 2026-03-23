@@ -41,7 +41,7 @@ contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
 contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
 greenText=Color3.fromRGB(156,199,40),
-groupLine=Color3.fromRGB(55,55,55),
+groupStroke=Color3.fromRGB(50,50,50),
 }
 
 local aimbotEnabled=false
@@ -556,184 +556,198 @@ UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseB
 return{getValue=function() return currentValue end}
 end
 
-local function addCornerTriangle(parent, baseZIndex)
-	local z = (baseZIndex or 2) + 10
-	local triSize = 7
-	local clip = mk("Frame", {
-		Size = UDim2.fromOffset(triSize, triSize),
-		Position = UDim2.new(1, -triSize - 1, 1, -triSize - 1),
+-- Helper to add a small gray triangle at bottom-left of a container
+local function addBottomLeftTriangle(parent, zindex)
+	local triSize = 6
+	local tri = mk("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		Position = UDim2.new(0, 0, 1, 0),
+		AnchorPoint = Vector2.new(0, 1),
 		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		ZIndex = z,
-		ClipsDescendants = true,
+		ZIndex = (zindex or 3) + 5,
+		ClipsDescendants = false,
 	}, parent)
-	mk("Frame", {
-		Size = UDim2.fromOffset(triSize * 2, triSize * 2),
-		Position = UDim2.fromOffset(triSize * 0.15, triSize * 0.15),
-		BackgroundColor3 = C.groupLine,
+	-- Use an ImageLabel with a triangle or build from frames
+	-- Simple approach: small rotated frame to simulate triangle
+	local triFrame = mk("Frame", {
+		Size = UDim2.fromOffset(triSize, triSize),
+		Position = UDim2.fromOffset(-1, -1),
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundColor3 = Color3.fromRGB(55, 55, 55),
 		BorderSizePixel = 0,
 		Rotation = 45,
-		ZIndex = z + 1,
-	}, clip)
+		ZIndex = (zindex or 3) + 6,
+	}, tri)
+	-- Clip it so only bottom-left triangle shows: we use the parent's ClipsDescendants
+	-- Actually, let's use a different approach - ImageLabel triangle
+	tri:Destroy()
+	
+	-- Use a small triangle via overlapping approach
+	local triContainer = mk("Frame", {
+		Size = UDim2.fromOffset(triSize, triSize),
+		Position = UDim2.new(0, 2, 1, -2),
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundTransparency = 1,
+		ZIndex = (zindex or 3) + 5,
+		ClipsDescendants = true,
+	}, parent)
+	
+	local innerTri = mk("Frame", {
+		Size = UDim2.fromOffset(triSize * 2, triSize * 2),
+		Position = UDim2.fromOffset(0, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(55, 55, 55),
+		BorderSizePixel = 0,
+		Rotation = 45,
+		ZIndex = (zindex or 3) + 6,
+	}, triContainer)
+	
+	return triContainer
 end
 
 local function createGroup(parent, x, y, w, h, titleText, addTriangle)
-	local g0 = mk("Frame", {Size=UDim2.fromOffset(w, h), Position=UDim2.fromOffset(x, y), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, parent)
-	mk("Frame", {Size=UDim2.new(1, 0, 0, 1), Position=UDim2.fromOffset(0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(1, 0, 0, 1), Position=UDim2.new(0, 0, 1, -1), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(0, 1, 1, 0), Position=UDim2.fromOffset(0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	mk("Frame", {Size=UDim2.new(0, 1, 1, 0), Position=UDim2.new(1, -1, 0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
-	local g2 = mk("Frame", {Size=UDim2.new(1, -2, 1, -2), Position=UDim2.fromOffset(1, 1), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, g0)
-	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), Position=UDim2.fromOffset(8, -7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=4}, g2)
-	mk("TextLabel", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0, 14), BackgroundTransparency=1, Text=" "..titleText.." ", Font=MENU_FONT, TextSize=13, TextColor3=C.text, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, tb)
+	local g0 = mk("Frame", {Size=UDim2.fromOffset(w,h), Position=UDim2.fromOffset(x,y), BackgroundColor3=C.bg0, BorderSizePixel=0, ZIndex=2}, parent)
+	-- Add gray stroke to outer frame
+	mk("UIStroke", {Color=C.groupStroke, Thickness=1, ApplyStrokeMode=Enum.ApplyStrokeMode.Border}, g0)
+	local g1 = mk("Frame", {Size=UDim2.new(1,-2,1,-2), Position=UDim2.fromOffset(1,1), BackgroundColor3=C.inner, BorderSizePixel=0, ZIndex=2}, g0)
+	local g2 = mk("Frame", {Size=UDim2.new(1,-2,1,-2), Position=UDim2.fromOffset(1,1), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, g1)
+	local tb = mk("Frame", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0,14), Position=UDim2.fromOffset(8,-7), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=4}, g2)
+	mk("TextLabel", {AutomaticSize=Enum.AutomaticSize.X, Size=UDim2.fromOffset(0,14), BackgroundTransparency=1, Text=" "..titleText.." ", Font=MENU_FONT, TextSize=13, TextColor3=C.text, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, tb)
+	
+	-- Add triangle if requested
 	if addTriangle then
-		addCornerTriangle(g0, 2)
+		addBottomLeftTriangle(g0, 2)
 	end
+	
 	return g2
 end
 
-local LEFT_PAD = 20
+local LEFT_PAD = 20 -- padding for tabs 2,3,4,5,6,8
 
 local function buildRagebotPage(parent)
-	local TOP = 20
-	local totalH = contentHeight - TOP - 5
-	local wgH = 40
-	createGroup(parent, 6, TOP, 274, wgH, "Weapon type")
-	local aimbotGroup = createGroup(parent, 6, TOP + wgH + 10, 274, totalH - wgH - 10, "Aimbot")
-	createCheckboxWithBind(aimbotGroup, 12, "Enabled", false, "[-]",
-		function(val) aimbotEnabled = val; if not val then currentTarget = nil; targetLocked = false end end,
-		function(bindLabel) if isRecordingKeybind then return end; isRecordingKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingKeybind then return end; if input.UserInputType ~= Enum.UserInputType.Keyboard then return end; if input.KeyCode == Enum.KeyCode.Escape then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = nil; aimlockKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingKeybind = false; conn:Disconnect(); aimlockKey = input.KeyCode; aimlockKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. aimlockKeyName .. "]"; bindLabel.TextColor3 = C.bindText end); task.delay(5, function() if isRecordingKeybind then isRecordingKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = aimlockKey and ("[" .. aimlockKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
-		function(mode) aimlockMode = mode end, function() return aimlockMode end)
-	local otherGroup = createGroup(parent, 290, TOP, 274, totalH, "Other")
-	local y = 12
-	createCheckbox(otherGroup, y, "Automatic fire", false, function(v) autofireEnabled = v end); y = y + 22
-	createCheckbox(otherGroup, y, "Silent aim", false, function(v) silentAimEnabled = v; if not v then silentAimTarget = nil end end); y = y + 22
-	createCheckbox(otherGroup, y, "Remove recoil", false, function(v) if v then activateNoVisualRecoil() else deactivateNoVisualRecoil() end end); y = y + 22
-	createCheckbox(otherGroup, y, "Wallcheck", true, function(v) wallCheckEnabled = v end); y = y + 22
-	createSlider(otherGroup, y, "Maximum FOV", 0, 180, 180, "°", function(v) fovDegrees = v end); y = y + 28
-	createCheckboxWithColor(otherGroup, y, "Show FOV", false, Color3.new(1, 1, 1), function(v) showFOV = v end, function(c) fovColor = c; fovCircle.Color = c end)
+local totalH=contentHeight-15;local wgH=40
+createGroup(parent,6,5,274,wgH,"Weapon type")
+local aimbotGroup=createGroup(parent,6,5+wgH+10,274,totalH-wgH-10,"Aimbot")
+createCheckboxWithBind(aimbotGroup,12,"Enabled",false,"[-]",
+function(val) aimbotEnabled=val;if not val then currentTarget=nil;targetLocked=false end end,
+function(bindLabel) if isRecordingKeybind then return end;isRecordingKeybind=true;bindLabel.Text="[-]";bindLabel.TextColor3=C.bindRecording;local conn;conn=UIS.InputBegan:Connect(function(input) if not isRecordingKeybind then return end;if input.UserInputType~=Enum.UserInputType.Keyboard then return end;if input.KeyCode==Enum.KeyCode.Escape then isRecordingKeybind=false;conn:Disconnect();aimlockKey=nil;aimlockKeyName="Not Set";bindLabel.Text="[-]";bindLabel.TextColor3=C.bindText;return end;if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift or input.KeyCode==Enum.KeyCode.LeftControl or input.KeyCode==Enum.KeyCode.RightControl or input.KeyCode==Enum.KeyCode.LeftAlt or input.KeyCode==Enum.KeyCode.RightAlt then return end;isRecordingKeybind=false;conn:Disconnect();aimlockKey=input.KeyCode;aimlockKeyName=input.KeyCode.Name;bindLabel.Text="["..aimlockKeyName.."]";bindLabel.TextColor3=C.bindText end);task.delay(5,function() if isRecordingKeybind then isRecordingKeybind=false;if conn then conn:Disconnect() end;bindLabel.Text=aimlockKey and("["..aimlockKeyName.."]") or "[-]";bindLabel.TextColor3=C.bindText end end) end,
+function(mode) aimlockMode=mode end,function() return aimlockMode end)
+local otherGroup=createGroup(parent,290,5,274,totalH,"Other")
+local y=12
+createCheckbox(otherGroup,y,"Automatic fire",false,function(v) autofireEnabled=v end);y=y+22
+createCheckbox(otherGroup,y,"Silent aim",false,function(v) silentAimEnabled=v;if not v then silentAimTarget=nil end end);y=y+22
+createCheckbox(otherGroup,y,"Remove recoil",false,function(v) if v then activateNoVisualRecoil() else deactivateNoVisualRecoil() end end);y=y+22
+createCheckbox(otherGroup,y,"Wallcheck",true,function(v) wallCheckEnabled=v end);y=y+22
+createSlider(otherGroup,y,"Maximum FOV",0,180,180,"°",function(v) fovDegrees=v end);y=y+28
+createCheckboxWithColor(otherGroup,y,"Show FOV",false,Color3.new(1,1,1),function(v) showFOV=v end,function(c) fovColor=c;fovCircle.Color=c end)
 end
 
 local function buildAntiAimPage(parent)
-	local TOP = 20
-	local leftW = 250
-	local gap = 25
-	local rightX = LEFT_PAD + leftW + gap
-	local rightW = 250
-	local leftH = contentHeight - TOP - 10
-	local fakelagH = 230
-	local otherY = TOP + fakelagH + 20
-	createGroup(parent, LEFT_PAD, TOP, leftW, leftH, "Anti-aimbot angles", true)
-	createGroup(parent, rightX, TOP, rightW, fakelagH, "Fake lag", true)
-	createGroup(parent, rightX, otherY, rightW, TOP + leftH - otherY, "Other", true)
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Anti-aimbot angles", true)
+	createGroup(parent, LEFT_PAD + 250 + 25, 20, 250, 230, "Fake lag", true)
+	createGroup(parent, LEFT_PAD + 250 + 25, 20 + 230 + 20, 250, 230, "Other", true)
 end
 
 local function buildESPSettingsPage(parent)
-	local TOP = 20
+	local topPad = 25
 	local gapHoriz = 20
 	local gapVert = 20
 	local wtW = 250
 	local wtH = 60
-	createGroup(parent, LEFT_PAD, TOP, wtW, wtH, "Weapon type", true)
-	local aimbotH = contentHeight - TOP - wtH - gapVert - 10
-	local aimbotY = TOP + wtH + gapVert
-	createGroup(parent, LEFT_PAD, aimbotY, wtW, aimbotH, "Aimbot", true)
+	local wtX = LEFT_PAD
+	local wtY = topPad
+	createGroup(parent, wtX, wtY, wtW, wtH, "Weapon type", true)
+	local aimbotW = 250
+	local aimbotH = 420
+	local aimbotX = LEFT_PAD
+	local aimbotY = wtY + wtH + gapVert
+	createGroup(parent, aimbotX, aimbotY, aimbotW, aimbotH, "Aimbot", true)
 	local rightX = LEFT_PAD + 250 + gapHoriz
+	local trigY = topPad
 	local otherH = 130
 	local aimbotBottom = aimbotY + aimbotH
 	local otherY = aimbotBottom - otherH
-	local trigH = otherY - TOP - gapVert
-	createGroup(parent, rightX, TOP, 250, trigH, "Triggerbot", true)
+	local trigH = otherY - trigY - gapVert
+	createGroup(parent, rightX, trigY, 250, trigH, "Triggerbot", true)
 	createGroup(parent, rightX, otherY, 250, otherH, "Other", true)
 end
 
 local function buildPlayerESPPage(parent)
-	local TOP = 20
-	local leftX = LEFT_PAD
-	local rightX = LEFT_PAD + 250 + 24
-	local totalH = contentHeight - TOP - 10
-	local playerGroup = createGroup(parent, leftX, TOP, 250, 270, "Player ESP")
-	local otherGroup = createGroup(parent, rightX, TOP, 250, 250, "Other ESP")
-	createGroup(parent, leftX, TOP + 290, 250, totalH - 290, "Colored models")
-	local effectsGroup = createGroup(parent, rightX, TOP + 270, 250, totalH - 270, "Effects")
-	local y = 12
-	createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
-		function(val) espVisualEnabled = val; if not val then for plr, _ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end,
-		function(bindLabel) if isRecordingESPKeybind then return end; isRecordingESPKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingESPKeybind then return end; if input.UserInputType ~= Enum.UserInputType.Keyboard then return end; if input.KeyCode == Enum.KeyCode.Escape then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = nil; espVisualKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = input.KeyCode; espVisualKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. espVisualKeyName .. "]"; bindLabel.TextColor3 = C.bindText end); task.delay(5, function() if isRecordingESPKeybind then isRecordingESPKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
-		function(mode) espVisualMode = mode end, function() return espVisualMode end)
-	y = y + 22
-	createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255, 0, 0), function(v) Box_ESP_Enabled = v end, function(c) Settings.Box_Color = c end); y = y + 22
-	createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255, 0, 0), function(v) ESP_HPEnabled = v end, function(c) Settings.HP_Color = c end); y = y + 22
-	createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255, 0, 0), function(v) ESP_NameEnabled = v end, function(c) Settings.Name_Color = c end); y = y + 22
-	createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255, 0, 0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.Weapon_Color = c end); y = y + 22
-	createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
-	createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
-	createCheckbox(effectsGroup, 12, "NoFall protection", false, function(v) if v then startNoFall() else stopNoFall() end end)
+local leftX=LEFT_PAD;local rightX=LEFT_PAD+250+24
+local playerGroup=createGroup(parent,leftX,5,250,270,"Player ESP")
+local otherGroup=createGroup(parent,rightX,5,250,250,"Other ESP")
+local coloredGroup=createGroup(parent,leftX,295,250,220,"Colored models")
+local effectsGroup=createGroup(parent,rightX,280,250,235,"Effects")
+local y=12
+createCheckboxWithBind(playerGroup,y,"Activation type",false,"[-]",
+function(val) espVisualEnabled=val;if not val then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end,
+function(bindLabel) if isRecordingESPKeybind then return end;isRecordingESPKeybind=true;bindLabel.Text="[-]";bindLabel.TextColor3=C.bindRecording;local conn;conn=UIS.InputBegan:Connect(function(input) if not isRecordingESPKeybind then return end;if input.UserInputType~=Enum.UserInputType.Keyboard then return end;if input.KeyCode==Enum.KeyCode.Escape then isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=nil;espVisualKeyName="Not Set";bindLabel.Text="[-]";bindLabel.TextColor3=C.bindText;return end;if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift or input.KeyCode==Enum.KeyCode.LeftControl or input.KeyCode==Enum.KeyCode.RightControl or input.KeyCode==Enum.KeyCode.LeftAlt or input.KeyCode==Enum.KeyCode.RightAlt then return end;isRecordingESPKeybind=false;conn:Disconnect();espVisualKey=input.KeyCode;espVisualKeyName=input.KeyCode.Name;bindLabel.Text="["..espVisualKeyName.."]";bindLabel.TextColor3=C.bindText end);task.delay(5,function() if isRecordingESPKeybind then isRecordingESPKeybind=false;if conn then conn:Disconnect() end;bindLabel.Text=espVisualKey and("["..espVisualKeyName.."]") or "[-]";bindLabel.TextColor3=C.bindText end end) end,
+function(mode) espVisualMode=mode end,function() return espVisualMode end)
+y=y+22
+createCheckboxWithColor(playerGroup,y,"Bounding box",false,Color3.fromRGB(255,0,0),function(v) Box_ESP_Enabled=v end,function(c) Settings.Box_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Health bar",false,Color3.fromRGB(255,0,0),function(v) ESP_HPEnabled=v end,function(c) Settings.HP_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Name",false,Color3.fromRGB(255,0,0),function(v) ESP_NameEnabled=v end,function(c) Settings.Name_Color=c end);y=y+22
+createCheckboxWithColor(playerGroup,y,"Weapon text",false,Color3.fromRGB(255,0,0),function(v) ESP_WeaponEnabled=v end,function(c) Settings.Weapon_Color=c end);y=y+22
+createCheckbox(playerGroup,y,"Dynamic HP color",false,function(v) ESP_HPDynamicEnabled=v end);y=y+28
+createSlider(playerGroup,y,"Max distance",1,1500,1500," studs",function(v) ESP_MaxDistance=v end)
+createCheckbox(effectsGroup,12,"NoFall protection",false,function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 local function buildMiscPage(parent)
-	local TOP = 20
-	local totalH = contentHeight - TOP - 10
-	createGroup(parent, LEFT_PAD, TOP, 250, totalH, "Miscellaneous", true)
-	local movGroup = createGroup(parent, LEFT_PAD + 250 + 11, TOP, 250, 245, "Movement", true)
-	createGroup(parent, LEFT_PAD + 250 + 11, TOP + 265, 250, totalH - 265, "Settings", true)
-	createCheckbox(movGroup, 12, "NoFall protection", false, function(v)
-		if v then startNoFall() else stopNoFall() end
-	end)
+local miscGroup = createGroup(parent, LEFT_PAD, 5, 250, 510, "Miscellaneous", true)
+local movGroup = createGroup(parent, LEFT_PAD + 250 + 11, 5, 250, 245, "Movement", true)
+local setGroup = createGroup(parent, LEFT_PAD + 250 + 11, 270, 250, 245, "Settings", true)
+local my = 12
+createCheckbox(movGroup, my, "NoFall protection", false, function(v)
+	if v then startNoFall() else stopNoFall() end
+end)
 end
 
 local function buildSkinsPage(parent)
-	local TOP = 20
-	local totalH = contentHeight - TOP - 10
-	createGroup(parent, LEFT_PAD, TOP, 250, totalH, "Model options")
-	createGroup(parent, LEFT_PAD + 250 + 20, TOP, 250, totalH, "Weapon skin")
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Model options")
+	createGroup(parent, LEFT_PAD + 250 + 20, 20, 250, 500, "Weapon skin")
 end
 
 local function buildPlayersPage(parent)
-	local TOP = 20
-	local totalH = contentHeight - TOP - 10
-	local playersGroup = createGroup(parent, 6, TOP, 250, totalH, "Players", true)
-	local adjustGroup = createGroup(parent, 266, TOP, 298, totalH, "Adjustments", true)
-	local listFrame = mk("Frame", {Size = UDim2.new(1, -16, 1, -52), Position = UDim2.fromOffset(8, 12), BackgroundColor3 = Color3.fromRGB(15, 15, 15), BorderSizePixel = 0, ZIndex = 4, ClipsDescendants = true}, playersGroup)
-	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, listFrame)
-	local scrollFrame = mk("ScrollingFrame", {Size = UDim2.new(1, 0, 1, 0), Position = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4, ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 5}, listFrame)
-	mk("UIListLayout", {SortOrder = Enum.SortOrder.Name, Padding = UDim.new(0, 1)}, scrollFrame)
-	local searchBox = mk("TextBox", {Size = UDim2.new(1, -16, 0, 22), Position = UDim2.new(0, 8, 1, -32), BackgroundColor3 = Color3.fromRGB(15, 15, 15), BorderSizePixel = 0, Text = "", PlaceholderText = "Search player...", Font = MENU_FONT, TextSize = 12, TextColor3 = C.text, PlaceholderColor3 = C.textDim, ClearTextOnFocus = false, ZIndex = 5}, playersGroup)
-	mk("UIStroke", {Color = Color3.fromRGB(3, 3, 3), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, searchBox)
-	local rightContent = mk("Frame", {Size = UDim2.new(1, -16, 1, -20), Position = UDim2.fromOffset(8, 12), BackgroundTransparency = 1, ZIndex = 4}, adjustGroup)
-	local selectedLabel = mk("TextLabel", {Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Text = "No player selected", Font = MENU_FONT, TextSize = 13, TextColor3 = C.textDim, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5}, rightContent)
-	local adjustY = 24
-	local whitelistCB = createCheckbox(rightContent, adjustY, "Add to whitelist", false, function(v) if playerPageData.selectedPlayer then local ps = getPlayerSettings(playerPageData.selectedPlayer); ps.whitelisted = v; if v then local found = false; for _, n in pairs(FriendList) do if n == playerPageData.selectedPlayer then found = true; break end end; if not found then table.insert(FriendList, playerPageData.selectedPlayer) end else for i, n in pairs(FriendList) do if n == playerPageData.selectedPlayer then table.remove(FriendList, i); break end end end end end); adjustY = adjustY + 22
-	local teamColorCB = createCheckbox(rightContent, adjustY, "Team color", false, function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).teamColor = v end end); adjustY = adjustY + 22
-	local disableVisCB = createCheckbox(rightContent, adjustY, "Disable visuals", false, function(v) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).disableVisuals = v; if v then local plr = Players:FindFirstChild(playerPageData.selectedPlayer); if plr then hidePlayerESP(plr) end end end end); adjustY = adjustY + 28
-	createCheckboxWithColor(rightContent, adjustY, "Box color", false, Color3.fromRGB(255, 0, 0), nil, function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).boxColor = c end end); adjustY = adjustY + 22
-	createCheckboxWithColor(rightContent, adjustY, "HP color", false, Color3.fromRGB(255, 0, 0), nil, function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).hpColor = c end end); adjustY = adjustY + 22
-	createCheckboxWithColor(rightContent, adjustY, "Name color", false, Color3.fromRGB(255, 0, 0), nil, function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).nameColor = c end end); adjustY = adjustY + 22
-	createCheckboxWithColor(rightContent, adjustY, "Weapon color", false, Color3.fromRGB(255, 0, 0), nil, function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).weaponColor = c end end)
-	local function refreshPlayerList()
-		for _, child in pairs(scrollFrame:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end; playerPageData.buttons = {}
-		local search = searchBox.Text:lower(); local plist = Players:GetPlayers(); table.sort(plist, function(a, b) return a.Name:lower() < b.Name:lower() end)
-		for _, plr in pairs(plist) do if plr ~= lp then if search == "" or plr.Name:lower():find(search, 1, true) then
-			local isSelected = (playerPageData.selectedPlayer == plr.Name)
-			local btn = mk("TextButton", {Size = UDim2.new(1, -2, 0, 20), BackgroundColor3 = isSelected and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(18, 18, 18), BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 6, Name = plr.Name}, scrollFrame)
-			local ps = getPlayerSettings(plr.Name); local nameCol = ps.whitelisted and Settings.Friend_Color or C.text
-			mk("TextLabel", {Size = UDim2.new(1, -8, 1, 0), Position = UDim2.fromOffset(6, 0), BackgroundTransparency = 1, Text = plr.Name, Font = MENU_FONT, TextSize = 12, TextColor3 = nameCol, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7}, btn)
-			btn.MouseEnter:Connect(function() if playerPageData.selectedPlayer ~= plr.Name then btn.BackgroundColor3 = Color3.fromRGB(28, 28, 28) end end)
-			btn.MouseLeave:Connect(function() if playerPageData.selectedPlayer ~= plr.Name then btn.BackgroundColor3 = Color3.fromRGB(18, 18, 18) end end)
-			btn.MouseButton1Click:Connect(function() playerPageData.selectedPlayer = plr.Name; selectedLabel.Text = plr.Name; selectedLabel.TextColor3 = C.text; local s = getPlayerSettings(plr.Name); whitelistCB.setEnabled(s.whitelisted); teamColorCB.setEnabled(s.teamColor or false); disableVisCB.setEnabled(s.disableVisuals); for _, b in pairs(playerPageData.buttons) do b.BackgroundColor3 = (b.Name == plr.Name) and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(18, 18, 18) end end)
-			playerPageData.buttons[#playerPageData.buttons + 1] = btn
-		end end end
-	end
-	refreshPlayerList(); searchBox:GetPropertyChangedSignal("Text"):Connect(function() refreshPlayerList() end)
-	Players.PlayerAdded:Connect(function() task.wait(0.5); refreshPlayerList() end)
-	Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer == plr.Name then playerPageData.selectedPlayer = nil; selectedLabel.Text = "No player selected"; selectedLabel.TextColor3 = C.textDim end; task.wait(0.1); refreshPlayerList() end)
+local playersGroup=createGroup(parent,6,5,250,510,"Players", true)
+local adjustGroup=createGroup(parent,266,5,298,510,"Adjustments", true)
+local listFrame=mk("Frame",{Size=UDim2.new(1,-16,1,-52),Position=UDim2.fromOffset(8,12),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,ZIndex=4,ClipsDescendants=true},playersGroup)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},listFrame)
+local scrollFrame=mk("ScrollingFrame",{Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=4,ScrollBarImageColor3=Color3.fromRGB(80,80,80),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ZIndex=5},listFrame)
+mk("UIListLayout",{SortOrder=Enum.SortOrder.Name,Padding=UDim.new(0,1)},scrollFrame)
+local searchBox=mk("TextBox",{Size=UDim2.new(1,-16,0,22),Position=UDim2.new(0,8,1,-32),BackgroundColor3=Color3.fromRGB(15,15,15),BorderSizePixel=0,Text="",PlaceholderText="Search player...",Font=MENU_FONT,TextSize=12,TextColor3=C.text,PlaceholderColor3=C.textDim,ClearTextOnFocus=false,ZIndex=5},playersGroup)
+mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},searchBox)
+local rightContent=mk("Frame",{Size=UDim2.new(1,-16,1,-20),Position=UDim2.fromOffset(8,12),BackgroundTransparency=1,ZIndex=4},adjustGroup)
+local selectedLabel=mk("TextLabel",{Size=UDim2.new(1,0,0,18),Position=UDim2.fromOffset(0,0),BackgroundTransparency=1,Text="No player selected",Font=MENU_FONT,TextSize=13,TextColor3=C.textDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},rightContent)
+local adjustY=24
+local whitelistCB=createCheckbox(rightContent,adjustY,"Add to whitelist",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.whitelisted=v;if v then local found=false;for _,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then found=true;break end end;if not found then table.insert(FriendList,playerPageData.selectedPlayer) end else for i,n in pairs(FriendList) do if n==playerPageData.selectedPlayer then table.remove(FriendList,i);break end end end end end);adjustY=adjustY+22
+local teamColorCB=createCheckbox(rightContent,adjustY,"Team color",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.teamColor=v end end);adjustY=adjustY+22
+local disableVisCB=createCheckbox(rightContent,adjustY,"Disable visuals",false,function(v) if playerPageData.selectedPlayer then local ps=getPlayerSettings(playerPageData.selectedPlayer);ps.disableVisuals=v;if v then local plr=Players:FindFirstChild(playerPageData.selectedPlayer);if plr then hidePlayerESP(plr) end end end end);adjustY=adjustY+28
+createCheckboxWithColor(rightContent,adjustY,"Box color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).boxColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"HP color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).hpColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"Name color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).nameColor=c end end);adjustY=adjustY+22
+createCheckboxWithColor(rightContent,adjustY,"Weapon color",false,Color3.fromRGB(255,0,0),nil,function(c) if playerPageData.selectedPlayer then getPlayerSettings(playerPageData.selectedPlayer).weaponColor=c end end)
+local function refreshPlayerList()
+for _,child in pairs(scrollFrame:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end;playerPageData.buttons={}
+local search=searchBox.Text:lower();local plist=Players:GetPlayers();table.sort(plist,function(a,b) return a.Name:lower()<b.Name:lower() end)
+for _,plr in pairs(plist) do if plr~=lp then if search=="" or plr.Name:lower():find(search,1,true) then
+local isSelected=(playerPageData.selectedPlayer==plr.Name)
+local btn=mk("TextButton",{Size=UDim2.new(1,-2,0,20),BackgroundColor3=isSelected and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6,Name=plr.Name},scrollFrame)
+local ps=getPlayerSettings(plr.Name);local nameCol=ps.whitelisted and Settings.Friend_Color or C.text
+mk("TextLabel",{Size=UDim2.new(1,-8,1,0),Position=UDim2.fromOffset(6,0),BackgroundTransparency=1,Text=plr.Name,Font=MENU_FONT,TextSize=12,TextColor3=nameCol,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},btn)
+btn.MouseEnter:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(28,28,28) end end)
+btn.MouseLeave:Connect(function() if playerPageData.selectedPlayer~=plr.Name then btn.BackgroundColor3=Color3.fromRGB(18,18,18) end end)
+btn.MouseButton1Click:Connect(function() playerPageData.selectedPlayer=plr.Name;selectedLabel.Text=plr.Name;selectedLabel.TextColor3=C.text;local s=getPlayerSettings(plr.Name);whitelistCB.setEnabled(s.whitelisted);teamColorCB.setEnabled(s.teamColor or false);disableVisCB.setEnabled(s.disableVisuals);for _,b in pairs(playerPageData.buttons) do b.BackgroundColor3=(b.Name==plr.Name) and Color3.fromRGB(35,35,35) or Color3.fromRGB(18,18,18) end end)
+playerPageData.buttons[#playerPageData.buttons+1]=btn
+end end end end
+refreshPlayerList();searchBox:GetPropertyChangedSignal("Text"):Connect(function() refreshPlayerList() end)
+Players.PlayerAdded:Connect(function() task.wait(0.5);refreshPlayerList() end)
+Players.PlayerRemoving:Connect(function(plr) if playerPageData.selectedPlayer==plr.Name then playerPageData.selectedPlayer=nil;selectedLabel.Text="No player selected";selectedLabel.TextColor3=C.textDim end;task.wait(0.1);refreshPlayerList() end)
 end
 
 local function buildConfigPage(parent)
-	local TOP = 20
-	local totalH = contentHeight - TOP - 10
-	createGroup(parent, LEFT_PAD, TOP, 250, totalH, "Presets", true)
-	createGroup(parent, LEFT_PAD + 250 + 20, TOP, 250, totalH, "Lua", true)
+	createGroup(parent, LEFT_PAD, 20, 250, 500, "Presets", true)
+	createGroup(parent, LEFT_PAD + 250 + 20, 20, 250, 500, "Lua", true)
 end
 
 local function createTab(index,imageId)
