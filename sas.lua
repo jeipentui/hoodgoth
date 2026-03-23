@@ -574,7 +574,7 @@ local function addCornerTriangle(parent, baseZIndex)
 end
 local function createGroup(parent, x, y, w, h, titleText, addTriangle)
 	-- Outer border line (1px gray lines on all sides)
-	local g0 = mk("Frame", {Size=UDim2.fromOffset(w, h), Position=UDim2.fromOffset(x, y), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=true}, parent)
+	local g0 = mk("Frame", {Size=UDim2.fromOffset(w, h), Position=UDim2.fromOffset(x, y), BackgroundColor3=C.groupBg, BorderSizePixel=0, ZIndex=2, ClipsDescendants=false}, parent)
 	
 	-- Top line
 	mk("Frame", {Size=UDim2.new(1, 0, 0, 1), Position=UDim2.fromOffset(0, 0), BackgroundColor3=C.groupLine, BorderSizePixel=0, ZIndex=3}, g0)
