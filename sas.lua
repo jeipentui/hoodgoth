@@ -790,24 +790,47 @@ local function buildConfigPage(parent)
 end
 
 
-local function createTab(index,imageId)
-local y=math.floor(topPadding+(index-1)*(iconSize+gapIcons))
-local holder=mk("TextButton",{Size=UDim2.fromOffset(buttonWidth,iconSize),Position=UDim2.fromOffset(12,y),BackgroundTransparency=1,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=21},iconHolder)
-local icon=mk("ImageLabel",{Size=UDim2.fromOffset(120,120),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),BackgroundTransparency=1,Image=imageId,ScaleType=Enum.ScaleType.Fit,ZIndex=22},holder)
-local page=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=2},pageHolder)
-if index==1 then buildRagebotPage(page)
-elseif index==2 then buildAntiAimPage(page)
-elseif index==3 then buildESPSettingsPage(page)
-elseif index==4 then buildPlayerESPPage(page)
-elseif index==5 then buildMiscPage(page)
-elseif index==6 then buildSkinsPage(page)
-elseif index==7 then buildPlayersPage(page)
-elseif index==8 then buildConfigPage(page)
-end
-tabButtons[index]={button=holder,icon=icon};pages[index]=page
-holder.MouseButton1Click:Connect(function() closeActiveContext();for _,closeFunc in ipairs(allColorPickers) do closeFunc() end;for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==index) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==index) end end)
+local function createTab(index, imageId)
+    local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
+    local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
+    local activeBg = mk("Frame", {
+        Size = UDim2.fromOffset(60, iconSize),
+        Position = UDim2.fromOffset(buttonWidth - 60, 0),
+        BackgroundColor3 = C.bg0,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 19
+    }, holder)
+    local icon = mk("ImageLabel", {Size = UDim2.fromOffset(120, 120), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22}, holder)
+    local page = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, ZIndex = 2}, pageHolder)
+    if index == 1 then buildRagebotPage(page)
+    elseif index == 2 then buildAntiAimPage(page)
+    elseif index == 3 then buildESPSettingsPage(page)
+    elseif index == 4 then buildPlayerESPPage(page)
+    elseif index == 5 then buildMiscPage(page)
+    elseif index == 6 then buildSkinsPage(page)
+    elseif index == 7 then buildPlayersPage(page)
+    elseif index == 8 then buildConfigPage(page)
+    end
+    tabButtons[index] = {button = holder, icon = icon, activeBg = activeBg}
+    pages[index] = page
+    holder.MouseButton1Click:Connect(function()
+        closeActiveContext()
+        for _, closeFunc in ipairs(allColorPickers) do closeFunc() end
+        for i = 1, #tabButtons do
+            tabButtons[i].icon.ImageColor3 = (i == index) and C.iconOn or Color3.new(1, 1, 1)
+            tabButtons[i].activeBg.Visible = (i == index)
+            pages[i].Visible = (i == index)
+        end
+    end)
 end
 
+for i, id in ipairs(ICONS) do createTab(i, id) end
+for i = 1, #tabButtons do
+    tabButtons[i].icon.ImageColor3 = (i == 1) and C.iconOn or Color3.new(1, 1, 1)
+    tabButtons[i].activeBg.Visible = (i == 1)
+    pages[i].Visible = (i == 1)
+end
 for i,id in ipairs(ICONS) do createTab(i,id) end
 for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==1) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==1) end
 
