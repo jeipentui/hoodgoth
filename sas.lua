@@ -793,15 +793,39 @@ end
 local function createTab(index, imageId)
     local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
     local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
-    -- Фон активной вкладки - позиционируется от левого края сайдбара до правого
+    
+    -- Фон активной вкладки - цвет как у основного фона с полосками
     local activeBg = mk("Frame", {
-        Size = UDim2.fromOffset(75, iconSize),
+        Size = UDim2.fromOffset(75, 80),
         Position = UDim2.fromOffset(-12, 0),
-        BackgroundColor3 = Color3.fromRGB(8, 8, 8),
+        BackgroundColor3 = C.dotA,
         BorderSizePixel = 0,
         Visible = false,
         ZIndex = 18
     }, holder)
+    -- Полоски поверх фона (как на основном фоне)
+    task.spawn(function()
+        task.wait(0.2)
+        for x = 0, 75, 2 do
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(0, 1, 1, 0)
+            line.Position = UDim2.fromOffset(x, 0)
+            line.BackgroundColor3 = C.dotB
+            line.BorderSizePixel = 0
+            line.ZIndex = 19
+            line.Parent = activeBg
+        end
+    end)
+    -- Перекрыватель разделительной линии (белый -> цвет фона)
+    local dividerKill = mk("Frame", {
+        Size = UDim2.fromOffset(2, 80),
+        Position = UDim2.fromOffset(63, 0),
+        BackgroundColor3 = C.dotA,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 25
+    }, holder)
+
     local icon = mk("ImageLabel", {Size = UDim2.fromOffset(120, 120), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22}, holder)
     local page = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, ZIndex = 2}, pageHolder)
     if index == 1 then buildRagebotPage(page)
@@ -813,7 +837,7 @@ local function createTab(index, imageId)
     elseif index == 7 then buildPlayersPage(page)
     elseif index == 8 then buildConfigPage(page)
     end
-    tabButtons[index] = {button = holder, icon = icon, activeBg = activeBg}
+    tabButtons[index] = {button = holder, icon = icon, activeBg = activeBg, dividerKill = dividerKill}
     pages[index] = page
     holder.MouseButton1Click:Connect(function()
         closeActiveContext()
@@ -821,6 +845,7 @@ local function createTab(index, imageId)
         for i = 1, #tabButtons do
             tabButtons[i].icon.ImageColor3 = (i == index) and C.iconOn or Color3.new(1, 1, 1)
             tabButtons[i].activeBg.Visible = (i == index)
+            tabButtons[i].dividerKill.Visible = (i == index)
             pages[i].Visible = (i == index)
         end
     end)
@@ -830,6 +855,7 @@ for i, id in ipairs(ICONS) do createTab(i, id) end
 for i = 1, #tabButtons do
     tabButtons[i].icon.ImageColor3 = (i == 1) and C.iconOn or Color3.new(1, 1, 1)
     tabButtons[i].activeBg.Visible = (i == 1)
+    tabButtons[i].dividerKill.Visible = (i == 1)
     pages[i].Visible = (i == 1)
 end
 
