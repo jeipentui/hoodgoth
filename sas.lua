@@ -400,7 +400,7 @@ local function addDotPattern(parent, colorA, colorB, spacing)
         Size = UDim2.new(1, 0, 1, 0),
         Image = "rbxassetid://88522226815674",
         ScaleType = Enum.ScaleType.Tile,
-        TileSize = UDim2.fromOffset(2, 560),
+        TileSize = UDim2.fromOffset(4, 4),
         ImageTransparency = 0,
         ZIndex = parent.ZIndex + 1
     }, parent)
