@@ -793,13 +793,14 @@ end
 local function createTab(index, imageId)
     local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
     local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
+    -- Фон активной вкладки - позиционируется от левого края сайдбара до правого
     local activeBg = mk("Frame", {
-        Size = UDim2.fromOffset(60, iconSize),
-        Position = UDim2.fromOffset(buttonWidth - 60, 0),
-        BackgroundColor3 = C.bg0,
+        Size = UDim2.fromOffset(75, iconSize),
+        Position = UDim2.fromOffset(-12, 0),
+        BackgroundColor3 = Color3.fromRGB(8, 8, 8),
         BorderSizePixel = 0,
         Visible = false,
-        ZIndex = 19
+        ZIndex = 18
     }, holder)
     local icon = mk("ImageLabel", {Size = UDim2.fromOffset(120, 120), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22}, holder)
     local page = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, ZIndex = 2}, pageHolder)
@@ -831,8 +832,6 @@ for i = 1, #tabButtons do
     tabButtons[i].activeBg.Visible = (i == 1)
     pages[i].Visible = (i == 1)
 end
-for i,id in ipairs(ICONS) do createTab(i,id) end
-for i=1,#tabButtons do tabButtons[i].icon.ImageColor3=(i==1) and C.iconOn or Color3.new(1,1,1);pages[i].Visible=(i==1) end
 
 local topLine=mk("Frame",{Size=UDim2.new(1,-2,0,2),Position=UDim2.fromOffset(1,1),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=100},body)
 gradient(topLine,0,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(55,170,255)),ColorSequenceKeypoint.new(0.18,Color3.fromRGB(80,120,255)),ColorSequenceKeypoint.new(0.35,Color3.fromRGB(150,85,255)),ColorSequenceKeypoint.new(0.53,Color3.fromRGB(255,90,210)),ColorSequenceKeypoint.new(0.76,Color3.fromRGB(255,155,70)),ColorSequenceKeypoint.new(1,Color3.fromRGB(170,255,0))}))
