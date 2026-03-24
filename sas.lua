@@ -405,22 +405,15 @@ local function addDotPattern(parent, colorA, colorB, spacing)
     task.spawn(function()
         task.wait(0.15)
         local w = parent.AbsoluteSize.X
-        local h = parent.AbsoluteSize.Y
         if w < 10 then w = 660 end
-        if h < 10 then h = 560 end
-        local count = 0
-        for y = 0, h, 3 do
-            for x = 0, w, spacing do
-                local dash = Instance.new("Frame")
-                dash.Size = UDim2.fromOffset(1, 2)
-                dash.Position = UDim2.fromOffset(x, y)
-                dash.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
-                dash.BorderSizePixel = 0
-                dash.ZIndex = parent.ZIndex + 1
-                dash.Parent = pattern
-                count = count + 1
-                if count % 500 == 0 then task.wait() end
-            end
+        for x = 0, w, spacing do
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(0, 1, 1, 0)
+            line.Position = UDim2.fromOffset(x, 0)
+            line.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
+            line.BorderSizePixel = 0
+            line.ZIndex = parent.ZIndex + 1
+            line.Parent = pattern
         end
     end)
 end
