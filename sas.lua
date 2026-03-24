@@ -387,7 +387,6 @@ Players.PlayerRemoving:Connect(function(plr) cleanupPlayerESP(plr) end)
 local function mk(class,props,parent) local o=Instance.new(class);for k,v in pairs(props) do o[k]=v end;if parent then o.Parent=parent end;return o end
 local function gradient(parent,rotation,seq) local g=Instance.new("UIGradient");g.Rotation=rotation or 0;g.Color=seq;g.Parent=parent;return g end
 local function addDotPattern(parent, colorA, colorB, spacing)
-    spacing = spacing or 2
     mk("Frame", {
         Name = "DotBase",
         BackgroundColor3 = colorA or Color3.fromRGB(12, 12, 12),
@@ -395,27 +394,16 @@ local function addDotPattern(parent, colorA, colorB, spacing)
         Size = UDim2.new(1, 0, 1, 0),
         ZIndex = parent.ZIndex
     }, parent)
-    local pattern = mk("Frame", {
-        Name = "Dither",
+    mk("ImageLabel", {
+        Name = "DitherTile",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
-        ClipsDescendants = true,
+        Image = "rbxassetid://88522226815674",
+        ScaleType = Enum.ScaleType.Tile,
+        TileSize = UDim2.fromOffset(2, 560),
+        ImageTransparency = 0,
         ZIndex = parent.ZIndex + 1
     }, parent)
-    task.spawn(function()
-        task.wait(0.15)
-        local w = parent.AbsoluteSize.X
-        if w < 10 then w = 660 end
-        for x = 0, w, spacing do
-            local line = Instance.new("Frame")
-            line.Size = UDim2.new(0, 1, 1, 0)
-            line.Position = UDim2.fromOffset(x, 0)
-            line.BackgroundColor3 = colorB or Color3.fromRGB(20, 20, 20)
-            line.BorderSizePixel = 0
-            line.ZIndex = parent.ZIndex + 1
-            line.Parent = pattern
-        end
-    end)
 end
 local sliderDragging=false
 local colorPickerDragging=false
