@@ -436,7 +436,7 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=15;local bottomPadding=35;local iconSize=70;local buttonWidth=50
+local topPadding=15;local bottomPadding=35;local iconSize=45;local buttonWidth=50
 local countIcons=#ICONS
 local gapIcons=10
 
@@ -796,7 +796,7 @@ local function createTab(index, imageId)
     
     -- Фон активной вкладки - цвет как у основного фона с полосками
 local activeBg = mk("Frame", {
-    Size = UDim2.fromOffset(75, 80),
+    Size = UDim2.fromOffset(75, iconSize),
     Position = UDim2.fromOffset(-12, 0),
     BackgroundColor3 = C.dotA,
     BorderSizePixel = 0,
