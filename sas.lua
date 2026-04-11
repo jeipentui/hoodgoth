@@ -1,4 +1,3 @@
-
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -437,9 +436,9 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=15;local bottomPadding=35;local iconSize=60;local buttonWidth=50
+local topPadding=15;local bottomPadding=35;local iconSize=65;local buttonWidth=50
 local countIcons=#ICONS
-local gapIcons=5
+local gapIcons=3
 
 local tabButtons={};local pages={};local activeContextMenu=nil;local activeContextConn=nil
 
