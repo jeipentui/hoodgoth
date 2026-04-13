@@ -439,7 +439,7 @@ local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIn
 
 local topPadding=15;local bottomPadding=35;local iconSize=200;local buttonWidth=50
 local countIcons=#ICONS
-local gapIcons=-80
+local gapIcons=-150
 
 local tabButtons={};local pages={};local activeContextMenu=nil;local activeContextConn=nil
 
