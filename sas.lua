@@ -31,8 +31,8 @@ local ICONS = {
 "rbxassetid://124822799974325"
 }
 local C = {
-outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(47,47,47),bg0=Color3.fromRGB(8,8,8),
-side=Color3.fromRGB(12,12,12),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
+outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(31,30,30),
+side=Color3.fromRGB(31,30,30),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
 textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(23,23,23),
 dotA=Color3.fromRGB(12,12,12),dotB=Color3.fromRGB(20,20,20),topMini=Color3.fromRGB(40,40,40),
 checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
@@ -437,7 +437,7 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=20;local bottomPadding=30;local iconSize=70;local buttonWidth=50
+local topPadding=20;local bottomPadding=30;local iconSize=50;local buttonWidth=50
 local countIcons=#ICONS
 local gapIcons=20
 
