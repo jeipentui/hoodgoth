@@ -34,7 +34,7 @@ local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(31,30,30),
 side=Color3.fromRGB(31,30,30),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
 textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(23,23,23),
-dotA=Color3.fromRGB(12,12,12),dotB=Color3.fromRGB(20,20,20),topMini=Color3.fromRGB(40,40,40),
+dotA=Color3.fromRGB(31,30,30),dotB=Color3.fromRGB(43,43,43),topMini=Color3.fromRGB(40,40,40),
 checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
 sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
 bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
