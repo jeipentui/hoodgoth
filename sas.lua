@@ -21,14 +21,14 @@ gui.Parent = pg
 local MENU_FONT = Enum.Font.SourceSansBold
 
 local ICONS = {
-"rbxassetid://110979950588031",
-"rbxassetid://113976066806919",
-"rbxassetid://80406856427257",
-"rbxassetid://126778553277427",
-"rbxassetid://94065804843329",
-"rbxassetid://83792592771704",
-"rbxassetid://85327526284449",
-"rbxassetid://139236143651252"
+"rbxassetid://94278499966618",
+"rbxassetid://80872229311920",
+"rbxassetid://72714253932103",
+"rbxassetid://86320316804391",
+"rbxassetid://90283725405705",
+"rbxassetid://112389776984679",
+"rbxassetid://87159373815906",
+"rbxassetid://124822799974325"
 }
 local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(47,47,47),bg0=Color3.fromRGB(8,8,8),
