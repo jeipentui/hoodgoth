@@ -437,9 +437,9 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=-55;local bottomPadding=-30;local iconSize=200;local buttonWidth=50
+local topPadding=20;local bottomPadding=30;local iconSize=70;local buttonWidth=50
 local countIcons=#ICONS
-local gapIcons=-140
+local gapIcons=20
 
 local tabButtons={};local pages={};local activeContextMenu=nil;local activeContextConn=nil
 
@@ -827,7 +827,7 @@ local dividerKill = mk("Frame", {
     ZIndex = 25
 }, holder)
 
-    local icon = mk("ImageLabel", {Size = UDim2.fromOffset(120, 120), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22}, holder)
+    local icon = mk("ImageLabel", {Size = UDim2.fromOffset(50, 50), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 22}, holder)
     local page = mk("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false, ZIndex = 2}, pageHolder)
     if index == 1 then buildRagebotPage(page)
     elseif index == 2 then buildAntiAimPage(page)
