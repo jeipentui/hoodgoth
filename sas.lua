@@ -23,7 +23,7 @@ local MENU_FONT = Enum.Font.SourceSansBold
 local ICONS = {
 "rbxassetid://94278499966618",
 "rbxassetid://80872229311920",
-"rbxassetid://72714253932103",
+"rbxassetid://97966594320386",
 "rbxassetid://86320316804391",
 "rbxassetid://90283725405705",
 "rbxassetid://112389776984679",
