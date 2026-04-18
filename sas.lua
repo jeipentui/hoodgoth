@@ -31,8 +31,8 @@ local ICONS = {
 "rbxassetid://124822799974325"
 }
 local C = {
-outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(31,30,30),
-side=Color3.fromRGB(31,30,30),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
+outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
+side=Color3.fromRGB(32,31,31),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
 textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(48,47,47),
 dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
 checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
