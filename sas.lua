@@ -23,7 +23,7 @@ local MENU_FONT = Enum.Font.SourceSansBold
 local ICONS = {
 "rbxassetid://94278499966618",
 "rbxassetid://80872229311920",
-"rbxassetid://102405939950100",
+"rbxassetid://72714253932103",
 "rbxassetid://86320316804391",
 "rbxassetid://90283725405705",
 "rbxassetid://112389776984679",
@@ -32,7 +32,7 @@ local ICONS = {
 }
 local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
-side=Color3.fromRGB(32,31,31),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
+side=Color3.fromRGB(20,19,19),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
 textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(49,48,48),
 dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
 checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(90,89,89),sliderBg=Color3.fromRGB(8,8,8),
