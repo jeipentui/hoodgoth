@@ -33,16 +33,16 @@ local ICONS = {
 local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
 side=Color3.fromRGB(32,31,31),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
-textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(48,47,47),
+textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(49,48,48),
 dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
-checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(35,35,35),sliderBg=Color3.fromRGB(8,8,8),
+checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(90,89,89),sliderBg=Color3.fromRGB(8,8,8),
 sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
 bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
 contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
 contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
-contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(3,3,3),
+contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(32,31,31),
 greenText=Color3.fromRGB(156,199,40),
-groupLine=Color3.fromRGB(55,55,55),
+groupLine=Color3.fromRGB(45,44,44),
 }
 
 local aimbotEnabled=false
