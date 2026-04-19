@@ -56,9 +56,9 @@ local ICONS = {
 local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
 side=Color3.fromRGB(20,19,19),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
-textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(36,35,35),
+textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(40,39,39),
 dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
-checkOn=Color3.fromRGB(40,39,39),checkOff=Color3.fromRGB(90,89,89),checkBorder=Color3.fromRGB(24,23,23),sliderBg=Color3.fromRGB(8,8,8),
+checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(90,89,89),checkBorder=Color3.fromRGB(24,23,23),sliderBg=Color3.fromRGB(8,8,8),
 sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
 bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
 contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
