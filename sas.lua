@@ -460,7 +460,7 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=35;local iconSize=40;local buttonWidth=40
+local topPadding=35;local iconSize=35;local buttonWidth=35
 local countIcons=#ICONS
 local gapIcons=25
 
