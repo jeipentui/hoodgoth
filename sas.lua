@@ -1,4 +1,3 @@
-
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -17,7 +16,7 @@ gui.Name = "skeet_visual"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = pg
-ф
+
 local MENU_FONT = Enum.Font.SourceSansBold
 
 local ICONS = {
