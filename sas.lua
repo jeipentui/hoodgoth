@@ -56,16 +56,16 @@ local ICONS = {
 local C = {
 outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
 side=Color3.fromRGB(20,19,19),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
-textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(49,48,48),
+textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(36,35,35),
 dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
-checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(90,89,89),sliderBg=Color3.fromRGB(8,8,8),
+checkOn=Color3.fromRGB(40,39,39),checkOff=Color3.fromRGB(90,89,89),checkBorder=Color3.fromRGB(24,23,23),sliderBg=Color3.fromRGB(8,8,8),
 sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
 bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
 contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
 contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
 contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(32,31,31),
 greenText=Color3.fromRGB(156,199,40),
-groupLine=Color3.fromRGB(45,44,44),
+groupLine=Color3.fromRGB(24,23,23),
 }
 
 local aimbotEnabled=false
@@ -505,7 +505,7 @@ end
 local function createCheckboxWithBind(parent,yPos,labelText,defaultValue,bindText,onToggle,onBindClick,onContextSelect,getCurrentMode)
 local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
 local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=defaultValue and C.checkOn or C.checkOff,BorderSizePixel=0,ZIndex=6},container)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
+mk("UIStroke",{Color=C.checkBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
 mk("TextLabel",{Size=UDim2.new(1,-55,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
 local bindLabel=mk("TextLabel",{Size=UDim2.fromOffset(40,14),Position=UDim2.new(1,-40,0,2),BackgroundTransparency=1,Text=bindText or "[-]",Font=MENU_FONT,TextSize=11,TextColor3=C.bindText,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=7},container)
 local bindClickArea=mk("TextButton",{Size=UDim2.fromOffset(40,18),Position=UDim2.new(1,-40,0,0),BackgroundTransparency=1,Text="",ZIndex=9},container)
@@ -520,7 +520,7 @@ end
 local function createCheckbox(parent,yPos,labelText,defaultValue,onToggle)
 local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
 local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=defaultValue and C.checkOn or C.checkOff,BorderSizePixel=0,ZIndex=6},container)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
+mk("UIStroke",{Color=C.checkBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
 mk("TextLabel",{Size=UDim2.new(1,-30,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
 local clickArea=mk("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=8},container)
 local enabled=defaultValue
@@ -531,7 +531,7 @@ end
 local function createCheckboxWithColor(parent,yPos,labelText,defaultValue,defaultColor,onToggle,onColorChanged)
 local container=mk("Frame",{Size=UDim2.new(1,-16,0,18),Position=UDim2.fromOffset(8,yPos),BackgroundTransparency=1,ZIndex=5},parent)
 local checkBox=mk("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.fromOffset(0,5),BackgroundColor3=defaultValue and C.checkOn or C.checkOff,BorderSizePixel=0,ZIndex=6},container)
-mk("UIStroke",{Color=Color3.fromRGB(3,3,3),Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
+mk("UIStroke",{Color=C.checkBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},checkBox)
 mk("TextLabel",{Size=UDim2.new(1,-40,1,0),Position=UDim2.fromOffset(TEXT_OFFSET,0),BackgroundTransparency=1,Text=labelText,Font=MENU_FONT,TextSize=13,TextColor3=C.text,TextXAlignment=Enum.TextXAlignment.Left,ClipsDescendants=false,ZIndex=6},container)
 local preview=mk("Frame",{Size=UDim2.fromOffset(16,10),Position=UDim2.new(1,-16,0,4),BackgroundColor3=defaultColor,BorderSizePixel=0,ZIndex=7},container)
 mk("UIStroke",{Color=C.pickerBorder,Thickness=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},preview)
