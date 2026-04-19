@@ -17,7 +17,7 @@ gui.Name = "skeet_visual"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = pg
-
+ф
 local MENU_FONT = Enum.Font.SourceSansBold
 
 local ICONS = {
@@ -437,9 +437,9 @@ local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Bo
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
 local dragZone=mk("Frame",{Size=UDim2.new(1,0,0,20),BackgroundTransparency=1,ZIndex=200},body)
 
-local topPadding=20;local iconSize=40;local buttonWidth=40
+local topPadding=35;local iconSize=40;local buttonWidth=40
 local countIcons=#ICONS
-local gapIcons=20
+local gapIcons=25
 
 local tabButtons={};local pages={};local activeContextMenu=nil;local activeContextConn=nil
 
