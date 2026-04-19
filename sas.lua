@@ -1,3 +1,4 @@
+
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -6,6 +7,29 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharStats = ReplicatedStorage:WaitForChild("CharStats")
 
 local lp = Players.LocalPlayer
+local pg = lp:WaitForChild("PlayerGui")
+
+local old = pg:FindFirstChild("skeet_visual")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "skeet_visual"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = pg
+
+local MENU_FONT = Enum.Font.SourceSansBold
+
+local ICONS = {
+"rbxassetid://75505308547874",
+"rbxassetid://88283035885276",
+"rbxassetid://116548265089114",
+"rbxassetid://81104482182074",
+"rbxassetid://85815102326294",
+"rbxassetid://88044223701800",
+"rbxassetid://98186413778048",
+"rbxassetid://131464962715953"
+}
 local pg = lp:WaitForChild("PlayerGui")
 
 local old = pg:FindFirstChild("skeet_visual")
