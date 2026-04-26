@@ -54,18 +54,18 @@ local ICONS = {
 "rbxassetid://131464962715953"
 }
 local C = {
-outer=Color3.fromRGB(3,3,3),inner=Color3.fromRGB(43,43,43),bg0=Color3.fromRGB(32,31,31),
-side=Color3.fromRGB(20,19,19),divider=Color3.fromRGB(34,34,34),text=Color3.fromRGB(214,214,214),
-textDim=Color3.fromRGB(120,120,120),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(40,39,39),
-dotA=Color3.fromRGB(43,43,43),dotB=Color3.fromRGB(31,30,30),topMini=Color3.fromRGB(40,40,40),
-checkOn=Color3.fromRGB(156,199,40),checkOff=Color3.fromRGB(90,89,89),checkBorder=Color3.fromRGB(24,23,23),sliderBg=Color3.fromRGB(8,8,8),
-sliderFill=Color3.fromRGB(156,199,40),sliderFill2=Color3.fromRGB(180,220,60),
-bindText=Color3.fromRGB(180,180,180),bindRecording=Color3.fromRGB(255,50,50),
-contextBg=Color3.fromRGB(20,20,20),contextBorder=Color3.fromRGB(50,50,50),
-contextHover=Color3.fromRGB(35,35,35),contextSelected=Color3.fromRGB(156,199,40),
-contextUnselected=Color3.fromRGB(120,120,120),pickerBorder=Color3.fromRGB(32,31,31),
-greenText=Color3.fromRGB(156,199,40),
-groupLine=Color3.fromRGB(24,23,23),
+outer=Color3.fromRGB(10,10,15),inner=Color3.fromRGB(25,25,35),bg0=Color3.fromRGB(18,18,25),
+side=Color3.fromRGB(15,15,20),divider=Color3.fromRGB(40,40,50),text=Color3.fromRGB(220,220,230),
+textDim=Color3.fromRGB(130,130,145),iconOn=Color3.fromRGB(255,255,255),groupBg=Color3.fromRGB(22,22,30),
+dotA=Color3.fromRGB(20,20,28),dotB=Color3.fromRGB(16,16,22),topMini=Color3.fromRGB(30,30,40),
+checkOn=Color3.fromRGB(100,180,255),checkOff=Color3.fromRGB(60,60,75),checkBorder=Color3.fromRGB(12,12,18),sliderBg=Color3.fromRGB(10,10,15),
+sliderFill=Color3.fromRGB(100,180,255),sliderFill2=Color3.fromRGB(120,200,255),
+bindText=Color3.fromRGB(180,180,200),bindRecording=Color3.fromRGB(255,80,100),
+contextBg=Color3.fromRGB(18,18,25),contextBorder=Color3.fromRGB(50,50,65),
+contextHover=Color3.fromRGB(30,30,40),contextSelected=Color3.fromRGB(100,180,255),
+contextUnselected=Color3.fromRGB(130,130,145),pickerBorder=Color3.fromRGB(25,25,35),
+greenText=Color3.fromRGB(100,180,255),
+groupLine=Color3.fromRGB(35,35,45),
 }
 
 local aimbotEnabled=false
