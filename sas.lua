@@ -338,8 +338,10 @@ if ESP_Boxes[plr].box then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].box:R
 if ESP_Boxes[plr].boxoutline then ESP_Boxes[plr].boxoutline.Visible=false;ESP_Boxes[plr].boxoutline:Remove() end;ESP_Boxes[plr]=nil
 end
 if ESP_Boxes2[plr] then
-if ESP_Boxes2[plr].box then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].box:Remove() end
-if ESP_Boxes2[plr].boxoutline then ESP_Boxes2[plr].boxoutline.Visible=false;ESP_Boxes2[plr].boxoutline:Remove() end;ESP_Boxes2[plr]=nil
+for i=1,8 do
+if ESP_Boxes2[plr][i] then ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr][i]:Remove() end
+if ESP_Boxes2[plr]["o"..i] then ESP_Boxes2[plr]["o"..i].Visible=false;ESP_Boxes2[plr]["o"..i]:Remove() end
+end;ESP_Boxes2[plr]=nil
 end;characterCache[plr]=nil;viewportCache[plr]=nil;playersInRange[plr]=nil;wallCheckCache[plr]=nil
 end
 local function hidePlayerESP(plr)
@@ -347,7 +349,7 @@ if ESP_HPText[plr] then ESP_HPText[plr].Visible=false end
 if ESP_NameText[plr] then ESP_NameText[plr].Visible=false end
 if ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible=false end
 if ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
-if ESP_Boxes2[plr] then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
+if ESP_Boxes2[plr] then for i=1,8 do if ESP_Boxes2[plr][i] then ESP_Boxes2[plr][i].Visible=false end;if ESP_Boxes2[plr]["o"..i] then ESP_Boxes2[plr]["o"..i].Visible=false end end end
 end
 local function createESPObjects(plr)
 cleanupPlayerESP(plr)
@@ -357,9 +359,13 @@ ESP_WeaponText[plr]=Drawing.new("Text");ESP_WeaponText[plr].Visible=false;ESP_We
 local box=Drawing.new("Square");box.Visible=false;box.Thickness=1;box.Color=Settings.Box_Color
 local bxo=Drawing.new("Square");bxo.Visible=false;bxo.Thickness=1;bxo.Color=Color3.new(0,0,0)
 ESP_Boxes[plr]={box=box,boxoutline=bxo}
-local box2=Drawing.new("Square");box2.Visible=false;box2.Thickness=1;box2.Color=Settings.Box_2_Color
-local bxo2=Drawing.new("Square");bxo2.Visible=false;bxo2.Thickness=1;bxo2.Color=Color3.new(0,0,0)
-ESP_Boxes2[plr]={box=box2,boxoutline=bxo2};characterCache[plr]=plr.Character
+local corners={}
+for i=1,8 do
+local line=Drawing.new("Line");line.Visible=false;line.Thickness=2;line.Color=Settings.Box_2_Color
+local outline=Drawing.new("Line");outline.Visible=false;outline.Thickness=3;outline.Color=Color3.new(0,0,0)
+corners[i]=line;corners["o"..i]=outline
+end
+ESP_Boxes2[plr]=corners;characterCache[plr]=plr.Character
 end
 local function updatePlayersInRangeCache()
 if frameCache.time-lastDistanceCheck<DISTANCE_CHECK_INTERVAL then return end;lastDistanceCheck=frameCache.time;local cp=frameCache.cameraPos
@@ -415,10 +421,26 @@ elseif ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxou
 if Box_ESP_2_Enabled and ESP_Boxes2[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
-if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes2[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes2[plr].box.Size=Vector2.new(w,hh);ESP_Boxes2[plr].box.Color=Settings.Box_2_Color;ESP_Boxes2[plr].box.Visible=true;ESP_Boxes2[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes2[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes2[plr].boxoutline.Visible=true
-else ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
-else ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
-elseif ESP_Boxes2[plr] then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
+if av then local w,hh=mxX-mnX,mxY-mnY;local cw,ch=w/3,hh/4
+ESP_Boxes2[plr].o1.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o1.To=Vector2.new(mnX+cw+1,mnY-1);ESP_Boxes2[plr].o1.Visible=true
+ESP_Boxes2[plr][1].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][1].To=Vector2.new(mnX+cw,mnY);ESP_Boxes2[plr][1].Color=Settings.Box_2_Color;ESP_Boxes2[plr][1].Visible=true
+ESP_Boxes2[plr].o2.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o2.To=Vector2.new(mnX-1,mnY+ch+1);ESP_Boxes2[plr].o2.Visible=true
+ESP_Boxes2[plr][2].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][2].To=Vector2.new(mnX,mnY+ch);ESP_Boxes2[plr][2].Color=Settings.Box_2_Color;ESP_Boxes2[plr][2].Visible=true
+ESP_Boxes2[plr].o3.From=Vector2.new(mxX-cw-1,mnY-1);ESP_Boxes2[plr].o3.To=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o3.Visible=true
+ESP_Boxes2[plr][3].From=Vector2.new(mxX-cw,mnY);ESP_Boxes2[plr][3].To=Vector2.new(mxX,mnY);ESP_Boxes2[plr][3].Color=Settings.Box_2_Color;ESP_Boxes2[plr][3].Visible=true
+ESP_Boxes2[plr].o4.From=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o4.To=Vector2.new(mxX+1,mnY+ch+1);ESP_Boxes2[plr].o4.Visible=true
+ESP_Boxes2[plr][4].From=Vector2.new(mxX,mnY);ESP_Boxes2[plr][4].To=Vector2.new(mxX,mnY+ch);ESP_Boxes2[plr][4].Color=Settings.Box_2_Color;ESP_Boxes2[plr][4].Visible=true
+ESP_Boxes2[plr].o5.From=Vector2.new(mnX-1,mxY-ch-1);ESP_Boxes2[plr].o5.To=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o5.Visible=true
+ESP_Boxes2[plr][5].From=Vector2.new(mnX,mxY-ch);ESP_Boxes2[plr][5].To=Vector2.new(mnX,mxY);ESP_Boxes2[plr][5].Color=Settings.Box_2_Color;ESP_Boxes2[plr][5].Visible=true
+ESP_Boxes2[plr].o6.From=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o6.To=Vector2.new(mnX+cw+1,mxY+1);ESP_Boxes2[plr].o6.Visible=true
+ESP_Boxes2[plr][6].From=Vector2.new(mnX,mxY);ESP_Boxes2[plr][6].To=Vector2.new(mnX+cw,mxY);ESP_Boxes2[plr][6].Color=Settings.Box_2_Color;ESP_Boxes2[plr][6].Visible=true
+ESP_Boxes2[plr].o7.From=Vector2.new(mxX+1,mxY-ch-1);ESP_Boxes2[plr].o7.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o7.Visible=true
+ESP_Boxes2[plr][7].From=Vector2.new(mxX,mxY-ch);ESP_Boxes2[plr][7].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][7].Color=Settings.Box_2_Color;ESP_Boxes2[plr][7].Visible=true
+ESP_Boxes2[plr].o8.From=Vector2.new(mxX-cw-1,mxY+1);ESP_Boxes2[plr].o8.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o8.Visible=true
+ESP_Boxes2[plr][8].From=Vector2.new(mxX-cw,mxY);ESP_Boxes2[plr][8].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][8].Color=Settings.Box_2_Color;ESP_Boxes2[plr][8].Visible=true
+else for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
+else for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
+elseif ESP_Boxes2[plr] then for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
 end
 
 local function initPlayer(plr) if plr==lp then return end;plr.CharacterAdded:Connect(function() cleanupPlayerESP(plr) end) end
@@ -754,6 +776,7 @@ local function buildPlayerESPPage(parent)
 	createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255, 0, 0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.Weapon_Color = c end); y = y + 22
 	createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 	createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
+	createCheckbox(effectsGroup, 12, "NoFall protection", false, function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 local function buildMiscPage(parent)
