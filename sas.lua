@@ -103,6 +103,7 @@ local espVisualMode="On hotkey"
 local espVisualKeyHeld=false
 local espVisualToggled=false
 local Box_ESP_Enabled=false
+local Box_ESP_2_Enabled=false
 local ESP_HPEnabled=false
 local ESP_NameEnabled=false
 local ESP_HPDynamicEnabled=false
@@ -110,7 +111,7 @@ local ESP_WeaponEnabled=false
 local ESP_MaxDistance=1500
 local Settings={
 ESP_Color=Color3.fromRGB(255,0,0),Friend_Color=Color3.fromRGB(0,255,0),
-Box_Color=Color3.fromRGB(255,0,0),HP_Color=Color3.fromRGB(255,0,0),
+Box_Color=Color3.fromRGB(255,0,0),Box_2_Color=Color3.fromRGB(0,255,0),HP_Color=Color3.fromRGB(255,0,0),
 Name_Color=Color3.fromRGB(255,0,0),Weapon_Color=Color3.fromRGB(255,0,0)
 }
 
@@ -731,12 +732,12 @@ local function buildPlayerESPPage(parent)
 		function(mode) espVisualMode = mode end, function() return espVisualMode end)
 	y = y + 22
 	createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255, 0, 0), function(v) Box_ESP_Enabled = v end, function(c) Settings.Box_Color = c end); y = y + 22
+	createCheckboxWithColor(playerGroup, y, "Bounding box 2", false, Color3.fromRGB(0, 255, 0), function(v) Box_ESP_2_Enabled = v end, function(c) Settings.Box_2_Color = c end); y = y + 22
 	createCheckboxWithColor(playerGroup, y, "Health bar", false, Color3.fromRGB(255, 0, 0), function(v) ESP_HPEnabled = v end, function(c) Settings.HP_Color = c end); y = y + 22
 	createCheckboxWithColor(playerGroup, y, "Name", false, Color3.fromRGB(255, 0, 0), function(v) ESP_NameEnabled = v end, function(c) Settings.Name_Color = c end); y = y + 22
 	createCheckboxWithColor(playerGroup, y, "Weapon text", false, Color3.fromRGB(255, 0, 0), function(v) ESP_WeaponEnabled = v end, function(c) Settings.Weapon_Color = c end); y = y + 22
 	createCheckbox(playerGroup, y, "Dynamic HP color", false, function(v) ESP_HPDynamicEnabled = v end); y = y + 28
 	createSlider(playerGroup, y, "Max distance", 1, 1500, 1500, " studs", function(v) ESP_MaxDistance = v end)
-	createCheckbox(effectsGroup, 12, "NoFall protection", false, function(v) if v then startNoFall() else stopNoFall() end end)
 end
 
 local function buildMiscPage(parent)
