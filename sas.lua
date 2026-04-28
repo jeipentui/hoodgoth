@@ -820,8 +820,8 @@ local function createTab(index, imageId)
 
     -- Фон активной вкладки - цвет как у основного фона с полосками
 local activeBg = mk("Frame", {
-    Size = UDim2.fromOffset(75, iconSize),
-    Position = UDim2.fromOffset(-12, 0),
+    Size = UDim2.fromOffset(75, iconSize + 10),
+    Position = UDim2.fromOffset(-12, -5),
     BackgroundColor3 = C.dotA,
     BorderSizePixel = 0,
     Visible = false,
@@ -844,7 +844,7 @@ local activeBg = mk("Frame", {
     -- Верхняя горизонтальная линия квадрата
     local topBorder = mk("Frame", {
         Size = UDim2.fromOffset(75, 1),
-        Position = UDim2.fromOffset(-12, 0),
+        Position = UDim2.fromOffset(-12, -5),
         BackgroundColor3 = C.divider,
         BorderSizePixel = 0,
         Visible = false,
@@ -854,7 +854,7 @@ local activeBg = mk("Frame", {
     -- Нижняя горизонтальная линия квадрата
     local bottomBorder = mk("Frame", {
         Size = UDim2.fromOffset(75, 1),
-        Position = UDim2.fromOffset(-12, iconSize - 1),
+        Position = UDim2.fromOffset(-12, iconSize + 4),
         BackgroundColor3 = C.divider,
         BorderSizePixel = 0,
         Visible = false,
@@ -863,8 +863,8 @@ local activeBg = mk("Frame", {
 
     -- Перекрыватель разделительной линии (белый -> цвет фона)
 local dividerKill = mk("Frame", {
-    Size = UDim2.fromOffset(2, iconSize),
-    Position = UDim2.fromOffset(63, 0),
+    Size = UDim2.fromOffset(2, iconSize + 10),
+    Position = UDim2.fromOffset(63, -5),
     BackgroundColor3 = C.dotA,
     BorderSizePixel = 0,
     Visible = false,
