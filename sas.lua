@@ -361,13 +361,13 @@ ESP_WeaponText[plr]=Drawing.new("Text");ESP_WeaponText[plr].Visible=false;ESP_We
 local box={};local bxo={}
 for i=1,4 do
 box[i]=Drawing.new("Line");box[i].Visible=false;box[i].Thickness=1;box[i].Color=Settings.Box_Color
-bxo[i]=Drawing.new("Line");bxo[i].Visible=false;bxo[i].Thickness=3;bxo[i].Color=Color3.new(0,0,0)
+bxo[i]=Drawing.new("Line");bxo[i].Visible=false;bxo[i].Thickness=1;bxo[i].Color=Color3.new(0,0,0)
 end
 ESP_Boxes[plr]={box=box,boxoutline=bxo}
 local corners={}
 for i=1,8 do
 local line=Drawing.new("Line");line.Visible=false;line.Thickness=1;line.Color=Settings.Box_2_Color
-local outline=Drawing.new("Line");outline.Visible=false;outline.Thickness=3;outline.Color=Color3.new(0,0,0)
+local outline=Drawing.new("Line");outline.Visible=false;outline.Thickness=1;outline.Color=Color3.new(0,0,0)
 corners[i]=line;corners["o"..i]=outline
 end
 ESP_Boxes2[plr]=corners;characterCache[plr]=plr.Character
@@ -420,13 +420,13 @@ if Box_ESP_Enabled and ESP_Boxes[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
 if av then local w,hh=mxX-mnX,mxY-mnY
-ESP_Boxes[plr].boxoutline[1].From=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline[1].To=Vector2.new(mxX+1,mnY-1);ESP_Boxes[plr].boxoutline[1].Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline[1].Visible=true
+ESP_Boxes[plr].boxoutline[1].From=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline[1].To=Vector2.new(mxX+1,mnY-1);ESP_Boxes[plr].boxoutline[1].Visible=true
 ESP_Boxes[plr].box[1].From=Vector2.new(mnX,mnY);ESP_Boxes[plr].box[1].To=Vector2.new(mxX,mnY);ESP_Boxes[plr].box[1].Color=boxCol;ESP_Boxes[plr].box[1].Visible=true
-ESP_Boxes[plr].boxoutline[2].From=Vector2.new(mxX+1,mnY-1);ESP_Boxes[plr].boxoutline[2].To=Vector2.new(mxX+1,mxY+1);ESP_Boxes[plr].boxoutline[2].Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline[2].Visible=true
+ESP_Boxes[plr].boxoutline[2].From=Vector2.new(mxX+1,mnY-1);ESP_Boxes[plr].boxoutline[2].To=Vector2.new(mxX+1,mxY+1);ESP_Boxes[plr].boxoutline[2].Visible=true
 ESP_Boxes[plr].box[2].From=Vector2.new(mxX,mnY);ESP_Boxes[plr].box[2].To=Vector2.new(mxX,mxY);ESP_Boxes[plr].box[2].Color=boxCol;ESP_Boxes[plr].box[2].Visible=true
-ESP_Boxes[plr].boxoutline[3].From=Vector2.new(mxX+1,mxY+1);ESP_Boxes[plr].boxoutline[3].To=Vector2.new(mnX-1,mxY+1);ESP_Boxes[plr].boxoutline[3].Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline[3].Visible=true
+ESP_Boxes[plr].boxoutline[3].From=Vector2.new(mxX+1,mxY+1);ESP_Boxes[plr].boxoutline[3].To=Vector2.new(mnX-1,mxY+1);ESP_Boxes[plr].boxoutline[3].Visible=true
 ESP_Boxes[plr].box[3].From=Vector2.new(mxX,mxY);ESP_Boxes[plr].box[3].To=Vector2.new(mnX,mxY);ESP_Boxes[plr].box[3].Color=boxCol;ESP_Boxes[plr].box[3].Visible=true
-ESP_Boxes[plr].boxoutline[4].From=Vector2.new(mnX-1,mxY+1);ESP_Boxes[plr].boxoutline[4].To=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline[4].Color=Color3.new(0,0,0);ESP_Boxes[plr].boxoutline[4].Visible=true
+ESP_Boxes[plr].boxoutline[4].From=Vector2.new(mnX-1,mxY+1);ESP_Boxes[plr].boxoutline[4].To=Vector2.new(mnX-1,mnY-1);ESP_Boxes[plr].boxoutline[4].Visible=true
 ESP_Boxes[plr].box[4].From=Vector2.new(mnX,mxY);ESP_Boxes[plr].box[4].To=Vector2.new(mnX,mnY);ESP_Boxes[plr].box[4].Color=boxCol;ESP_Boxes[plr].box[4].Visible=true
 else for i=1,4 do ESP_Boxes[plr].box[i].Visible=false;ESP_Boxes[plr].boxoutline[i].Visible=false end end
 else for i=1,4 do ESP_Boxes[plr].box[i].Visible=false;ESP_Boxes[plr].boxoutline[i].Visible=false end end
@@ -434,23 +434,23 @@ elseif ESP_Boxes[plr] then for i=1,4 do ESP_Boxes[plr].box[i].Visible=false;ESP_
 if Box_ESP_2_Enabled and ESP_Boxes2[plr] then local bc=data.boxCorners
 if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
 for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
-if av then local w,hh=mxX-mnX,mxY-mnY;local cw,ch=w/3,hh/4;local outlineCol=Color3.new(0,0,0)
-ESP_Boxes2[plr].o1.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o1.To=Vector2.new(mnX+cw+1,mnY-1);ESP_Boxes2[plr].o1.Color=outlineCol;ESP_Boxes2[plr].o1.Visible=true
-ESP_Boxes2[plr][1].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][1].To=Vector2.new(mnX+cw,mnY);ESP_Boxes2[plr][1].Color=Settings.Box_2_Color;ESP_Boxes2[plr][1].Visible=true
-ESP_Boxes2[plr].o2.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o2.To=Vector2.new(mnX-1,mnY+ch+1);ESP_Boxes2[plr].o2.Color=outlineCol;ESP_Boxes2[plr].o2.Visible=true
-ESP_Boxes2[plr][2].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][2].To=Vector2.new(mnX,mnY+ch);ESP_Boxes2[plr][2].Color=Settings.Box_2_Color;ESP_Boxes2[plr][2].Visible=true
-ESP_Boxes2[plr].o3.From=Vector2.new(mxX-cw-1,mnY-1);ESP_Boxes2[plr].o3.To=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o3.Color=outlineCol;ESP_Boxes2[plr].o3.Visible=true
-ESP_Boxes2[plr][3].From=Vector2.new(mxX-cw,mnY);ESP_Boxes2[plr][3].To=Vector2.new(mxX,mnY);ESP_Boxes2[plr][3].Color=Settings.Box_2_Color;ESP_Boxes2[plr][3].Visible=true
-ESP_Boxes2[plr].o4.From=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o4.To=Vector2.new(mxX+1,mnY+ch+1);ESP_Boxes2[plr].o4.Color=outlineCol;ESP_Boxes2[plr].o4.Visible=true
-ESP_Boxes2[plr][4].From=Vector2.new(mxX,mnY);ESP_Boxes2[plr][4].To=Vector2.new(mxX,mnY+ch);ESP_Boxes2[plr][4].Color=Settings.Box_2_Color;ESP_Boxes2[plr][4].Visible=true
-ESP_Boxes2[plr].o5.From=Vector2.new(mnX-1,mxY-ch-1);ESP_Boxes2[plr].o5.To=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o5.Color=outlineCol;ESP_Boxes2[plr].o5.Visible=true
-ESP_Boxes2[plr][5].From=Vector2.new(mnX,mxY-ch);ESP_Boxes2[plr][5].To=Vector2.new(mnX,mxY);ESP_Boxes2[plr][5].Color=Settings.Box_2_Color;ESP_Boxes2[plr][5].Visible=true
-ESP_Boxes2[plr].o6.From=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o6.To=Vector2.new(mnX+cw+1,mxY+1);ESP_Boxes2[plr].o6.Color=outlineCol;ESP_Boxes2[plr].o6.Visible=true
-ESP_Boxes2[plr][6].From=Vector2.new(mnX,mxY);ESP_Boxes2[plr][6].To=Vector2.new(mnX+cw,mxY);ESP_Boxes2[plr][6].Color=Settings.Box_2_Color;ESP_Boxes2[plr][6].Visible=true
-ESP_Boxes2[plr].o7.From=Vector2.new(mxX+1,mxY-ch-1);ESP_Boxes2[plr].o7.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o7.Color=outlineCol;ESP_Boxes2[plr].o7.Visible=true
-ESP_Boxes2[plr][7].From=Vector2.new(mxX,mxY-ch);ESP_Boxes2[plr][7].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][7].Color=Settings.Box_2_Color;ESP_Boxes2[plr][7].Visible=true
-ESP_Boxes2[plr].o8.From=Vector2.new(mxX-cw-1,mxY+1);ESP_Boxes2[plr].o8.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o8.Color=outlineCol;ESP_Boxes2[plr].o8.Visible=true
-ESP_Boxes2[plr][8].From=Vector2.new(mxX-cw,mxY);ESP_Boxes2[plr][8].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][8].Color=Settings.Box_2_Color;ESP_Boxes2[plr][8].Visible=true
+if av then local w,hh=mxX-mnX,mxY-mnY;local cw,ch=w/3,hh/4;local cornerCol=Settings.Box_2_Color
+ESP_Boxes2[plr].o1.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o1.To=Vector2.new(mnX+cw+1,mnY-1);ESP_Boxes2[plr].o1.Visible=true
+ESP_Boxes2[plr][1].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][1].To=Vector2.new(mnX+cw,mnY);ESP_Boxes2[plr][1].Color=cornerCol;ESP_Boxes2[plr][1].Visible=true
+ESP_Boxes2[plr].o2.From=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].o2.To=Vector2.new(mnX-1,mnY+ch+1);ESP_Boxes2[plr].o2.Visible=true
+ESP_Boxes2[plr][2].From=Vector2.new(mnX,mnY);ESP_Boxes2[plr][2].To=Vector2.new(mnX,mnY+ch);ESP_Boxes2[plr][2].Color=cornerCol;ESP_Boxes2[plr][2].Visible=true
+ESP_Boxes2[plr].o3.From=Vector2.new(mxX-cw-1,mnY-1);ESP_Boxes2[plr].o3.To=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o3.Visible=true
+ESP_Boxes2[plr][3].From=Vector2.new(mxX-cw,mnY);ESP_Boxes2[plr][3].To=Vector2.new(mxX,mnY);ESP_Boxes2[plr][3].Color=cornerCol;ESP_Boxes2[plr][3].Visible=true
+ESP_Boxes2[plr].o4.From=Vector2.new(mxX+1,mnY-1);ESP_Boxes2[plr].o4.To=Vector2.new(mxX+1,mnY+ch+1);ESP_Boxes2[plr].o4.Visible=true
+ESP_Boxes2[plr][4].From=Vector2.new(mxX,mnY);ESP_Boxes2[plr][4].To=Vector2.new(mxX,mnY+ch);ESP_Boxes2[plr][4].Color=cornerCol;ESP_Boxes2[plr][4].Visible=true
+ESP_Boxes2[plr].o5.From=Vector2.new(mnX-1,mxY-ch-1);ESP_Boxes2[plr].o5.To=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o5.Visible=true
+ESP_Boxes2[plr][5].From=Vector2.new(mnX,mxY-ch);ESP_Boxes2[plr][5].To=Vector2.new(mnX,mxY);ESP_Boxes2[plr][5].Color=cornerCol;ESP_Boxes2[plr][5].Visible=true
+ESP_Boxes2[plr].o6.From=Vector2.new(mnX-1,mxY+1);ESP_Boxes2[plr].o6.To=Vector2.new(mnX+cw+1,mxY+1);ESP_Boxes2[plr].o6.Visible=true
+ESP_Boxes2[plr][6].From=Vector2.new(mnX,mxY);ESP_Boxes2[plr][6].To=Vector2.new(mnX+cw,mxY);ESP_Boxes2[plr][6].Color=cornerCol;ESP_Boxes2[plr][6].Visible=true
+ESP_Boxes2[plr].o7.From=Vector2.new(mxX+1,mxY-ch-1);ESP_Boxes2[plr].o7.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o7.Visible=true
+ESP_Boxes2[plr][7].From=Vector2.new(mxX,mxY-ch);ESP_Boxes2[plr][7].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][7].Color=cornerCol;ESP_Boxes2[plr][7].Visible=true
+ESP_Boxes2[plr].o8.From=Vector2.new(mxX-cw-1,mxY+1);ESP_Boxes2[plr].o8.To=Vector2.new(mxX+1,mxY+1);ESP_Boxes2[plr].o8.Visible=true
+ESP_Boxes2[plr][8].From=Vector2.new(mxX-cw,mxY);ESP_Boxes2[plr][8].To=Vector2.new(mxX,mxY);ESP_Boxes2[plr][8].Color=cornerCol;ESP_Boxes2[plr][8].Visible=true
 else for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
 else for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
 elseif ESP_Boxes2[plr] then for i=1,8 do ESP_Boxes2[plr][i].Visible=false;ESP_Boxes2[plr]["o"..i].Visible=false end end
