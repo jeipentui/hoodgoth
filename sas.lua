@@ -817,7 +817,7 @@ end
 local function createTab(index, imageId)
     local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
     local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
-    
+
     -- Фон активной вкладки - цвет как у основного фона с полосками
 local activeBg = mk("Frame", {
     Size = UDim2.fromOffset(75, iconSize),
@@ -840,6 +840,27 @@ local activeBg = mk("Frame", {
             line.Parent = activeBg
         end
     end)
+
+    -- Верхняя горизонтальная линия квадрата
+    local topBorder = mk("Frame", {
+        Size = UDim2.fromOffset(75, 1),
+        Position = UDim2.fromOffset(-12, 0),
+        BackgroundColor3 = C.divider,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 26
+    }, holder)
+
+    -- Нижняя горизонтальная линия квадрата
+    local bottomBorder = mk("Frame", {
+        Size = UDim2.fromOffset(75, 1),
+        Position = UDim2.fromOffset(-12, iconSize - 1),
+        BackgroundColor3 = C.divider,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 26
+    }, holder)
+
     -- Перекрыватель разделительной линии (белый -> цвет фона)
 local dividerKill = mk("Frame", {
     Size = UDim2.fromOffset(2, iconSize),
@@ -864,7 +885,7 @@ local dividerKill = mk("Frame", {
     elseif index == 7 then buildPlayersPage(page)
     elseif index == 8 then buildConfigPage(page)
     end
-    tabButtons[index] = {button = holder, icon = icon, activeBg = activeBg, dividerKill = dividerKill}
+    tabButtons[index] = {button = holder, icon = icon, activeBg = activeBg, dividerKill = dividerKill, topBorder = topBorder, bottomBorder = bottomBorder}
     pages[index] = page
     holder.MouseButton1Click:Connect(function()
         closeActiveContext()
@@ -873,6 +894,8 @@ local dividerKill = mk("Frame", {
             tabButtons[i].icon.ImageColor3 = (i == index) and C.iconOn or Color3.new(1, 1, 1)
             tabButtons[i].activeBg.Visible = (i == index)
             tabButtons[i].dividerKill.Visible = (i == index)
+            tabButtons[i].topBorder.Visible = (i == index)
+            tabButtons[i].bottomBorder.Visible = (i == index)
             pages[i].Visible = (i == index)
         end
     end)
@@ -883,6 +906,8 @@ for i = 1, #tabButtons do
     tabButtons[i].icon.ImageColor3 = (i == 1) and C.iconOn or Color3.new(1, 1, 1)
     tabButtons[i].activeBg.Visible = (i == 1)
     tabButtons[i].dividerKill.Visible = (i == 1)
+    tabButtons[i].topBorder.Visible = (i == 1)
+    tabButtons[i].bottomBorder.Visible = (i == 1)
     pages[i].Visible = (i == 1)
 end
 
