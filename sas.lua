@@ -454,7 +454,7 @@ mk("Frame",{Size=UDim2.new(1,0,0,3),Position=UDim2.fromOffset(0,0),BackgroundCol
 
 local contentHeight=546;local contentYStart=4
 local side=mk("Frame",{Size=UDim2.fromOffset(75,contentHeight+contentYStart),Position=UDim2.fromOffset(0,0),BackgroundColor3=C.side,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
-local sideRightBorder=mk("Frame",{Size=UDim2.new(0,2,1,0),Position=UDim2.new(1,-2,0,0),BackgroundColor3=C.divider,BorderSizePixel=0,ZIndex=3},side)
+mk("Frame",{Size=UDim2.new(0,1,1,0),Position=UDim2.new(1,-1,0,0),BackgroundColor3=C.divider,BorderSizePixel=0,ZIndex=3},side)
 local content=mk("Frame",{Size=UDim2.fromOffset(570,contentHeight),Position=UDim2.fromOffset(82,contentYStart),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2},body)
 local pageHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ZIndex=2},content)
 local iconHolder=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=20},side)
@@ -816,12 +816,12 @@ end
 
 local function createTab(index, imageId)
     local y = math.floor(topPadding + (index - 1) * (iconSize + gapIcons))
-    local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(20, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
-
+    local holder = mk("TextButton", {Size = UDim2.fromOffset(buttonWidth, iconSize), Position = UDim2.fromOffset(12, y), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 21}, iconHolder)
+    
     -- Фон активной вкладки - цвет как у основного фона с полосками
 local activeBg = mk("Frame", {
-    Size = UDim2.fromOffset(75, 45),
-    Position = UDim2.fromOffset(-20, -5),
+    Size = UDim2.fromOffset(75, iconSize),
+    Position = UDim2.fromOffset(-12, 0),
     BackgroundColor3 = C.dotA,
     BorderSizePixel = 0,
     Visible = false,
@@ -842,8 +842,8 @@ local activeBg = mk("Frame", {
     end)
     -- Перекрыватель разделительной линии (белый -> цвет фона)
 local dividerKill = mk("Frame", {
-    Size = UDim2.fromOffset(2, 45),
-    Position = UDim2.fromOffset(55, -5),
+    Size = UDim2.fromOffset(2, iconSize),
+    Position = UDim2.fromOffset(63, 0),
     BackgroundColor3 = C.dotA,
     BorderSizePixel = 0,
     Visible = false,
