@@ -148,6 +148,7 @@ local ESP_HPText={}
 local ESP_NameText={}
 local ESP_WeaponText={}
 local ESP_Boxes={}
+local ESP_Boxes2={}
 local characterCache={}
 local viewportCache={}
 local playersInRange={}
@@ -335,6 +336,10 @@ if ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible=false;ESP_WeaponText[plr
 if ESP_Boxes[plr] then
 if ESP_Boxes[plr].box then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].box:Remove() end
 if ESP_Boxes[plr].boxoutline then ESP_Boxes[plr].boxoutline.Visible=false;ESP_Boxes[plr].boxoutline:Remove() end;ESP_Boxes[plr]=nil
+end
+if ESP_Boxes2[plr] then
+if ESP_Boxes2[plr].box then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].box:Remove() end
+if ESP_Boxes2[plr].boxoutline then ESP_Boxes2[plr].boxoutline.Visible=false;ESP_Boxes2[plr].boxoutline:Remove() end;ESP_Boxes2[plr]=nil
 end;characterCache[plr]=nil;viewportCache[plr]=nil;playersInRange[plr]=nil;wallCheckCache[plr]=nil
 end
 local function hidePlayerESP(plr)
@@ -342,6 +347,7 @@ if ESP_HPText[plr] then ESP_HPText[plr].Visible=false end
 if ESP_NameText[plr] then ESP_NameText[plr].Visible=false end
 if ESP_WeaponText[plr] then ESP_WeaponText[plr].Visible=false end
 if ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
+if ESP_Boxes2[plr] then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
 end
 local function createESPObjects(plr)
 cleanupPlayerESP(plr)
@@ -350,7 +356,10 @@ ESP_NameText[plr]=Drawing.new("Text");ESP_NameText[plr].Visible=false;ESP_NameTe
 ESP_WeaponText[plr]=Drawing.new("Text");ESP_WeaponText[plr].Visible=false;ESP_WeaponText[plr].Color=Settings.Weapon_Color;ESP_WeaponText[plr].Size=12;ESP_WeaponText[plr].Center=true;ESP_WeaponText[plr].Outline=true
 local box=Drawing.new("Square");box.Visible=false;box.Thickness=1;box.Color=Settings.Box_Color
 local bxo=Drawing.new("Square");bxo.Visible=false;bxo.Thickness=1;bxo.Color=Color3.new(0,0,0)
-ESP_Boxes[plr]={box=box,boxoutline=bxo};characterCache[plr]=plr.Character
+ESP_Boxes[plr]={box=box,boxoutline=bxo}
+local box2=Drawing.new("Square");box2.Visible=false;box2.Thickness=1;box2.Color=Settings.Box_2_Color
+local bxo2=Drawing.new("Square");bxo2.Visible=false;bxo2.Thickness=1;bxo2.Color=Color3.new(0,0,0)
+ESP_Boxes2[plr]={box=box2,boxoutline=bxo2};characterCache[plr]=plr.Character
 end
 local function updatePlayersInRangeCache()
 if frameCache.time-lastDistanceCheck<DISTANCE_CHECK_INTERVAL then return end;lastDistanceCheck=frameCache.time;local cp=frameCache.cameraPos
@@ -371,7 +380,7 @@ if hrp and h and h.Health>0 then
 local data={head=nil,boxCorners={},anyVisible=false}
 local head=plr.Character:FindFirstChild("Head")
 if head then local hp,hv=Camera:WorldToViewportPoint(head.Position);data.head={pos=Vector2.new(hp.X,hp.Y),visible=hv,z=hp.Z};if hv then data.anyVisible=true end end
-if Box_ESP_Enabled and data.anyVisible then for i,corner in ipairs(get3DBoxCorners(hrp)) do local p,v=Camera:WorldToViewportPoint(corner);data.boxCorners[i]={pos=Vector2.new(p.X,p.Y),visible=v,z=p.Z} end end
+if (Box_ESP_Enabled or Box_ESP_2_Enabled) and data.anyVisible then for i,corner in ipairs(get3DBoxCorners(hrp)) do local p,v=Camera:WorldToViewportPoint(corner);data.boxCorners[i]={pos=Vector2.new(p.X,p.Y),visible=v,z=p.Z} end end
 viewportCache[plr]=data
 end
 end
@@ -382,7 +391,7 @@ local function updatePlayerESP(plr)
 if not isESPActive() then hidePlayerESP(plr);return end
 local ps=playerPageData.playerSettings[plr.Name]
 if ps and ps.disableVisuals then hidePlayerESP(plr);return end
-if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled then hidePlayerESP(plr);return end
+if not ESP_HPEnabled and not ESP_NameEnabled and not ESP_WeaponEnabled and not Box_ESP_Enabled and not Box_ESP_2_Enabled then hidePlayerESP(plr);return end
 local char=plr.Character;if not char then cleanupPlayerESP(plr);return end
 local h=char:FindFirstChild("Humanoid");if not h or h.Health<=0 then cleanupPlayerESP(plr);return end
 if not ESP_HPText[plr] then createESPObjects(plr) end
@@ -403,6 +412,13 @@ if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes[plr].box.Position=Vector2.new(mn
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 else ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
 elseif ESP_Boxes[plr] then ESP_Boxes[plr].box.Visible=false;ESP_Boxes[plr].boxoutline.Visible=false end
+if Box_ESP_2_Enabled and ESP_Boxes2[plr] then local bc=data.boxCorners
+if bc and #bc>0 then local mnX,mnY,mxX,mxY=9e9,9e9,-9e9,-9e9;local av=false
+for _,c in ipairs(bc) do if c.visible and c.z>0 then av=true;if c.pos.X<mnX then mnX=c.pos.X end;if c.pos.Y<mnY then mnY=c.pos.Y end;if c.pos.X>mxX then mxX=c.pos.X end;if c.pos.Y>mxY then mxY=c.pos.Y end end end
+if av then local w,hh=mxX-mnX,mxY-mnY;ESP_Boxes2[plr].box.Position=Vector2.new(mnX,mnY);ESP_Boxes2[plr].box.Size=Vector2.new(w,hh);ESP_Boxes2[plr].box.Color=Settings.Box_2_Color;ESP_Boxes2[plr].box.Visible=true;ESP_Boxes2[plr].boxoutline.Position=Vector2.new(mnX-1,mnY-1);ESP_Boxes2[plr].boxoutline.Size=Vector2.new(w+2,hh+2);ESP_Boxes2[plr].boxoutline.Color=Color3.new(0,0,0);ESP_Boxes2[plr].boxoutline.Visible=true
+else ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
+else ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
+elseif ESP_Boxes2[plr] then ESP_Boxes2[plr].box.Visible=false;ESP_Boxes2[plr].boxoutline.Visible=false end
 end
 
 local function initPlayer(plr) if plr==lp then return end;plr.CharacterAdded:Connect(function() cleanupPlayerESP(plr) end) end
