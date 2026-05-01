@@ -723,7 +723,7 @@ local function buildRagebotPage(parent)
 	local aimbotGroup = createGroup(parent, lx, aimbotY, COL_W, aimbotH, "Aimbot")
 	createCheckboxWithBind(aimbotGroup, 12, "Enabled", false, "[-]",
 		function(val) aimbotEnabled = val; if not val then currentTarget = nil; targetLocked = false end end,
-		function(bindLabel) if isRecordingKeybind then return end; isRecordingKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingKeybind then return end; if input.UserInputType ~= Enum.UserInputType.Keyboard then return end; if input.KeyCode == Enum.KeyCode.Escape then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = nil; aimlockKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingKeybind = false; conn:Disconnect(); aimlockKey = input.KeyCode; aimlockKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. aimlockKeyName .. "]"; bindLabel.TextColor3 = C.bindText end); task.delay(5, function() if isRecordingKeybind then isRecordingKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = aimlockKey and ("[" .. aimlockKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
+		function(bindLabel) if isRecordingKeybind then return end; isRecordingKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingKeybind then return end; if input.UserInputType == Enum.UserInputType.Keyboard then if input.KeyCode == Enum.KeyCode.Escape then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = nil; aimlockKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingKeybind = false; conn:Disconnect(); aimlockKey = input.KeyCode; aimlockKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. aimlockKeyName .. "]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton1 then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = "MouseButton1"; aimlockKeyName = "MS1"; bindLabel.Text = "[MS1]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton2 then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = "MouseButton2"; aimlockKeyName = "MS2"; bindLabel.Text = "[MS2]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton3 then isRecordingKeybind = false; conn:Disconnect(); aimlockKey = "MouseButton3"; aimlockKeyName = "MS3"; bindLabel.Text = "[MS3]"; bindLabel.TextColor3 = C.bindText end end); task.delay(5, function() if isRecordingKeybind then isRecordingKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = aimlockKey and ("[" .. aimlockKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
 		function(mode) aimlockMode = mode end, function() return aimlockMode end)
 	local otherGroup = createGroup(parent, rx, ty, COL_W, totalH, "Other")
 	local y = 12
@@ -779,7 +779,7 @@ local function buildPlayerESPPage(parent)
 	local y = 12
 	createCheckboxWithBind(playerGroup, y, "Activation type", false, "[-]",
 		function(val) espVisualEnabled = val; if not val then for plr, _ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end,
-		function(bindLabel) if isRecordingESPKeybind then return end; isRecordingESPKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingESPKeybind then return end; if input.UserInputType ~= Enum.UserInputType.Keyboard then return end; if input.KeyCode == Enum.KeyCode.Escape then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = nil; espVisualKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = input.KeyCode; espVisualKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. espVisualKeyName .. "]"; bindLabel.TextColor3 = C.bindText end); task.delay(5, function() if isRecordingESPKeybind then isRecordingESPKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
+		function(bindLabel) if isRecordingESPKeybind then return end; isRecordingESPKeybind = true; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindRecording; local conn; conn = UIS.InputBegan:Connect(function(input) if not isRecordingESPKeybind then return end; if input.UserInputType == Enum.UserInputType.Keyboard then if input.KeyCode == Enum.KeyCode.Escape then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = nil; espVisualKeyName = "Not Set"; bindLabel.Text = "[-]"; bindLabel.TextColor3 = C.bindText; return end; if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then return end; isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = input.KeyCode; espVisualKeyName = input.KeyCode.Name; bindLabel.Text = "[" .. espVisualKeyName .. "]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton1 then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = "MouseButton1"; espVisualKeyName = "MS1"; bindLabel.Text = "[MS1]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton2 then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = "MouseButton2"; espVisualKeyName = "MS2"; bindLabel.Text = "[MS2]"; bindLabel.TextColor3 = C.bindText elseif input.UserInputType == Enum.UserInputType.MouseButton3 then isRecordingESPKeybind = false; conn:Disconnect(); espVisualKey = "MouseButton3"; espVisualKeyName = "MS3"; bindLabel.Text = "[MS3]"; bindLabel.TextColor3 = C.bindText end end); task.delay(5, function() if isRecordingESPKeybind then isRecordingESPKeybind = false; if conn then conn:Disconnect() end; bindLabel.Text = espVisualKey and ("[" .. espVisualKeyName .. "]") or "[-]"; bindLabel.TextColor3 = C.bindText end end) end,
 		function(mode) espVisualMode = mode end, function() return espVisualMode end)
 	y = y + 22
 	createCheckboxWithColor(playerGroup, y, "Bounding box", false, Color3.fromRGB(255, 0, 0), function(v) Box_ESP_Enabled = v end, function(c) Settings.Box_Color = c end); y = y + 22
@@ -977,18 +977,50 @@ UIS.InputBegan:Connect(function(input,gp)
 if gp then return end
 if input.KeyCode==Enum.KeyCode.K then gui.Enabled=not gui.Enabled;return end
 if isRecordingKeybind or isRecordingESPKeybind then return end
-if espVisualKey and input.KeyCode==espVisualKey then
+local isESPPressed = false
+if espVisualKey then
+if type(espVisualKey) == "string" then
+if (espVisualKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1) or (espVisualKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2) or (espVisualKey == "MouseButton3" and input.UserInputType == Enum.UserInputType.MouseButton3) then isESPPressed = true end
+else
+if input.KeyCode == espVisualKey then isESPPressed = true end
+end
+end
+if isESPPressed then
 if espVisualMode=="Toggle" then espVisualToggled=not espVisualToggled;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
 elseif espVisualMode=="On hotkey" then espVisualKeyHeld=true
 elseif espVisualMode=="Off hotkey" then espVisualKeyHeld=true;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end end end
-if aimlockKey and input.KeyCode==aimlockKey then aimlockKeyHeld=true;if aimlockMode=="Toggle" then keyHeld=not keyHeld elseif aimlockMode=="On hotkey" then keyHeld=true;currentTarget=nil;targetLocked=false elseif aimlockMode=="Off hotkey" then keyHeld=false end end
+local isAimlockPressed = false
+if aimlockKey then
+if type(aimlockKey) == "string" then
+if (aimlockKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1) or (aimlockKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2) or (aimlockKey == "MouseButton3" and input.UserInputType == Enum.UserInputType.MouseButton3) then isAimlockPressed = true end
+else
+if input.KeyCode == aimlockKey then isAimlockPressed = true end
+end
+end
+if isAimlockPressed then aimlockKeyHeld=true;if aimlockMode=="Toggle" then keyHeld=not keyHeld elseif aimlockMode=="On hotkey" then keyHeld=true;currentTarget=nil;targetLocked=false elseif aimlockMode=="Off hotkey" then keyHeld=false end end
 end)
 
 UIS.InputEnded:Connect(function(input)
-if espVisualKey and input.KeyCode==espVisualKey then
+local isESPReleased = false
+if espVisualKey then
+if type(espVisualKey) == "string" then
+if (espVisualKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1) or (espVisualKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2) or (espVisualKey == "MouseButton3" and input.UserInputType == Enum.UserInputType.MouseButton3) then isESPReleased = true end
+else
+if input.KeyCode == espVisualKey then isESPReleased = true end
+end
+end
+if isESPReleased then
 if espVisualMode=="On hotkey" then espVisualKeyHeld=false;if not isESPActive() then for plr,_ in pairs(ESP_HPText) do hidePlayerESP(plr) end end
 elseif espVisualMode=="Off hotkey" then espVisualKeyHeld=false end end
-if aimlockKey and input.KeyCode==aimlockKey then aimlockKeyHeld=false;if aimlockMode=="On hotkey" then keyHeld=false;currentTarget=nil;targetLocked=false elseif aimlockMode=="Off hotkey" then keyHeld=true end end
+local isAimlockReleased = false
+if aimlockKey then
+if type(aimlockKey) == "string" then
+if (aimlockKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1) or (aimlockKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2) or (aimlockKey == "MouseButton3" and input.UserInputType == Enum.UserInputType.MouseButton3) then isAimlockReleased = true end
+else
+if input.KeyCode == aimlockKey then isAimlockReleased = true end
+end
+end
+if isAimlockReleased then aimlockKeyHeld=false;if aimlockMode=="On hotkey" then keyHeld=false;currentTarget=nil;targetLocked=false elseif aimlockMode=="Off hotkey" then keyHeld=true end end
 end)
 
 local currentTool;local lastSilentShot=0;local SILENT_FIRE_RATE=0.08
